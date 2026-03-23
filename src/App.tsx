@@ -46,9 +46,9 @@ const DEFAULT_RULES = {
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], helpThreshold: 17
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v32"; 
-const KEY_MONTHLY = "shifto_monthly_v32"; 
-const KEY_RULES = "shifto_rules_v32";
+const KEY_ALL_DAYS = "shifto_alldays_v33"; 
+const KEY_MONTHLY = "shifto_monthly_v33"; 
+const KEY_RULES = "shifto_rules_v33";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(17時〜)", "(19時〜)"];
 
@@ -306,6 +306,42 @@ export default function App() {
     }
   };
 
+  // ★ バックアップ機能の実装
+  const handleExport = () => {
+    const dataObj = { allDays, monthlyAssign, customRules };
+    const jsonStr = JSON.stringify(dataObj);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shifto_backup_${targetMonday}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const dataObj = JSON.parse(event.target?.result as string);
+        if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) {
+          setAllDays(dataObj.allDays);
+          setMonthlyAssign(dataObj.monthlyAssign);
+          setCustomRules(dataObj.customRules);
+          alert("データを復元しました！");
+        } else {
+          alert("正しいバックアップファイルではありません。");
+        }
+      } catch (err) {
+        alert("ファイルの読み込みに失敗しました。");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // 同じファイルを連続で読み込めるようにリセット
+  };
+
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
 
@@ -352,7 +388,6 @@ export default function App() {
       }
     });
 
-    // ★ 未使用の room 引数を削除しエラーを解消
     function pick(list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
@@ -562,12 +597,20 @@ export default function App() {
       <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap", background: "#fff", padding: "16px 24px", borderRadius: 12, boxShadow: "0 2px 4px rgba(0,0,0,0.02)", border: "1px solid #e2e8f0" }}>
         <div>
           <h2 style={{ margin: 0, color: "#1e293b", letterSpacing: 1, fontSize: 22 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 12, fontWeight: 500 }}>担当不可強化 ＆ エラー修正版</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 12, fontWeight: 500 }}>データ保存・読込機能搭載</p>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
           <button onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
           <button onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
+          
+          {/* ★ 追加：エクスポート・インポートボタン */}
+          <button onClick={handleExport} style={btnStyle("#6366f1")}>💾 バックアップ保存</button>
+          <label style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-block" }}>
+            📂 データ読込
+            <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
+          </label>
+
           <button onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ 全リセット</button>
         </div>
@@ -582,8 +625,8 @@ export default function App() {
             
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 16 }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#475569", display: "block", marginBottom: 6 }}>在籍スタッフ名簿（空白OK・カンマ区切り）</label>
-                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 佐藤, 山田 太郎, 高橋" style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 6, minHeight: 60, fontSize: 13 }} />
+                <label style={{ fontSize: 13, fontWeight: 700, color: "#475569", display: "block", marginBottom: 6 }}>在籍スタッフ名簿（カンマ区切りで入力）</label>
+                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 佐藤, 鈴木, 高橋" style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 6, minHeight: 60, fontSize: 13 }} />
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: "#475569", display: "block", marginBottom: 6 }}>追加の休診日（YYYY-MM-DD形式、カンマ区切り）</label>
