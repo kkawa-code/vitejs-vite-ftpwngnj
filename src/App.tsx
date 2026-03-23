@@ -24,11 +24,8 @@ const SECTIONS = [
   "MMG","骨塩","パノラマCT","ポータブル","DSA","治療","検像","昼当番","残り・待機","受付"
 ];
 
-// 担当不可などで選べるセクション（休みや不在以外）
 const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在"].includes(s));
-// 連動や専従で選べる純粋な部屋
 const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","検像","昼当番","残り・待機"].includes(s));
-
 const ROLE_PLACEHOLDERS = ["CT枠", "MRI枠", "RI枠", "治療枠", "MMG枠", "一般枠", "透視枠", "受付枠", "フリー"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = {
@@ -38,13 +35,11 @@ const FALLBACK_HOLIDAYS: Record<string, string> = {
 
 const DEFAULT_STAFF = "";
 
-// ★ 月間担当者の枠を復活させ、入力できるように空文字を設定
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string[]> = {
   CT: ["","","","","",""], MRI: ["","","","","",""], 治療: ["","","",""], 治療サブ: ["","","",""], 
   RIメイン: ["",""], RIサブ: ["","","",""], MMG: ["","","","",""], 検像: ["",""], 受付: ["","",""]
 };
 
-// ★ 担当限定（limits）を廃止
 const DEFAULT_RULES = {
   staffList: DEFAULT_STAFF, customHolidays: "",
   capacity: { CT: 3, MRI: 3 },
@@ -57,7 +52,6 @@ const KEY_RULES = "shifto_rules_v32";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(17時〜)", "(19時〜)"];
 
-// ★ スペース区切りを除外（名前の間のスペースを保持）
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
@@ -74,7 +68,6 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false): Rea
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// --- セクションのプルダウン選択（汎用） ---
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
   const handleAdd = (sec: string) => { if (sec && !current.includes(sec)) onChange(join([...current, sec])); };
@@ -285,8 +278,6 @@ export default function App() {
   useEffect(() => { if (!sel || !days.find(d => d.id === sel)) setSel(days[0].id); }, [days, sel]);
 
   const cur = days.find(d => d.id === sel) || days[0];
-  
-  // ★ 重複排除して、スペース区切りを除外したきれいな名簿
   const activeStaff = Array.from(new Set(split(customRules.staffList || DEFAULT_STAFF)));
 
   const updateDay = (k: string, v: string) => { setAllDays(prev => ({ ...prev, [cur.id]: { ...(prev[cur.id] || cur.cells), [k]: v } })); };
@@ -342,7 +333,6 @@ export default function App() {
     });
     const availCount = avail.length;
 
-    // ★ 担当不可の複数選択対応
     const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
 
     const hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => members.some(member => (customRules.ngPairs || []).some((ng: any) => {
@@ -362,7 +352,8 @@ export default function App() {
       }
     });
 
-    function pick(list: string[], n: number, section?: string, room?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
+    // ★ 未使用の room 引数を削除しエラーを解消
+    function pick(list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
 
@@ -400,10 +391,10 @@ export default function App() {
       return result;
     }
 
-    function fill(section: string, preferredList: string[], targetCount: number, room?: string) {
+    function fill(section: string, preferredList: string[], targetCount: number) {
       const current = split(dayCells[section]);
       if (current.length >= targetCount) return;
-      const picked = pick([...preferredList, ...avail], targetCount - current.length, section, room, current);
+      const picked = pick([...preferredList, ...avail], targetCount - current.length, section, current);
       dayCells[section] = join([...current, ...picked]);
     }
 
@@ -423,14 +414,14 @@ export default function App() {
     let currentTreat = split(dayCells["治療"]);
     if (currentTreat.length < 3) {
       const preferredTreat = [...(monthlyAssign.治療 || []), ...(monthlyAssign.治療サブ || [])];
-      currentTreat = [...currentTreat, ...pick(preferredTreat, 3 - currentTreat.length, "治療", undefined, currentTreat)];
+      currentTreat = [...currentTreat, ...pick(preferredTreat, 3 - currentTreat.length, "治療", currentTreat)];
       dayCells["治療"] = join(currentTreat);
     }
 
     let currentRI = split(dayCells["RI"]);
     if (currentRI.length < 1) {
       const preferredRI = [...(monthlyAssign.RIメイン || []), ...(monthlyAssign.RIサブ || [])];
-      currentRI = [...currentRI, ...pick(preferredRI, 1 - currentRI.length, "RI", undefined, currentRI)];
+      currentRI = [...currentRI, ...pick(preferredRI, 1 - currentRI.length, "RI", currentRI)];
       dayCells["RI"] = join(currentRI);
     }
     split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
@@ -494,8 +485,8 @@ export default function App() {
       if (ctMembersAfter.length >= 4) { helpMembers.push(ctMembersAfter[ctMembersAfter.length - 1]); }
     }
 
-    ["1号室", "2号室", "3号室", "5号室"].forEach(sec => fill(sec, helpMembers, 1, sec));
-    fill("透視（6号）", helpMembers, 1, "透視（6号）");
+    ["1号室", "2号室", "3号室", "5号室"].forEach(sec => fill(sec, helpMembers, 1));
+    fill("透視（6号）", helpMembers, 1);
     fill("MMG", monthlyAssign.MMG || [], 1);
     fill("透視（11号）", split(dayCells["MMG"]), 1);
     ["骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => fill(sec, helpMembers, 1));
@@ -507,10 +498,7 @@ export default function App() {
 
     const currentReserve = split(dayCells["残り・待機"]);
     if (!currentReserve.length) {
-      const preferred = avail.filter(name => {
-        return split("残り・待機").includes("残り・待機");
-      });
-      dayCells["残り・待機"] = join([...currentReserve, ...pick(preferred.length ? preferred : avail, 1, "残り・待機", undefined, currentReserve, true)]);
+      dayCells["残り・待機"] = join([...currentReserve, ...pick(avail, 1, "残り・待機", currentReserve, true)]);
     }
     fill("待機", [], 1);
 
@@ -574,7 +562,7 @@ export default function App() {
       <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap", background: "#fff", padding: "16px 24px", borderRadius: 12, boxShadow: "0 2px 4px rgba(0,0,0,0.02)", border: "1px solid #e2e8f0" }}>
         <div>
           <h2 style={{ margin: 0, color: "#1e293b", letterSpacing: 1, fontSize: 22 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 12, fontWeight: 500 }}>月間設定復活 ＆ 担当不可複数化</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 12, fontWeight: 500 }}>担当不可強化 ＆ エラー修正版</p>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -594,8 +582,8 @@ export default function App() {
             
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 16 }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700, color: "#475569", display: "block", marginBottom: 6 }}>在籍スタッフ名簿（カンマ区切りで入力）</label>
-                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 佐藤, 鈴木, 高橋" style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 6, minHeight: 60, fontSize: 13 }} />
+                <label style={{ fontSize: 13, fontWeight: 700, color: "#475569", display: "block", marginBottom: 6 }}>在籍スタッフ名簿（空白OK・カンマ区切り）</label>
+                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 佐藤, 山田 太郎, 高橋" style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 6, minHeight: 60, fontSize: 13 }} />
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: "#475569", display: "block", marginBottom: 6 }}>追加の休診日（YYYY-MM-DD形式、カンマ区切り）</label>
@@ -650,13 +638,12 @@ export default function App() {
                 <button onClick={() => addRule("fixed", { staff: "", section: "" })} style={{ ...btnStyle("#fff"), color: "#15803d", border: "1px solid #86efac", padding: "4px 8px", fontSize: 12 }}>＋ 追加</button>
               </div>
 
-              {/* ★ 担当不可を複数選択に変更 */}
               <div style={{ background: "#f8fafc", padding: 12, borderRadius: 8, border: "1px solid #cbd5e1" }}>
                 <h4 style={{ margin: "0 0 8px", color: "#475569", fontSize: 13 }}>🙅 担当不可（複数選択可）</h4>
                 {(customRules.forbidden || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 12, borderBottom: "1px solid #e2e8f0", paddingBottom: 12 }}>
                     <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}>
-                      <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} style={{ width: "120px", padding: 4, borderRadius: 4, border: "1px solid #cbd5e1" }}><option value="">選択</option>{activeStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} style={{ width: "120px", padding: 4, borderRadius: 4, border: "1px solid #cbd5e1", fontWeight: 700 }}><option value="">選択</option>{activeStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} style={{ border: "none", background: "none", color: "#475569", cursor: "pointer" }}>✖</button>
                     </div>
                     <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
