@@ -44,9 +44,9 @@ const FALLBACK_HOLIDAYS: Record<string, string> = {
 
 const DEFAULT_STAFF = "";
 
-// ★ 治療の3段階（メイン、優先サブ、サブ）を明記
+// ★ 治療の3段階（メイン、サブ優先、サブ）を明記
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = {
-  CT: "", MRI: "", 治療: "", 治療優先サブ: "", 治療サブ: "",
+  CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "",
   RI: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: ""
 };
 
@@ -60,9 +60,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v48"; 
-const KEY_MONTHLY = "shifto_monthly_v48"; 
-const KEY_RULES = "shifto_rules_v48";
+const KEY_ALL_DAYS = "shifto_alldays_v49"; 
+const KEY_MONTHLY = "shifto_monthly_v49"; 
+const KEY_RULES = "shifto_rules_v49";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
 
@@ -310,12 +310,25 @@ export default function App() {
     return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
   });
 
+  // ★ バグ修正：保存データを読み込む際、DEFAULT_MONTHLY_ASSIGN とマージして欠損を防ぐ
   const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => {
-    try { const saved = localStorage.getItem(KEY_MONTHLY); if (saved) return JSON.parse(saved); } catch {} return DEFAULT_MONTHLY_ASSIGN;
+    try { 
+      const saved = localStorage.getItem(KEY_MONTHLY); 
+      if (saved) {
+        return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(saved) };
+      }
+    } catch {} 
+    return DEFAULT_MONTHLY_ASSIGN;
   });
   
   const [customRules, setCustomRules] = useState<any>(() => {
-    try { const saved = localStorage.getItem(KEY_RULES); if (saved) return JSON.parse(saved); } catch {} return DEFAULT_RULES;
+    try { 
+      const saved = localStorage.getItem(KEY_RULES); 
+      if (saved) {
+        return { ...DEFAULT_RULES, ...JSON.parse(saved) };
+      }
+    } catch {} 
+    return DEFAULT_RULES;
   });
 
   const [sel, setSel] = useState("");
@@ -423,8 +436,8 @@ export default function App() {
         const dataObj = JSON.parse(event.target?.result as string);
         if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) {
           setAllDays(dataObj.allDays);
-          setMonthlyAssign(dataObj.monthlyAssign);
-          setCustomRules(dataObj.customRules);
+          setMonthlyAssign({ ...DEFAULT_MONTHLY_ASSIGN, ...dataObj.monthlyAssign });
+          setCustomRules({ ...DEFAULT_RULES, ...dataObj.customRules });
           alert("データを復元しました！");
         } else {
           alert("正しいバックアップファイルではありません。");
@@ -546,7 +559,7 @@ export default function App() {
       if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { dayCells[ra.section] = join([...split(dayCells[ra.section]), staff]); addUsed(staff); }
     });
 
-    // ★ 治療の補充ロジック（メイン ➔ 優先サブ ➔ サブ）
+    // ★ 治療の補充ロジック（メイン ➔ サブ優先 ➔ サブ）※一般からは入れない
     let currentTreat = split(dayCells["治療"]);
     const treatTarget = customRules.capacity?.治療 ?? 3;
     if (currentTreat.length < treatTarget) {
@@ -554,7 +567,7 @@ export default function App() {
       currentTreat = [...currentTreat, ...pick(availGeneral, treatMain, treatTarget - currentTreat.length, "治療", currentTreat)];
       
       if (currentTreat.length < treatTarget) {
-        const treatPrioritySub = split(monthlyAssign.治療優先サブ || "").filter(s => availGeneral.includes(s));
+        const treatPrioritySub = split(monthlyAssign.治療サブ優先 || "").filter(s => availGeneral.includes(s));
         currentTreat = [...currentTreat, ...pick(availGeneral, treatPrioritySub, treatTarget - currentTreat.length, "治療", currentTreat)];
       }
       
@@ -581,9 +594,9 @@ export default function App() {
     }
     split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
 
-    // ★ 代打・優先補充ロジック（targetがないルールは無視する）
+    // ★ 代打・優先補充ロジック（ターゲット指定必須に）
     (customRules.substitutes || []).forEach((sub: any) => {
-      if (!sub.target) return; 
+      if (!sub.target) return; // ターゲット指定がないものは無視（指定なし枠を廃止したため）
       const trigger = !availAll.includes(sub.target) || isUsed(sub.target);
       if (trigger) {
         const fallbackStaff = split(sub.subs).filter(s => availAll.includes(s) && !isUsed(s));
@@ -772,7 +785,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>治療3段階・代打スッキリ版 (v48)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>治療3段階・バグ修正版 (v49)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -999,7 +1012,7 @@ export default function App() {
                 {Object.entries(monthlyAssign).map(([category, membersStr]) => {
                   let displayLabel = category;
                   if (category === "治療") displayLabel = "治療 (メイン)";
-                  if (category === "治療優先サブ") displayLabel = "治療 (優先サブ)";
+                  if (category === "治療サブ優先") displayLabel = "治療 (サブ優先)";
                   if (category === "治療サブ") displayLabel = "治療 (サブ)";
                   if (category === "RI") displayLabel = "RI (メイン)";
 
