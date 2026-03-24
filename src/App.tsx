@@ -35,8 +35,6 @@ const SECTIONS = [
 
 const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在"].includes(s));
 const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","検像","昼当番","残り・待機"].includes(s));
-
-// ★ 不要な「フリー」「一般枠」を完全に削除
 const ROLE_PLACEHOLDERS = ["CT枠", "MRI枠", "RI枠", "治療枠", "MMG枠", "透視枠", "受付枠"];
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "透析後胸部"];
 
@@ -76,9 +74,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v52"; 
-const KEY_MONTHLY = "shifto_monthly_v52"; 
-const KEY_RULES = "shifto_rules_v52";
+const KEY_ALL_DAYS = "shifto_alldays_v53"; 
+const KEY_MONTHLY = "shifto_monthly_v53"; 
+const KEY_RULES = "shifto_rules_v53";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
 
@@ -398,20 +396,18 @@ export default function App() {
     return Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff]));
   }, [activeGeneralStaff, activeReceptionStaff]);
 
-  // ★ 受付スタッフは一般の部屋には出ないよう完全に分離
+  // ★ 受付ヘルプから受付スタッフを完全に除外（一般スタッフのみ）
   const getStaffForSection = (section: string) => {
     if (section === "受付") return activeReceptionStaff;
-    if (["明け", "入り", "土日休日代休", "不在", "受付ヘルプ"].includes(section)) return allStaff;
+    if (["明け", "入り", "土日休日代休", "不在", "待機", "残り・待機", "昼当番"].includes(section)) return allStaff;
     return activeGeneralStaff;
   };
 
   const getStaffForCategory = (category: string) => {
     if (category === "受付") return activeReceptionStaff;
-    if (category === "受付ヘルプ") return allStaff;
     return activeGeneralStaff;
   };
 
-  // ★ 入り➔明け連動ロジック（手動入力用）
   const updateDay = (k: string, v: string) => { 
     setAllDays(prev => {
       const nextState = { ...prev, [cur.id]: { ...(prev[cur.id] || cur.cells), [k]: v } };
@@ -490,7 +486,6 @@ export default function App() {
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
-    // ★ 入り➔明け連動ロジック（自動割当用）
     if (prevDay && prevDay.cells["入り"]) {
       const iriMembers = split(prevDay.cells["入り"]).map(getCoreName);
       const currentAke = split(dayCells["明け"]);
@@ -598,8 +593,8 @@ export default function App() {
 
     Object.values(roleAssignments).forEach((ra: any) => {
       const candidates = split(monthlyAssign[ra.role] || "");
-      const isRec = ["受付", "受付ヘルプ"].includes(ra.role);
-      const targetAvail = isRec ? availAll : availGeneral;
+      const isRec = ["受付"].includes(ra.role);
+      const targetAvail = isRec ? availReception : availGeneral;
       const staff = candidates.find(s => targetAvail.includes(s) && !isUsed(s));
       if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { dayCells[ra.section] = join([...split(dayCells[ra.section]), staff]); addUsed(staff); }
     });
@@ -630,8 +625,7 @@ export default function App() {
       currentRI = [...currentRI, ...pick(availGeneral, riMain, riTarget - currentRI.length, "RI", currentRI)];
       
       if (currentRI.length < riTarget) {
-        const riSub = split(monthlyAssign.RIサブ || "").filter(s => availGeneral.includes(s));
-        currentRI = [...currentRI, ...pick(availGeneral, riSub, riTarget - currentRI.length, "RI", currentRI)];
+        currentRI = [...currentRI, ...pick(availGeneral, availGeneral, riTarget - currentRI.length, "RI", currentRI)];
       }
       
       dayCells["RI"] = join(currentRI);
@@ -738,14 +732,14 @@ export default function App() {
           }
         }
       } else if (allStaff.includes(item)) {
-        if (availAll.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
+        if (availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
           currentUketsukeHelp.push(item);
           addUsed(item); 
         }
       }
     }
     if (helpMonthly.length > 0 && currentUketsukeHelp.length === 0) {
-      const fallback = pick(availAll, availAll, 1, "受付ヘルプ", currentUketsukeHelp);
+      const fallback = pick(availGeneral, availGeneral, 1, "受付ヘルプ", currentUketsukeHelp);
       currentUketsukeHelp = [...currentUketsukeHelp, ...fallback];
     }
     dayCells["受付ヘルプ"] = join(currentUketsukeHelp);
@@ -846,7 +840,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>入り明け連動・受付完全分離版 (v52)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>受付ヘルプ完全分離版 (v53)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1068,7 +1062,7 @@ export default function App() {
 
             <div style={{ marginTop: 24, paddingTop: 20, borderTop: "2px dashed #cbd5e1" }}>
               <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
-              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（※治療やRIは左から順に優先して補充されます）</p>
+              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 {MONTHLY_CATEGORIES.map(({ key, label }) => {
                   const membersStr = monthlyAssign[key] || "";
