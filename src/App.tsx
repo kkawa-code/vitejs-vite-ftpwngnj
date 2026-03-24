@@ -84,9 +84,9 @@ const DEFAULT_RULES = {
   lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v64"; 
-const KEY_MONTHLY = "shifto_monthly_v64"; 
-const KEY_RULES = "shifto_rules_v64";
+const KEY_ALL_DAYS = "shifto_alldays_v65"; 
+const KEY_MONTHLY = "shifto_monthly_v65"; 
+const KEY_RULES = "shifto_rules_v65";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -454,6 +454,19 @@ export default function App() {
     setAllDays(prev => ({ ...prev, [cur.id]: { ...prevDay.cells } }));
   };
 
+  // ★ カテゴリごとのクリア機能を追加
+  const handleClearCategory = (sectionsToClear: string[]) => {
+    if (window.confirm("この項目の割り当てをクリアしますか？")) {
+      setAllDays(prev => {
+        const nextCells = { ...(prev[cur.id] || cur.cells) };
+        sectionsToClear.forEach(sec => {
+          nextCells[sec] = "";
+        });
+        return { ...prev, [cur.id]: nextCells };
+      });
+    }
+  };
+
   const handleResetAll = () => {
     if (window.confirm("本当にすべてのデータを初期状態にリセットしますか？\n※これまで入力したシフト、特殊ルール、月間設定がすべて消去されます。")) {
       setAllDays({});
@@ -526,35 +539,57 @@ export default function App() {
       else blockMap.set(core, 'ALL');
     });
 
-    // ★ 徹底ガードのクレンジング：絶対に入れてはいけない人をお掃除
-    const strictRooms = ["治療", "RI", "MMG", "透析後胸部"];
+    const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
+
+    const hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => members.some(member => (customRules.ngPairs || []).some((ng: any) => {
+      const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate);
+      if (!match) return false;
+      if ((ng.level || "hard") === "hard") return true;
+      if ((ng.level || "hard") === "soft" && checkSoft) return true;
+      return false;
+    }));
+
+    let skipSections: string[] = [];
+    let roleAssignments: Record<string, any> = {};
+    let currentKenmu: any[] = [];
+    
+    const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
+
+    (customRules.emergencies || []).forEach((em: any) => {
+      if (tempAvailCount <= Number(em.threshold)) {
+        if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
+        if (em.type === "kenmu") { currentKenmu.push(em); }
+        if (em.type === "clear" && em.section) { skipSections.push(em.section); }
+      }
+    });
+
     Object.keys(dayCells).forEach(sec => {
       if (["明け","入り","不在","土日休日代休"].includes(sec)) return;
-      
-      let allowedForStrict: string[] | null = null;
-      if (strictRooms.includes(sec)) {
-          if (sec === "治療") allowedForStrict = [...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)];
-          else if (sec === "RI") allowedForStrict = [...split(monthlyAssign.RI), ...split(monthlyAssign.RIサブ)];
-          else allowedForStrict = split(monthlyAssign[sec]);
-          allowedForStrict = allowedForStrict.map(getCoreName);
+      if (skipSections.includes(sec)) {
+        dayCells[sec] = "";
+        return;
       }
-
+      
       let members = split(dayCells[sec]);
-      members = members.map(m => {
+      const validMembers: string[] = [];
+      
+      for (const m of members) {
         const core = getCoreName(m);
         const block = blockMap.get(core);
+        if (block === 'ALL') continue; 
         
-        // ガード：専任以外が入っていたら弾き出す（消去）
-        if (allowedForStrict !== null && allowedForStrict.length > 0 && !allowedForStrict.includes(core)) return null;
-
-        if (block === 'ALL') return null; 
-        if (block === 'AM' && m.includes('(AM)')) return null; 
-        if (block === 'PM' && m.includes('(PM)')) return null; 
-        if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) return `${core}(PM)`;
-        if (block === 'PM' && !m.includes('(AM)') && !m.match(/\(.*\)/)) return `${core}(AM)`;
-        return m;
-      }).filter(Boolean) as string[];
-      dayCells[sec] = join(members);
+        let newM = m;
+        if (block === 'AM' && m.includes('(AM)')) continue; 
+        if (block === 'PM' && m.includes('(PM)')) continue; 
+        if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) newM = `${core}(PM)`;
+        if (block === 'PM' && !m.includes('(AM)') && !m.match(/\(.*\)/)) newM = `${core}(AM)`;
+        
+        if (isForbidden(core, sec)) continue;
+        if (hasNGPair(core, validMembers.map(getCoreName), false)) continue;
+        
+        validMembers.push(newM);
+      }
+      dayCells[sec] = join(validMembers);
     });
 
     const assignCounts: Record<string, number> = {};
@@ -584,29 +619,6 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    const availCount = availGeneral.length;
-
-    const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
-
-    const hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => members.some(member => (customRules.ngPairs || []).some((ng: any) => {
-      const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate);
-      if (!match) return false;
-      if ((ng.level || "hard") === "hard") return true;
-      if ((ng.level || "hard") === "soft" && checkSoft) return true;
-      return false;
-    }));
-
-    let roleAssignments: Record<string, any> = {};
-    let currentKenmu: any[] = [];
-    let skipSections: string[] = [];
-
-    (customRules.emergencies || []).forEach((em: any) => {
-      if (availCount <= Number(em.threshold)) {
-        if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
-        if (em.type === "kenmu") { currentKenmu.push(em); }
-        if (em.type === "clear" && em.section) { skipSections.push(em.section); }
-      }
-    });
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -652,7 +664,6 @@ export default function App() {
       
       let amCount = 0;
       let pmCount = 0;
-      
       current.forEach(m => {
         let isAM = true;
         let isPM = true;
@@ -1075,7 +1086,6 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>レイアウト完全修正 ＆ 強制クレンジング版 (v64)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1157,7 +1167,7 @@ export default function App() {
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>📅 曜日で人数を変える</h5>
                     {(customRules.lunchSpecialDays || []).map((rule: any, idx: number) => (
                       <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
-                        <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} style={{ flexShrink: 0, padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
+                        <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} style={{ padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
                           {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
                         </select>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>は</span>
@@ -1171,7 +1181,7 @@ export default function App() {
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚖️ 条件付き選出（特定部屋が多い時）</h5>
                     {(customRules.lunchConditional || []).map((rule: any, idx: number) => (
                       <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} style={{ flexShrink: 0, padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
+                        <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} style={{ padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
                           <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                         <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", e.target.value)} style={{ width: "50px", padding: "6px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600, textAlign: "center" }} />
@@ -1228,7 +1238,7 @@ export default function App() {
                     <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} style={{ flex: "1 1 120px", padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700, flexShrink: 0 }}>と</span>
                     <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} style={{ flex: "1 1 120px", padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ flex: "0 0 auto", width: "130px", padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c" }}>
+                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ flex: "0 0 auto", width: "140px", padding: "6px 32px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c" }}>
                       <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
                     </select>
                     <button onClick={() => removeRule("ngPairs", idx)} style={{ border: "none", background: "none", color: "#b91c1c", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>✖</button>
@@ -1402,10 +1412,15 @@ export default function App() {
         ) : (
           <div style={{ display: "grid", gap: 32 }}>
             <div>
-              <h4 style={{ fontSize: 14, color: "#475569", margin: "0 0 12px 0", paddingBottom: 6, borderBottom: "2px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                <span style={{ display: "inline-block", width: 4, height: 16, background: "#94a3b8", borderRadius: 2 }}></span>
-                休務・夜勤
-              </h4>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#94a3b8", borderRadius: 2 }}></span>
+                  休務・夜勤
+                </h4>
+                <button onClick={() => handleClearCategory(["明け","入り","土日休日代休","不在"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                 {["明け","入り","土日休日代休","不在"].map(s => (
                   <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
@@ -1414,10 +1429,15 @@ export default function App() {
             </div>
 
             <div>
-              <h4 style={{ fontSize: 14, color: "#475569", margin: "0 0 12px 0", paddingBottom: 6, borderBottom: "2px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                <span style={{ display: "inline-block", width: 4, height: 16, background: "#3b82f6", borderRadius: 2 }}></span>
-                モダリティ・受付
-              </h4>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#3b82f6", borderRadius: 2 }}></span>
+                  モダリティ・受付
+                </h4>
+                <button onClick={() => handleClearCategory(["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                 {["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"].map(s => (
                   <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
@@ -1426,10 +1446,15 @@ export default function App() {
             </div>
 
             <div>
-              <h4 style={{ fontSize: 14, color: "#475569", margin: "0 0 12px 0", paddingBottom: 6, borderBottom: "2px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                <span style={{ display: "inline-block", width: 4, height: 16, background: "#10b981", borderRadius: 2 }}></span>
-                一般撮影・透視・その他
-              </h4>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#10b981", borderRadius: 2 }}></span>
+                  一般撮影・透視・その他
+                </h4>
+                <button onClick={() => handleClearCategory(["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                 {["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"].map(s => (
                   <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
@@ -1438,10 +1463,15 @@ export default function App() {
             </div>
 
             <div>
-              <h4 style={{ fontSize: 14, color: "#475569", margin: "0 0 12px 0", paddingBottom: 6, borderBottom: "2px solid #f1f5f9", display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                <span style={{ display: "inline-block", width: 4, height: 16, background: "#f59e0b", borderRadius: 2 }}></span>
-                待機・当番
-              </h4>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#f59e0b", borderRadius: 2 }}></span>
+                  待機・当番
+                </h4>
+                <button onClick={() => handleClearCategory(["待機","残り・待機","昼当番"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                 {["待機","残り・待機","昼当番"].map(s => (
                   <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
