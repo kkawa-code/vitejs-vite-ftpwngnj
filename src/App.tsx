@@ -44,8 +44,9 @@ const FALLBACK_HOLIDAYS: Record<string, string> = {
 
 const DEFAULT_STAFF = "";
 
+// ★ 治療の3段階（メイン、優先サブ、サブ）を明記
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = {
-  CT: "", MRI: "", 治療: "", 治療優先補充: "", 
+  CT: "", MRI: "", 治療: "", 治療優先サブ: "", 治療サブ: "",
   RI: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: ""
 };
 
@@ -59,9 +60,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v47"; 
-const KEY_MONTHLY = "shifto_monthly_v47"; 
-const KEY_RULES = "shifto_rules_v47";
+const KEY_ALL_DAYS = "shifto_alldays_v48"; 
+const KEY_MONTHLY = "shifto_monthly_v48"; 
+const KEY_RULES = "shifto_rules_v48";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
 
@@ -545,7 +546,7 @@ export default function App() {
       if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { dayCells[ra.section] = join([...split(dayCells[ra.section]), staff]); addUsed(staff); }
     });
 
-    // ★ 治療の補充ロジック（メイン ➔ 優先補充 ➔ その他の一般スタッフ全員）
+    // ★ 治療の補充ロジック（メイン ➔ 優先サブ ➔ サブ）
     let currentTreat = split(dayCells["治療"]);
     const treatTarget = customRules.capacity?.治療 ?? 3;
     if (currentTreat.length < treatTarget) {
@@ -553,18 +554,19 @@ export default function App() {
       currentTreat = [...currentTreat, ...pick(availGeneral, treatMain, treatTarget - currentTreat.length, "治療", currentTreat)];
       
       if (currentTreat.length < treatTarget) {
-        const treatPriority = split(monthlyAssign.治療優先補充 || "").filter(s => availGeneral.includes(s));
-        currentTreat = [...currentTreat, ...pick(availGeneral, treatPriority, treatTarget - currentTreat.length, "治療", currentTreat)];
+        const treatPrioritySub = split(monthlyAssign.治療優先サブ || "").filter(s => availGeneral.includes(s));
+        currentTreat = [...currentTreat, ...pick(availGeneral, treatPrioritySub, treatTarget - currentTreat.length, "治療", currentTreat)];
       }
       
       if (currentTreat.length < treatTarget) {
-        currentTreat = [...currentTreat, ...pick(availGeneral, availGeneral, treatTarget - currentTreat.length, "治療", currentTreat)];
+        const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
+        currentTreat = [...currentTreat, ...pick(availGeneral, treatSub, treatTarget - currentTreat.length, "治療", currentTreat)];
       }
       
       dayCells["治療"] = join(currentTreat);
     }
 
-    // ★ RIのロジック（メイン ➔ その他の一般スタッフ全員）
+    // ★ RIのロジック（メイン ➔ その他の一般スタッフ全員から補充）
     let currentRI = split(dayCells["RI"]);
     const riTarget = customRules.capacity?.RI ?? 1;
     if (currentRI.length < riTarget) {
@@ -579,8 +581,10 @@ export default function App() {
     }
     split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
 
+    // ★ 代打・優先補充ロジック（targetがないルールは無視する）
     (customRules.substitutes || []).forEach((sub: any) => {
-      const trigger = !sub.target || !availAll.includes(sub.target) || isUsed(sub.target);
+      if (!sub.target) return; 
+      const trigger = !availAll.includes(sub.target) || isUsed(sub.target);
       if (trigger) {
         const fallbackStaff = split(sub.subs).filter(s => availAll.includes(s) && !isUsed(s));
         if (fallbackStaff.length > 0) {
@@ -768,7 +772,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>治療優先補充・スッキリ画面版 (v47)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>治療3段階・代打スッキリ版 (v48)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -866,15 +870,13 @@ export default function App() {
               </div>
 
               <div style={{ background: "#fff7ed", padding: 16, borderRadius: 12, border: "1px solid #fed7aa", gridColumn: "1 / -1" }}>
-                <h4 style={{ margin: "0 0 12px 0", color: "#c2410c", fontSize: 14, fontWeight: 800 }}>🔄 代打・優先補充</h4>
-                <p style={{ fontSize: 12, color: "#9a3412", marginBottom: 12, fontWeight: 600 }}>特定のスタッフが休みの時や、特定の部屋の人数が足りない時に優先してアサインするルールです。</p>
+                <h4 style={{ margin: "0 0 12px 0", color: "#c2410c", fontSize: 14, fontWeight: 800 }}>🔄 代打ルール</h4>
+                <p style={{ fontSize: 12, color: "#9a3412", marginBottom: 12, fontWeight: 600 }}>特定のスタッフが休みの時に、指定した代打スタッフを優先してアサインするルールです。</p>
                 {(customRules.substitutes || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center", flexWrap: "wrap", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
                     <select value={rule.target} onChange={e => updateRule("substitutes", idx, "target", e.target.value)} style={{ width: "140px", padding: "8px", borderRadius: 6, border: "1px solid #fed7aa", fontWeight: 700, color: rule.target ? "#c2410c" : "#64748b" }}>
-                      <option value="">指定なし(常に優先)</option>
-                      <optgroup label="特定のスタッフが不在時">
-                        {allStaff.map(s => <option key={s} value={s}>{s}</option>)}
-                      </optgroup>
+                      <option value="" disabled>対象スタッフ</option>
+                      {allStaff.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>➔</span>
                     <div style={{ flex: 1, minWidth: "220px" }}>
@@ -888,7 +890,7 @@ export default function App() {
                     <button onClick={() => removeRule("substitutes", idx)} style={{ border: "none", background: "none", color: "#ef4444", cursor: "pointer", fontSize: 18, marginLeft: "auto" }}>✖</button>
                   </div>
                 ))}
-                <button className="btn-hover" onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })} style={{ ...btnStyle("#fff"), color: "#c2410c", border: "1px dashed #fdba74", padding: "6px 12px", fontSize: 12, width: "100%", justifyContent: "center" }}>＋ 優先補充ルールを追加</button>
+                <button className="btn-hover" onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })} style={{ ...btnStyle("#fff"), color: "#c2410c", border: "1px dashed #fdba74", padding: "6px 12px", fontSize: 12, width: "100%", justifyContent: "center" }}>＋ 代打ルールを追加</button>
               </div>
 
               <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
@@ -997,7 +999,9 @@ export default function App() {
                 {Object.entries(monthlyAssign).map(([category, membersStr]) => {
                   let displayLabel = category;
                   if (category === "治療") displayLabel = "治療 (メイン)";
-                  if (category === "治療優先補充") displayLabel = "治療 (優先補充)";
+                  if (category === "治療優先サブ") displayLabel = "治療 (優先サブ)";
+                  if (category === "治療サブ") displayLabel = "治療 (サブ)";
+                  if (category === "RI") displayLabel = "RI (メイン)";
 
                   return (
                     <SectionEditor key={category} section={displayLabel} value={membersStr} activeStaff={getStaffForCategory(category)} onChange={v => updateMonthly(category, v)} noTime={true} />
