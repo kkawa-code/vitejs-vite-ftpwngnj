@@ -44,9 +44,10 @@ const FALLBACK_HOLIDAYS: Record<string, string> = {
 
 const DEFAULT_STAFF = "";
 
+// ★ 治療の優先度を明確にし、RIをスッキリさせました
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = {
-  CT: "", MRI: "", 治療: "", 治療サブ: "", 
-  RIメイン: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: ""
+  CT: "", MRI: "", 治療: "", 治療補充1: "", 治療補充2: "", 
+  RI: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: ""
 };
 
 const DEFAULT_RULES = {
@@ -59,9 +60,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v44"; 
-const KEY_MONTHLY = "shifto_monthly_v44"; 
-const KEY_RULES = "shifto_rules_v44";
+const KEY_ALL_DAYS = "shifto_alldays_v45"; 
+const KEY_MONTHLY = "shifto_monthly_v45"; 
+const KEY_RULES = "shifto_rules_v45";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
 
@@ -122,7 +123,6 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
-// ★ 新設：スタッフを複数選択できるプルダウンUI
 const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
@@ -492,7 +492,7 @@ export default function App() {
 
       const primary = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
-        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RIメイン || "").includes(name) : false;
+        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RI || "").includes(name) : false;
         const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || isMonthlyMain;
         if (!allowRepeatFromPrev && prevDay && section && !isFixed) {
           if (split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
@@ -504,7 +504,7 @@ export default function App() {
 
       const fallback = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
-        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RIメイン || "").includes(name) : false;
+        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RI || "").includes(name) : false;
         const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || isMonthlyMain;
         if (!allowRepeatFromPrev && prevDay && section && !isFixed) {
           if (split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
@@ -546,32 +546,34 @@ export default function App() {
       if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { dayCells[ra.section] = join([...split(dayCells[ra.section]), staff]); addUsed(staff); }
     });
 
+    // ★ 治療の優先補充ロジック
     let currentTreat = split(dayCells["治療"]);
     const treatTarget = customRules.capacity?.治療 ?? 3;
     if (currentTreat.length < treatTarget) {
       const treatMain = split(monthlyAssign.治療 || "").filter(s => availGeneral.includes(s));
       currentTreat = [...currentTreat, ...pick(availGeneral, treatMain, treatTarget - currentTreat.length, "治療", currentTreat)];
+      
       if (currentTreat.length < treatTarget) {
-        const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
-        currentTreat = [...currentTreat, ...pick(availGeneral, treatSub, treatTarget - currentTreat.length, "治療", currentTreat)];
+        const treatSub1 = split(monthlyAssign.治療補充1 || "").filter(s => availGeneral.includes(s));
+        currentTreat = [...currentTreat, ...pick(availGeneral, treatSub1, treatTarget - currentTreat.length, "治療", currentTreat)];
+      }
+      if (currentTreat.length < treatTarget) {
+        const treatSub2 = split(monthlyAssign.治療補充2 || "").filter(s => availGeneral.includes(s));
+        currentTreat = [...currentTreat, ...pick(availGeneral, treatSub2, treatTarget - currentTreat.length, "治療", currentTreat)];
       }
       dayCells["治療"] = join(currentTreat);
     }
 
+    // ★ RIのロジック（サブなし）
     let currentRI = split(dayCells["RI"]);
     const riTarget = customRules.capacity?.RI ?? 1;
     if (currentRI.length < riTarget) {
-      const riMain = split(monthlyAssign.RIメイン || "").filter(s => availGeneral.includes(s));
+      const riMain = split(monthlyAssign.RI || "").filter(s => availGeneral.includes(s));
       currentRI = [...currentRI, ...pick(availGeneral, riMain, riTarget - currentRI.length, "RI", currentRI)];
-      if (currentRI.length < riTarget) {
-        const riSub = split(monthlyAssign.RIサブ || "").filter(s => availGeneral.includes(s));
-        currentRI = [...currentRI, ...pick(availGeneral, riSub, riTarget - currentRI.length, "RI", currentRI)];
-      }
       dayCells["RI"] = join(currentRI);
     }
     split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
 
-    // ★ 代打・優先補充ロジックの改善（targetが空なら常に優先）
     (customRules.substitutes || []).forEach((sub: any) => {
       const trigger = !sub.target || !availAll.includes(sub.target) || isUsed(sub.target);
       if (trigger) {
@@ -761,7 +763,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>優先補充強化 ＆ デザイン改善版 (v44)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>治療優先順位 ＆ 代打プルダウン版 (v45)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -963,7 +965,7 @@ export default function App() {
                       <>
                         <select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} style={{ padding: "4px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}>
                           <option value="">月間設定</option>
-                          {["CT", "MRI", "治療", "治療サブ", "RIメイン", "RIサブ", "MMG", "受付", "受付ヘルプ", "透析後胸部"].map(k => <option key={k} value={k}>{k}</option>)}
+                          {Object.keys(monthlyAssign).map(k => <option key={k} value={k}>{k}</option>)}
                         </select>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e" }}>を</span>
                         <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} style={{ padding: "4px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
@@ -985,14 +987,13 @@ export default function App() {
 
             <div style={{ marginTop: 24, paddingTop: 20, borderTop: "2px dashed #cbd5e1" }}>
               <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
-              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
+              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（※左から順に優先して補充されます）</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 {Object.entries(monthlyAssign).map(([category, membersStr]) => {
                   let displayLabel = category;
                   if (category === "治療") displayLabel = "治療 (メイン)";
-                  if (category === "治療サブ") displayLabel = "治療 (優先補充)";
-                  if (category === "RIメイン") displayLabel = "RI (メイン)";
-                  if (category === "RIサブ") displayLabel = "RI (優先補充)";
+                  if (category === "治療補充1") displayLabel = "治療 (補充1位)";
+                  if (category === "治療補充2") displayLabel = "治療 (補充2位)";
 
                   return (
                     <SectionEditor key={category} section={displayLabel} value={membersStr} activeStaff={getStaffForCategory(category)} onChange={v => updateMonthly(category, v)} noTime={true} />
