@@ -312,7 +312,6 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
                   <option value="">終日</option>
                   <option value="(AM)">AM</option>
                   <option value="(PM)">PM</option>
-                  {/* ★ AIが割り当てた特殊時間（12:00〜17:00等）がプルダウンから消えないための保護 */}
                   {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (
                     <option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>
                   )}
@@ -627,6 +626,9 @@ export default function App() {
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
 
+    // ★ 定義を復活 ★
+    const availCount = availGeneral.length;
+
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
@@ -905,7 +907,7 @@ export default function App() {
     
     if (!skipSections.includes("透析後胸部") && !extraPriorityRooms.includes("透析後胸部")) {
       const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
-      fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
+      fill(availGeneral, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
     }
 
     if (!skipSections.includes("透視（6号）") && !extraPriorityRooms.includes("透視（6号）")) {
@@ -923,7 +925,7 @@ export default function App() {
 
     if (!skipSections.includes("MMG") && !extraPriorityRooms.includes("MMG")) {
       const mmgMonthly = split(monthlyAssign.MMG || "").filter(s => availGeneral.includes(s));
-      fill(mmgMonthly, "MMG", mmgMonthly, mmgMonthly.length > 0 ? 1 : 0);
+      fill(availGeneral, "MMG", mmgMonthly, mmgMonthly.length > 0 ? 1 : 0);
     }
     
     fill(availGeneral, "透視（11号）", helpMembers, 1);
