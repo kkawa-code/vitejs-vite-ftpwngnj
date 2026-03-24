@@ -35,7 +35,11 @@ const SECTIONS = [
 
 const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在"].includes(s));
 const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","検像","昼当番","残り・待機"].includes(s));
-const ROLE_PLACEHOLDERS = ["CT枠", "MRI枠", "RI枠", "治療枠", "MMG枠", "一般枠", "透視枠", "受付枠", "フリー"];
+
+// ★ 不要な「フリー」「一般枠」を削除
+const ROLE_PLACEHOLDERS = ["CT枠", "MRI枠", "RI枠", "治療枠", "MMG枠", "透視枠", "受付枠"];
+// ★ 新設：部屋連動用リスト
+const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "透析後胸部"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = {
   "2025-01-01": "元日", "2025-01-13": "成人の日", "2025-02-11": "建国記念の日", "2025-02-23": "天皇誕生日", "2025-02-24": "振替休日", "2025-03-20": "春分の日", "2025-04-29": "昭和の日", "2025-05-03": "憲法記念日", "2025-05-04": "みどりの日", "2025-05-05": "こどもの日", "2025-05-06": "振替休日", "2025-07-21": "海の日", "2025-08-11": "山の日", "2025-09-15": "敬老の日", "2025-09-23": "秋分の日", "2025-10-13": "スポーツの日", "2025-11-03": "文化の日", "2025-11-23": "勤労感謝の日", "2025-11-24": "振替休日",
@@ -44,7 +48,6 @@ const FALLBACK_HOLIDAYS: Record<string, string> = {
 
 const DEFAULT_STAFF = "";
 
-// ★ 治療の3段階（メイン、サブ優先、サブ）を明記
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = {
   CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "",
   RI: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: ""
@@ -60,9 +63,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v49"; 
-const KEY_MONTHLY = "shifto_monthly_v49"; 
-const KEY_RULES = "shifto_rules_v49";
+const KEY_ALL_DAYS = "shifto_alldays_v50"; 
+const KEY_MONTHLY = "shifto_monthly_v50"; 
+const KEY_RULES = "shifto_rules_v50";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
 
@@ -278,7 +281,9 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false }
       <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
-          const isPlaceholder = ROLE_PLACEHOLDERS.includes(getCoreName(m));
+          const coreName = getCoreName(m);
+          // ★ 部屋連動チップも黄色にする
+          const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || GENERAL_ROOMS.includes(coreName);
           return (
             <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 16, padding: "4px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
               <span onClick={() => handleCycleTime(i)} style={{ cursor: noTime ? "default" : "pointer", userSelect: "none" }} title={noTime ? "" : "タップで時間を変更"}>{m}</span>
@@ -290,6 +295,10 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false }
           <option value="">＋追加</option>
           <optgroup label="スタッフ">
             {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+          </optgroup>
+          {/* ★ 追加: 具体的な部屋名を選べる連動グループ */}
+          <optgroup label="部屋連動（兼務）">
+            {GENERAL_ROOMS.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
           </optgroup>
           <optgroup label="担当枠（未定）">
             {ROLE_PLACEHOLDERS.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
@@ -310,7 +319,6 @@ export default function App() {
     return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
   });
 
-  // ★ バグ修正：保存データを読み込む際、DEFAULT_MONTHLY_ASSIGN とマージして欠損を防ぐ
   const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => {
     try { 
       const saved = localStorage.getItem(KEY_MONTHLY); 
@@ -559,7 +567,6 @@ export default function App() {
       if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { dayCells[ra.section] = join([...split(dayCells[ra.section]), staff]); addUsed(staff); }
     });
 
-    // ★ 治療の補充ロジック（メイン ➔ サブ優先 ➔ サブ）※一般からは入れない
     let currentTreat = split(dayCells["治療"]);
     const treatTarget = customRules.capacity?.治療 ?? 3;
     if (currentTreat.length < treatTarget) {
@@ -579,7 +586,6 @@ export default function App() {
       dayCells["治療"] = join(currentTreat);
     }
 
-    // ★ RIのロジック（メイン ➔ その他の一般スタッフ全員から補充）
     let currentRI = split(dayCells["RI"]);
     const riTarget = customRules.capacity?.RI ?? 1;
     if (currentRI.length < riTarget) {
@@ -594,9 +600,8 @@ export default function App() {
     }
     split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
 
-    // ★ 代打・優先補充ロジック（ターゲット指定必須に）
     (customRules.substitutes || []).forEach((sub: any) => {
-      if (!sub.target) return; // ターゲット指定がないものは無視（指定なし枠を廃止したため）
+      if (!sub.target) return; 
       const trigger = !availAll.includes(sub.target) || isUsed(sub.target);
       if (trigger) {
         const fallbackStaff = split(sub.subs).filter(s => availAll.includes(s) && !isUsed(s));
@@ -656,11 +661,6 @@ export default function App() {
     dayCells["受付"] = join(currentUketsuke);
     const uketsukeShortage = Math.max(0, 2 - currentUketsuke.length);
 
-    const helpMonthly = split(monthlyAssign.受付ヘルプ || "");
-    if (helpMonthly.length > 0) {
-      fill(availAll, "受付ヘルプ", helpMonthly, Math.max(split(dayCells["受付ヘルプ"]).length, helpMonthly.length));
-    }
-
     fill(availGeneral, "検像", [], 1);
 
     let helpMembers: string[] = [];
@@ -688,6 +688,36 @@ export default function App() {
     
     fill(availGeneral, "透視（11号）", helpMembers, 1);
     ["骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => fill(availGeneral, sec, helpMembers, 1));
+
+    // ★ 受付ヘルプの自動割当（部屋連動・兼務対応）
+    let currentUketsukeHelp = split(dayCells["受付ヘルプ"]);
+    const helpMonthly = split(monthlyAssign.受付ヘルプ || "");
+    
+    for (const item of helpMonthly) {
+      if (GENERAL_ROOMS.includes(item) || ROOM_SECTIONS.includes(item)) {
+        // 月間設定に部屋名が設定されている場合、その部屋の担当者を引っ張ってくる
+        const roomStaffs = split(dayCells[item]).map(getCoreName);
+        for (const rs of roomStaffs) {
+          if (rs && !currentUketsukeHelp.map(getCoreName).includes(rs)) {
+            currentUketsukeHelp.push(rs);
+          }
+        }
+      } else if (allStaff.includes(item)) {
+        // 月間設定にスタッフ名が直接設定されている場合
+        if (availAll.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
+          currentUketsukeHelp.push(item);
+          addUsed(item); // 直接指名なので出番としてカウント
+        }
+      }
+    }
+    
+    // 部屋連動も不発で誰も入らなかった場合、とりあえず1人補充
+    if (helpMonthly.length > 0 && currentUketsukeHelp.length === 0) {
+      const fallback = pick(availAll, availAll, 1, "受付ヘルプ", currentUketsukeHelp);
+      currentUketsukeHelp = [...currentUketsukeHelp, ...fallback];
+    }
+    dayCells["受付ヘルプ"] = join(currentUketsukeHelp);
+
 
     currentKenmu.forEach((km: any) => {
       const p1 = split(dayCells[km.s1]);
@@ -785,7 +815,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>治療3段階・バグ修正版 (v49)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>部屋連動・兼務対応版 (v50)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
