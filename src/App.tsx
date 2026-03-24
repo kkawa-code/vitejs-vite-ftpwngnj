@@ -50,6 +50,7 @@ const MONTHLY_CATEGORIES = [
   { key: "治療サブ優先", label: "治療 (サブ優先)" },
   { key: "治療サブ", label: "治療 (サブ)" },
   { key: "RI", label: "RI (メイン)" },
+  { key: "RIサブ", label: "RI (サブ)" },
   { key: "MMG", label: "MMG" },
   { key: "透析後胸部", label: "透析後胸部" },
   { key: "受付", label: "受付" },
@@ -60,7 +61,7 @@ const DEFAULT_STAFF = "";
 
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = {
   CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "",
-  RI: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: ""
+  RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: ""
 };
 
 const DEFAULT_RULES = {
@@ -73,9 +74,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v56"; 
-const KEY_MONTHLY = "shifto_monthly_v56"; 
-const KEY_RULES = "shifto_rules_v56";
+const KEY_ALL_DAYS = "shifto_alldays_v58"; 
+const KEY_MONTHLY = "shifto_monthly_v58"; 
+const KEY_RULES = "shifto_rules_v58";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
 
@@ -300,7 +301,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </div>
           )
         })}
-        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 80, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 8px" }}>
+        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 80, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 24px 4px 8px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">
             {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
@@ -493,7 +494,6 @@ export default function App() {
 
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
 
-    // ★ 半休考慮のブロック判定ロジック
     const blockMap = new Map<string, string>();
     allStaff.forEach(s => blockMap.set(s, 'NONE'));
 
@@ -524,7 +524,6 @@ export default function App() {
     allStaff.forEach(s => counts[s] = 0);
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
-    // 終日ブロックされていない人を集める（半休は含まれる）
     const availAll = allStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; return Math.random() - 0.5;
     });
@@ -544,16 +543,17 @@ export default function App() {
     }));
 
     let roleAssignments: Record<string, any> = {};
+    let currentKenmu: any[] = [];
     let skipSections: string[] = [];
 
     (customRules.emergencies || []).forEach((em: any) => {
       if (availCount <= Number(em.threshold)) {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
+        if (em.type === "kenmu") { currentKenmu.push(em); }
         if (em.type === "clear" && em.section) { skipSections.push(em.section); }
       }
     });
 
-    // 単純な coreName の抽出（タグ付けは後で行う）
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
@@ -592,7 +592,6 @@ export default function App() {
       return result;
     }
 
-    // ★ 半休のカバーロジックを搭載した強力な fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
@@ -631,10 +630,10 @@ export default function App() {
         const block = blockMap.get(core);
         
         let tag = "";
-        if (block === 'AM') { // AM不在＝PM出勤
+        if (block === 'AM') { 
           tag = "(PM)";
           pmCount += 1;
-        } else if (block === 'PM') { // PM不在＝AM出勤
+        } else if (block === 'PM') { 
           tag = "(AM)";
           amCount += 1;
         } else {
@@ -692,7 +691,6 @@ export default function App() {
       const treatPrioritySub = split(monthlyAssign.治療サブ優先 || "").filter(s => availGeneral.includes(s));
       const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
       
-      // 治療は一般スタッフから補充しない
       const preferred = [...treatMain, ...treatPrioritySub, ...treatSub];
       fill(preferred, "治療", preferred, treatTarget);
     }
@@ -700,7 +698,9 @@ export default function App() {
     if (!skipSections.includes("RI")) {
       const riTarget = customRules.capacity?.RI ?? 1;
       const riMain = split(monthlyAssign.RI || "").filter(s => availGeneral.includes(s));
-      fill(availGeneral, "RI", riMain, riTarget);
+      const riSub = split(monthlyAssign.RIサブ || "").filter(s => availGeneral.includes(s));
+      const preferred = [...riMain, ...riSub];
+      fill(preferred, "RI", preferred, riTarget);
       split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
     }
 
@@ -769,11 +769,23 @@ export default function App() {
     }
 
     if (!skipSections.includes("受付")) {
-      fill(availReception, "受付", split(monthlyAssign.受付 || ""), 2);
+      let currentUketsuke = split(dayCells["受付"]);
+      const uketsukeMonthly = split(monthlyAssign.受付 || "");
+      for (const name of uketsukeMonthly) {
+        if (availReception.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { currentUketsuke.push(name); addUsed(name); }
+      }
+      const neededUketsuke = 2 - currentUketsuke.length;
+      if (neededUketsuke > 0) {
+        const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
+        currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
+      }
+      dayCells["受付"] = join(currentUketsuke);
     }
     const uketsukeShortage = Math.max(0, 2 - split(dayCells["受付"]).length);
 
-    fill(availGeneral, "検像", [], 1);
+    if (!skipSections.includes("検像")) {
+      fill(availGeneral, "検像", [], 1);
+    }
 
     let helpMembers: string[] = [];
     const threshold = customRules.helpThreshold ?? 17;
@@ -788,7 +800,7 @@ export default function App() {
     
     if (!skipSections.includes("透析後胸部")) {
       const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
-      fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
+      fill(availGeneral, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
     }
 
     if (!skipSections.includes("透視（6号）")) {
@@ -834,12 +846,42 @@ export default function App() {
         }
       }
       dayCells["受付ヘルプ"] = join(currentUketsukeHelp);
-      // 空なら1人補充
-      fill(availGeneral, "受付ヘルプ", [], helpMonthly.length > 0 ? Math.max(1, helpMonthly.length) : 0);
+      if (helpMonthly.length > 0 && currentUketsukeHelp.length === 0) {
+        fill(availGeneral, "受付ヘルプ", [], 1);
+      }
     }
 
+    currentKenmu.forEach((km: any) => {
+      const p1 = split(dayCells[km.s1]);
+      if (p1.length > 0 && !skipSections.includes(km.s2)) { dayCells[km.s2] = join(p1); }
+    });
+
+    // ★ 未配置スタッフの完全回収ロジック
     if (!skipSections.includes("残り・待機")) {
-      fill(availGeneral, "残り・待機", [], 1);
+      let currentReserve = split(dayCells["残り・待機"]);
+      
+      const unassigned = availAll.filter(name => !isUsed(name));
+      unassigned.forEach(name => {
+        const block = blockMap.get(name);
+        let tag = "";
+        if (block === 'AM') tag = "(PM)";
+        if (block === 'PM') tag = "(AM)";
+        currentReserve.push(`${name}${tag}`);
+        addUsed(name);
+      });
+
+      if (currentReserve.length === 0) {
+        const fallback = pick(availGeneral, availGeneral, 1, "残り・待機", currentReserve, true);
+        fallback.forEach(name => {
+            const block = blockMap.get(name);
+            let tag = "";
+            if (block === 'AM') tag = "(PM)";
+            if (block === 'PM') tag = "(AM)";
+            currentReserve.push(`${name}${tag}`);
+            addUsed(name);
+        });
+      }
+      dayCells["残り・待機"] = join(currentReserve);
     }
     
     fill(availGeneral, "待機", [], 1);
@@ -930,7 +972,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>半休自動パズル ＆ 治療鉄壁ガード版 (v56)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>未配置回収 ＆ 半休自動パズル版 (v58)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -995,7 +1037,7 @@ export default function App() {
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>📅 曜日で人数を変える</h5>
                     {(customRules.lunchSpecialDays || []).map((rule: any, idx: number) => (
                       <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
-                        <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
+                        <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} style={{ padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
                           {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
                         </select>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>は</span>
@@ -1009,7 +1051,7 @@ export default function App() {
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚖️ 条件付き選出（特定部屋が多い時）</h5>
                     {(customRules.lunchConditional || []).map((rule: any, idx: number) => (
                       <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
+                        <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} style={{ padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
                           <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                         <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", e.target.value)} style={{ width: "50px", padding: "6px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600, textAlign: "center" }} />
@@ -1032,7 +1074,7 @@ export default function App() {
                 <p style={{ fontSize: 12, color: "#9a3412", marginBottom: 12, fontWeight: 600 }}>特定のスタッフが休みの時に、指定した代打スタッフを優先してアサインするルールです。</p>
                 {(customRules.substitutes || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center", flexWrap: "wrap", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
-                    <select value={rule.target} onChange={e => updateRule("substitutes", idx, "target", e.target.value)} style={{ width: "140px", padding: "8px", borderRadius: 6, border: "1px solid #fed7aa", fontWeight: 700, color: rule.target ? "#c2410c" : "#64748b" }}>
+                    <select value={rule.target} onChange={e => updateRule("substitutes", idx, "target", e.target.value)} style={{ width: "160px", padding: "8px 24px 8px 8px", borderRadius: 6, border: "1px solid #fed7aa", fontWeight: 700, color: rule.target ? "#c2410c" : "#64748b" }}>
                       <option value="" disabled>対象スタッフ</option>
                       {activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -1041,7 +1083,7 @@ export default function App() {
                       <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>を</span>
-                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} style={{ width: "110px", padding: "8px", borderRadius: 6, border: "1px solid #fed7aa", fontWeight: 700, color: "#c2410c" }}>
+                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} style={{ width: "130px", padding: "8px 24px 8px 8px", borderRadius: 6, border: "1px solid #fed7aa", fontWeight: 700, color: "#c2410c" }}>
                       <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>に優先</span>
@@ -1055,10 +1097,10 @@ export default function App() {
                 <h4 style={{ margin: "0 0 12px 0", color: "#b91c1c", fontSize: 14, fontWeight: 800 }}>🚫 NGペア</h4>
                 {(customRules.ngPairs || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
-                    <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} style={{ flex: 1, padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>と</span>
-                    <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ padding: "6px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c" }}>
+                    <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} style={{ flex: 1, padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c" }}>
                       <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
                     </select>
                     <button onClick={() => removeRule("ngPairs", idx)} style={{ border: "none", background: "none", color: "#b91c1c", cursor: "pointer", fontSize: 16 }}>✖</button>
@@ -1071,8 +1113,8 @@ export default function App() {
                 <h4 style={{ margin: "0 0 12px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🔒 専従（必ずここに配置）</h4>
                 {(customRules.fixed || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                    <select value={rule.staff} onChange={e => updateRule("fixed", idx, "staff", e.target.value)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid #86efac" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.section} onChange={e => updateRule("fixed", idx, "section", e.target.value)} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "1px solid #86efac" }}><option value="">選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.staff} onChange={e => updateRule("fixed", idx, "staff", e.target.value)} style={{ flex: 1, padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #86efac" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.section} onChange={e => updateRule("fixed", idx, "section", e.target.value)} style={{ flex: 1, padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #86efac" }}><option value="">選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <button onClick={() => removeRule("fixed", idx)} style={{ border: "none", background: "none", color: "#15803d", cursor: "pointer", fontSize: 16 }}>✖</button>
                   </div>
                 ))}
@@ -1084,7 +1126,7 @@ export default function App() {
                 {(customRules.forbidden || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
                     <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-                      <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} style={{ width: "140px", padding: "6px", borderRadius: 6, border: "1px solid #cbd5e1", fontWeight: 700 }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} style={{ width: "160px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #cbd5e1", fontWeight: 700 }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} style={{ border: "none", background: "none", color: "#475569", cursor: "pointer", fontSize: 16 }}>✖</button>
                     </div>
                     <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
@@ -1098,11 +1140,11 @@ export default function App() {
                 {(customRules.pushOuts || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #bae6fd", paddingBottom: 16 }}>
                     <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <select value={rule.triggerStaff} onChange={e => updateRule("pushOuts", idx, "triggerStaff", e.target.value)} style={{ width: "100px", padding: "6px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">誰が</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.triggerStaff} onChange={e => updateRule("pushOuts", idx, "triggerStaff", e.target.value)} style={{ width: "120px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">誰が</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <span style={{ fontSize: 12, fontWeight: 600, color: "#0284c7" }}>が</span>
-                      <select value={rule.triggerSection} onChange={e => updateRule("pushOuts", idx, "triggerSection", e.target.value)} style={{ width: "100px", padding: "6px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.triggerSection} onChange={e => updateRule("pushOuts", idx, "triggerSection", e.target.value)} style={{ width: "120px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <span style={{ fontSize: 12, fontWeight: 600, color: "#0284c7" }}>に入ったら➔</span>
-                      <select value={rule.targetStaff} onChange={e => updateRule("pushOuts", idx, "targetStaff", e.target.value)} style={{ width: "100px", padding: "6px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">誰を</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.targetStaff} onChange={e => updateRule("pushOuts", idx, "targetStaff", e.target.value)} style={{ width: "120px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">誰を</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("pushOuts", idx)} style={{ border: "none", background: "none", color: "#ef4444", cursor: "pointer", fontSize: 16 }}>✖</button>
                     </div>
                     <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
@@ -1124,30 +1166,38 @@ export default function App() {
                     <input type="number" value={rule.threshold} onChange={e => updateRule("emergencies", idx, "threshold", e.target.value)} style={{ width: "50px", padding: "4px", borderRadius: 6, border: "1px solid #fde047", textAlign: "center" }} />
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e" }}>人以下➔</span>
                     
-                    <select value={rule.type === "kenmu" ? "clear" : rule.type} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} style={{ padding: "4px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}>
+                    <select value={rule.type === "kenmu" ? "kenmu" : rule.type === "clear" ? "clear" : "role_assign"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} style={{ padding: "4px 24px 4px 8px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}>
                       <option value="role_assign">担当配置</option>
+                      <option value="kenmu">兼務</option>
                       <option value="clear">配置なし(空ける)</option>
                     </select>
 
                     {rule.type === "role_assign" ? (
                       <>
-                        <select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} style={{ padding: "4px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}>
+                        <select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} style={{ padding: "4px 24px 4px 8px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}>
                           <option value="">月間設定</option>
                           {MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                         </select>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e" }}>を</span>
-                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} style={{ padding: "4px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} style={{ padding: "4px 24px 4px 8px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      </>
+                    ) : rule.type === "kenmu" ? (
+                      <>
+                        <select value={rule.s1} onChange={e => updateRule("emergencies", idx, "s1", e.target.value)} style={{ padding: "4px 24px 4px 8px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}><option value="">兼務する人(部屋)</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e" }}>の担当が</span>
+                        <select value={rule.s2} onChange={e => updateRule("emergencies", idx, "s2", e.target.value)} style={{ padding: "4px 24px 4px 8px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}><option value="">兼務先の部屋</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e" }}>も兼務</span>
                       </>
                     ) : (
                       <>
-                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} style={{ padding: "4px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} style={{ padding: "4px 24px 4px 8px", borderRadius: 6, border: "1px solid #fde047", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e" }}>を空にする</span>
                       </>
                     )}
                     <button onClick={() => removeRule("emergencies", idx)} style={{ border: "none", background: "none", color: "#ef4444", cursor: "pointer", fontSize: 16 }}>✖</button>
                   </div>
                 ))}
-                <button className="btn-hover" onClick={() => addRule("emergencies", { threshold: 16, type: "clear", role: "", section: "" })} style={{ ...btnStyle("#fff"), color: "#a16207", border: "1px dashed #ca8a04", padding: "6px 12px", fontSize: 12, width: "100%", justifyContent: "center" }}>＋ 追加</button>
+                <button className="btn-hover" onClick={() => addRule("emergencies", { threshold: 16, type: "clear", role: "", section: "", s1: "", s2: "" })} style={{ ...btnStyle("#fff"), color: "#a16207", border: "1px dashed #ca8a04", padding: "6px 12px", fontSize: 12, width: "100%", justifyContent: "center" }}>＋ 追加</button>
               </div>
 
             </div>
