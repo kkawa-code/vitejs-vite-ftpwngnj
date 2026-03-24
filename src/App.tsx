@@ -59,16 +59,18 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v41"; 
-const KEY_MONTHLY = "shifto_monthly_v41"; 
-const KEY_RULES = "shifto_rules_v41";
+const KEY_ALL_DAYS = "shifto_alldays_v42"; 
+const KEY_MONTHLY = "shifto_monthly_v42"; 
+const KEY_RULES = "shifto_rules_v42";
 
 const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
 
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
-function getCoreName(fullName: string) { return fullName.replace(/\(.*\)/g, '').replace(/（.*）/g, '').trim(); }
+
+// ★ 時間修飾子（カッコ）だけを正確に消し、名前本来のカッコは残すための安全な正規表現
+function getCoreName(fullName: string) { return fullName.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim(); }
 
 function btnStyle(bg: string): React.CSSProperties { return { background: bg, color: "#fff", border: "none", borderRadius: "10px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; }
 function panelStyle(): React.CSSProperties { return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)" }; }
@@ -87,6 +89,23 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
+
+// ★ ふりがな（カッコ内）を読み取って五十音順にソートし、カッコを消した配列を返す神関数
+function parseAndSortStaff(staffString: string) {
+  const list = split(staffString);
+  const parsed = list.map(s => {
+    // "山田(やまだ)" または "山田（やまだ）" の形式を検知
+    const match = s.match(/^(.*?)[\(（](.*?)[\)）]$/);
+    return {
+      cleanName: match ? match[1].trim() : s, // カッコを消した名前
+      yomi: match ? match[2].trim() : s       // カッコの中身（ふりがな）
+    };
+  });
+  // ふりがなで五十音ソート
+  parsed.sort((a, b) => a.yomi.localeCompare(b.yomi, 'ja'));
+  // 重複を削除して純粋な名前だけのリストを返す
+  return Array.from(new Set(parsed.map(p => p.cleanName)));
+}
 
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
@@ -317,20 +336,19 @@ export default function App() {
 
   const cur = days.find(d => d.id === sel) || days[0];
 
-  // ★ 五十音順ソートと受付の分離ロジック
+  // ★ 自動でふりがな順にソート（カッコ内のよみを優先）
   const activeGeneralStaff = useMemo(() => {
-    return Array.from(new Set(split(customRules.staffList || DEFAULT_STAFF))).sort((a, b) => a.localeCompare(b, 'ja'));
+    return parseAndSortStaff(customRules.staffList || DEFAULT_STAFF);
   }, [customRules.staffList]);
 
   const activeReceptionStaff = useMemo(() => {
-    return Array.from(new Set(split(customRules.receptionStaffList || ""))).sort((a, b) => a.localeCompare(b, 'ja'));
+    return parseAndSortStaff(customRules.receptionStaffList || "");
   }, [customRules.receptionStaffList]);
 
   const allStaff = useMemo(() => {
-    return [...activeGeneralStaff, ...activeReceptionStaff];
+    return Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff]));
   }, [activeGeneralStaff, activeReceptionStaff]);
 
-  // ★ 部屋ごとに表示する名簿を切り替える関数
   const getStaffForSection = (section: string) => {
     if (["受付", "受付ヘルプ"].includes(section)) return activeReceptionStaff;
     if (["明け", "入り", "土日休日代休", "不在", "待機", "残り・待機", "昼当番"].includes(section)) return allStaff;
@@ -425,15 +443,12 @@ export default function App() {
     allStaff.forEach(s => counts[s] = 0);
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
-    // ★ 自動割当の候補者リストを受付と一般で分離
     const availAll = allStaff.filter(s => !blocked.has(s)).sort((a, b) => {
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; return Math.random() - 0.5;
     });
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    
-    // ヘルプ発動ラインは「一般スタッフの出勤数」で判定
     const availCount = availGeneral.length;
 
     const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
@@ -455,7 +470,6 @@ export default function App() {
       }
     });
 
-    // ★ 引数に availList（候補者グループ）を受け取るように修正
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
@@ -575,7 +589,6 @@ export default function App() {
       dayCells["MRI"] = join(mriMembers.slice(0, mriTarget));
     }
 
-    // ★ 受付は「受付専任スタッフ」からのみ選ぶ
     let currentUketsuke = split(dayCells["受付"]);
     const uketsukeMonthly = split(monthlyAssign.受付 || "");
     for (const name of uketsukeMonthly) {
@@ -631,7 +644,6 @@ export default function App() {
     }
     fill(availGeneral, "待機", [], 1);
 
-    // 昼当番の自動アサイン（一般スタッフから選出）
     let currentLunch = split(dayCells["昼当番"]);
     
     let baseLunchTarget = customRules.lunchBaseCount ?? 3;
@@ -717,7 +729,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>自動五十音順 ＆ 受付分離版 (v41)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>自動ふりがなソート ＆ 受付分離版 (v42)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -744,16 +756,16 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>在籍スタッフ名簿（一般）</label>
-                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 佐藤, 山田 太郎, 高橋" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やまだ), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+                <div style={{ fontSize: 11, color: "#10b981", marginTop: 6, fontWeight: 600 }}>※カッコでふりがなを入れると50音順にソートされます！</div>
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>受付スタッフ名簿</label>
-                <textarea value={customRules.receptionStaffList || ""} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} placeholder="例: 伊藤, 鈴木" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+                <textarea value={customRules.receptionStaffList || ""} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} placeholder="例: 伊藤(いとう), 鈴木(すずき)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>追加の休診日</label>
                 <textarea value={customRules.customHolidays || ""} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} placeholder="例: 2026-12-29, 2026-12-30" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, fontWeight: 600 }}>※日本の祝日は自動ブロックされます。</div>
               </div>
             </div>
 
