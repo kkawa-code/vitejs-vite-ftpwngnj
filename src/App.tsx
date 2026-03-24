@@ -74,11 +74,20 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v58"; 
-const KEY_MONTHLY = "shifto_monthly_v58"; 
-const KEY_RULES = "shifto_rules_v58";
+const KEY_ALL_DAYS = "shifto_alldays_v59"; 
+const KEY_MONTHLY = "shifto_monthly_v59"; 
+const KEY_RULES = "shifto_rules_v59";
 
-const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜昼)", "(昼〜)", "(〜17時)", "(17時〜)", "(19時〜)", "✍️カスタム"];
+// ★ 時間オプションの生成（8:15〜19:00 の15分刻み）
+const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
+for (let h = 8; h <= 19; h++) {
+  for (let m = 0; m < 60; m += 15) {
+    if (h === 8 && m === 0) continue; 
+    const mm = m === 0 ? "00" : m;
+    TIME_OPTIONS.push(`(${h}:${mm}〜)`);
+    TIME_OPTIONS.push(`(〜${h}:${mm})`);
+  }
+}
 
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
@@ -260,30 +269,17 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
   );
 };
 
+// ★ 時間をスクロールで選べるようにUIを刷新
 const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [] }: { section: string, value: string, activeStaff: string[], onChange: (v: string) => void, noTime?: boolean, customOptions?: string[] }) => {
   const members = split(value);
   const handleAdd = (name: string) => { if (name) onChange(join([...members, name])); };
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
   
-  const handleCycleTime = (idx: number) => {
-    if (noTime) return; 
-    const next = [...members]; 
-    const core = getCoreName(next[idx]); 
-    const currentMod = next[idx].substring(core.length);
-    
-    let modIdx = TIME_MODIFIERS.indexOf(currentMod);
-    let nextMod = TIME_MODIFIERS[modIdx === -1 ? 1 : (modIdx + 1) % TIME_MODIFIERS.length];
-    
-    if (nextMod === "✍️カスタム") {
-      const customTime = window.prompt("時間を入力してください（例: 10:30〜）", "");
-      if (customTime) {
-        nextMod = `(${customTime})`;
-      } else {
-        nextMod = "";
-      }
-    }
-
-    next[idx] = core + nextMod; 
+  const handleTimeChange = (idx: number, newTime: string) => {
+    if (noTime) return;
+    const next = [...members];
+    const core = getCoreName(next[idx]);
+    next[idx] = core + newTime;
     onChange(join(next));
   };
 
@@ -293,11 +289,23 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = getCoreName(m);
+          const currentMod = m.substring(coreName.length);
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || GENERAL_ROOMS.includes(coreName);
+          
           return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 16, padding: "4px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
-              <span onClick={() => handleCycleTime(i)} style={{ cursor: noTime ? "default" : "pointer", userSelect: "none" }} title={noTime ? "" : "タップで時間を変更"}>{m}</span>
-              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
+            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 16, padding: "2px 8px 2px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 4, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
+              <span>{coreName}</span>
+              {!noTime && (
+                <select 
+                  value={currentMod} 
+                  onChange={(e) => handleTimeChange(i, e.target.value)}
+                  style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 700, color: "inherit", cursor: "pointer", padding: "0 2px" }}
+                >
+                  <option value="">終日</option>
+                  {TIME_OPTIONS.map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
+                </select>
+              )}
+              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 4 }}>✖</span>
             </div>
           )
         })}
@@ -506,6 +514,26 @@ export default function App() {
       if (m.includes("(AM)")) blockMap.set(core, 'AM');
       else if (m.includes("(PM)")) blockMap.set(core, 'PM');
       else blockMap.set(core, 'ALL');
+    });
+
+    // ★ 超賢いクレンジング：不在変更後の再割当に対応
+    // 手動で固定する部屋以外（自動割当される部屋）のアサインをリセット・またはAM/PM調整する
+    Object.keys(dayCells).forEach(sec => {
+      if (["明け","入り","不在","土日休日代休"].includes(sec)) return;
+      let members = split(dayCells[sec]);
+      members = members.map(m => {
+        const core = getCoreName(m);
+        const block = blockMap.get(core);
+        if (block === 'ALL') return null; // 終日不在なら部屋から消す
+        if (block === 'AM' && m.includes('(AM)')) return null; // AM不在なのにAM設定されてたら消す
+        if (block === 'PM' && m.includes('(PM)')) return null; // PM不在なのにPM設定されてたら消す
+        // 終日(タグなし)でアサインされていて、AM不在になったら、PMシフトに変更して残す
+        if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) return `${core}(PM)`;
+        // PM不在ならAMシフトに変更
+        if (block === 'PM' && !m.includes('(AM)') && !m.match(/\(.*\)/)) return `${core}(AM)`;
+        return m;
+      }).filter(Boolean) as string[];
+      dayCells[sec] = join(members);
     });
 
     const assignCounts: Record<string, number> = {};
@@ -856,10 +884,8 @@ export default function App() {
       if (p1.length > 0 && !skipSections.includes(km.s2)) { dayCells[km.s2] = join(p1); }
     });
 
-    // ★ 未配置スタッフの完全回収ロジック
     if (!skipSections.includes("残り・待機")) {
       let currentReserve = split(dayCells["残り・待機"]);
-      
       const unassigned = availAll.filter(name => !isUsed(name));
       unassigned.forEach(name => {
         const block = blockMap.get(name);
@@ -869,7 +895,6 @@ export default function App() {
         currentReserve.push(`${name}${tag}`);
         addUsed(name);
       });
-
       if (currentReserve.length === 0) {
         const fallback = pick(availGeneral, availGeneral, 1, "残り・待機", currentReserve, true);
         fallback.forEach(name => {
@@ -886,6 +911,7 @@ export default function App() {
     
     fill(availGeneral, "待機", [], 1);
 
+    // ★ 昼当番のロジック（治療の救済追加）
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
       let baseLunchTarget = customRules.lunchBaseCount ?? 3;
@@ -926,9 +952,19 @@ export default function App() {
       }
       
       if (currentLunch.length < lunchTarget) {
-        const fallbackCandidates = availGeneral.filter(name => !currentLunch.map(getCoreName).includes(name));
+        // 通常は治療メンバー以外から選ぶ
+        const treatMembers = split(dayCells["治療"]).map(getCoreName);
+        const fallbackCandidates = availGeneral.filter(name => !treatMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
         for (const name of fallbackCandidates) { 
           if (currentLunch.length < lunchTarget) currentLunch.push(name); 
+        }
+        
+        // ★ それでも足りない（本当に人がいない）場合は、治療メンバーからも選出する
+        if (currentLunch.length < lunchTarget) {
+           const treatFallback = availGeneral.filter(name => treatMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
+           for (const name of treatFallback) {
+             if (currentLunch.length < lunchTarget) currentLunch.push(name); 
+           }
         }
       }
       dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
@@ -972,7 +1008,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>未配置回収 ＆ 半休自動パズル版 (v58)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>スマート時間指定 ＆ 再計算パズル対応版 (v59)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1096,10 +1132,10 @@ export default function App() {
               <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#b91c1c", fontSize: 14, fontWeight: 800 }}>🚫 NGペア</h4>
                 {(customRules.ngPairs || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
-                    <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} style={{ flex: 1, padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                  <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} style={{ flex: 1, minWidth: "120px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>と</span>
-                    <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} style={{ flex: 1, padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} style={{ flex: 1, minWidth: "120px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c" }}>
                       <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
                     </select>
@@ -1256,13 +1292,13 @@ export default function App() {
         <div className="scroll-container hide-scrollbar" style={{ display: "flex", gap: 6, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 20, alignItems: "center" }}>
           {days.map(d => {
             return (
-              <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
+              <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
                 {d.label} {d.isPublicHoliday && "🎌"}
               </button>
             )
           })}
           <div style={{ flex: 1 }}></div>
-          <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1" }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
+          <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1", flexShrink: 0 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
         </div>
 
         {cur.isPublicHoliday ? (
