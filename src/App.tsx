@@ -5,7 +5,16 @@ const globalStyle = `
   body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.8rem center; background-size: 1.2em; }
+  select { 
+    appearance: none; 
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
+    background-repeat: no-repeat; 
+    background-position: right 0.5rem center; 
+    background-size: 1em; 
+    text-overflow: ellipsis; 
+    white-space: nowrap; 
+    overflow: hidden;
+  }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
@@ -39,8 +48,7 @@ const ROLE_PLACEHOLDERS = ["CT枠", "MRI枠", "RI枠", "治療枠", "MMG枠", "�
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "透析後胸部", "検像"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = {
-  "2025-01-01": "元日", "2025-01-13": "成人の日", "2025-02-11": "建国記念の日", "2025-02-23": "天皇誕生日", "2025-02-24": "振替休日", "2025-03-20": "春分の日", "2025-04-29": "昭和の日", "2025-05-03": "憲法記念日", "2025-05-04": "みどりの日", "2025-05-05": "こどもの日", "2025-05-06": "振替休日", "2025-07-21": "海の日", "2025-08-11": "山の日", "2025-09-15": "敬老の日", "2025-09-23": "秋分の日", "2025-10-13": "スポーツの日", "2025-11-03": "文化の日", "2025-11-23": "勤労感謝の日", "2025-11-24": "振替休日",
-  "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日"
+  "2025-01-01": "元日", "2025-01-13": "成人の日", "2025-02-11": "建国記念の日", "2025-02-23": "天皇誕生日", "2025-02-24": "振替休日", "2025-03-20": "春分の日", "2025-04-29": "昭和の日", "2025-05-03": "憲法記念日", "2025-05-04": "みどりの日", "2025-05-05": "こどもの日", "2025-05-06": "振替休日", "2025-07-21": "海の日", "2025-08-11": "山の日", "2025-09-15": "敬老の日", "2025-09-23": "秋分の日", "2025-10-13": "スポーツの日", "2025-11-03": "文化の日", "2025-11-23": "勤労感謝の日", "2025-11-24": "振替休日"
 };
 
 const MONTHLY_CATEGORIES = [
@@ -72,12 +80,12 @@ const DEFAULT_RULES = {
   lunchSpecialDays: [{ day: "火", count: 4 }],
   lunchConditional: [{ section: "CT", min: 4, out: 1 }],
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT",
-  lunchLastResortSections: "治療" // ★ 追加: なるべく選出しない（最終手段）枠
+  lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v60"; 
-const KEY_MONTHLY = "shifto_monthly_v60"; 
-const KEY_RULES = "shifto_rules_v60";
+const KEY_ALL_DAYS = "shifto_alldays_v62"; 
+const KEY_MONTHLY = "shifto_monthly_v62"; 
+const KEY_RULES = "shifto_rules_v62";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -159,7 +167,7 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
           <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
         </div>
       ))}
-      <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#fff", outline: "none", fontSize: 12, color: "#64748b", borderRadius: 8, padding: "4px 24px 4px 8px", cursor: "pointer", flex: 1, minWidth: 140, fontWeight: 600 }}>
+      <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#fff", outline: "none", fontSize: 12, color: "#64748b", borderRadius: 8, padding: "4px 24px 4px 8px", cursor: "pointer", flex: 1, minWidth: 110, fontWeight: 600 }}>
         <option value="">{placeholder}</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -298,7 +306,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
                 <select 
                   value={currentMod} 
                   onChange={(e) => handleTimeChange(i, e.target.value)}
-                  style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 700, color: "inherit", cursor: "pointer", padding: "0 2px" }}
+                  style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 700, color: "inherit", cursor: "pointer", padding: "0 4px", width: currentMod ? "auto" : "36px" }}
                 >
                   <option value="">終日</option>
                   {TIME_OPTIONS.map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
@@ -515,23 +523,59 @@ export default function App() {
       else blockMap.set(core, 'ALL');
     });
 
-    // ★ 超賢いクレンジング：不在変更後の再割当に対応
+    const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
+
+    const hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => members.some(member => (customRules.ngPairs || []).some((ng: any) => {
+      const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate);
+      if (!match) return false;
+      if ((ng.level || "hard") === "hard") return true;
+      if ((ng.level || "hard") === "soft" && checkSoft) return true;
+      return false;
+    }));
+
+    // ★ 超賢いクレンジング：ルール違反者やAM/PM変更者を自動削除
+    let skipSections: string[] = [];
+    let roleAssignments: Record<string, any> = {};
+    let currentKenmu: any[] = [];
+    
+    // 全体の出勤可能人数をざっくり計算（緊急ルールの判定用）
+    const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
+
+    (customRules.emergencies || []).forEach((em: any) => {
+      if (tempAvailCount <= Number(em.threshold)) {
+        if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
+        if (em.type === "kenmu") { currentKenmu.push(em); }
+        if (em.type === "clear" && em.section) { skipSections.push(em.section); }
+      }
+    });
+
     Object.keys(dayCells).forEach(sec => {
       if (["明け","入り","不在","土日休日代休"].includes(sec)) return;
+      if (skipSections.includes(sec)) {
+        dayCells[sec] = "";
+        return;
+      }
+      
       let members = split(dayCells[sec]);
-      members = members.map(m => {
+      const validMembers: string[] = [];
+      
+      for (const m of members) {
         const core = getCoreName(m);
         const block = blockMap.get(core);
-        if (block === 'ALL') return null; // 終日不在なら消す
-        if (block === 'AM' && m.includes('(AM)')) return null; // AM不在なのにAM設定されてたら消す
-        if (block === 'PM' && m.includes('(PM)')) return null; // PM不在なのにPM設定されてたら消す
-        // 終日(タグなし)でアサインされていて、AM不在になったら、PMシフトに変更して残す
-        if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) return `${core}(PM)`;
-        // PM不在ならAMシフトに変更
-        if (block === 'PM' && !m.includes('(AM)') && !m.match(/\(.*\)/)) return `${core}(AM)`;
-        return m;
-      }).filter(Boolean) as string[];
-      dayCells[sec] = join(members);
+        if (block === 'ALL') continue; 
+        
+        let newM = m;
+        if (block === 'AM' && m.includes('(AM)')) continue; 
+        if (block === 'PM' && m.includes('(PM)')) continue; 
+        if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) newM = `${core}(PM)`;
+        if (block === 'PM' && !m.includes('(AM)') && !m.match(/\(.*\)/)) newM = `${core}(AM)`;
+        
+        if (isForbidden(core, sec)) continue;
+        if (hasNGPair(core, validMembers.map(getCoreName), false)) continue;
+        
+        validMembers.push(newM);
+      }
+      dayCells[sec] = join(validMembers);
     });
 
     const assignCounts: Record<string, number> = {};
@@ -551,34 +595,16 @@ export default function App() {
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
     const availAll = allStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
-      if (counts[a] !== counts[b]) return counts[a] - counts[b]; return Math.random() - 0.5;
+      const aBlock = blockMap.get(a) !== 'NONE';
+      const bBlock = blockMap.get(b) !== 'NONE';
+      if (aBlock && !bBlock) return -1;
+      if (!aBlock && bBlock) return 1;
+      if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
+      return Math.random() - 0.5;
     });
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    const availCount = availGeneral.length;
-
-    const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
-
-    const hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => members.some(member => (customRules.ngPairs || []).some((ng: any) => {
-      const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate);
-      if (!match) return false;
-      if ((ng.level || "hard") === "hard") return true;
-      if ((ng.level || "hard") === "soft" && checkSoft) return true;
-      return false;
-    }));
-
-    let roleAssignments: Record<string, any> = {};
-    let currentKenmu: any[] = [];
-    let skipSections: string[] = [];
-
-    (customRules.emergencies || []).forEach((em: any) => {
-      if (availCount <= Number(em.threshold)) {
-        if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
-        if (em.type === "kenmu") { currentKenmu.push(em); }
-        if (em.type === "clear" && em.section) { skipSections.push(em.section); }
-      }
-    });
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -618,7 +644,6 @@ export default function App() {
       return result;
     }
 
-    // ★ 半休のパズル（不足分の補完）を行う超優秀な fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
@@ -626,7 +651,7 @@ export default function App() {
       let amCount = 0;
       let pmCount = 0;
       current.forEach(m => {
-        if (m.includes("(AM)") || m.includes("(〜昼)") || m.includes("(〜17時)")) { amCount += 1; }
+        if (m.includes("(AM)") || m.includes("(〜昼)") || m.includes("(〜17時)") || m.includes("(PM〜17時)")) { amCount += 1; }
         else if (m.includes("(PM)") || m.includes("(昼〜)") || m.includes("(17時〜)") || m.includes("(19時〜)")) { pmCount += 1; }
         else { amCount += 1; pmCount += 1; }
       });
@@ -654,7 +679,6 @@ export default function App() {
           return true;
         });
 
-        // 候補が全くいなければ諦める
         if (validPreferred.length === 0 && validAvail.length === 0) break;
 
         const pickedCoreList = pick(validAvail, [...validPreferred, ...validAvail], 1, section, current.map(getCoreName), false);
@@ -665,7 +689,7 @@ export default function App() {
         
         let tag = "";
         if (block === 'AM') { 
-          tag = "(PM)";
+          tag = section === "透視（6号）" ? "(PM〜17時)" : "(PM)";
           pmCount += 1;
         } else if (block === 'PM') { 
           tag = "(AM)";
@@ -675,10 +699,10 @@ export default function App() {
             tag = "(AM)";
             amCount += 1;
           } else if (neededPM && !neededAM) {
-            tag = "(PM)";
+            tag = section === "透視（6号）" ? "(PM〜17時)" : "(PM)";
             pmCount += 1;
           } else {
-            tag = "";
+            tag = section === "透視（6号）" ? "(〜17時)" : "";
             amCount += 1;
             pmCount += 1;
           }
@@ -727,7 +751,7 @@ export default function App() {
       const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
       
       const preferred = [...treatMain, ...treatPrioritySub, ...treatSub];
-      fill(preferred, "治療", preferred, treatTarget); // 治療の補充は一般から勝手に取らない
+      fill(preferred, "治療", preferred, treatTarget);
     }
 
     if (!skipSections.includes("RI")) {
@@ -802,13 +826,40 @@ export default function App() {
       dayCells["MRI"] = join(currentMRI);
       fill(availGeneral, "MRI", split(monthlyAssign.MRI || ""), mriTarget);
     }
+    
+    // ★ 動的に追加された「絶対優先枠」の処理
+    const extraPriorityRooms = Object.keys(customRules.capacity || {}).filter(r => !["治療", "RI", "CT", "MRI", "受付"].includes(r));
+    extraPriorityRooms.forEach(room => {
+      if (skipSections.includes(room)) return;
+      const targetCount = customRules.capacity[room];
+      const preferredList = split(monthlyAssign[room] || "").filter(s => availGeneral.includes(s));
+      
+      if (room === "MMG" || room === "透析後胸部") {
+        fill(preferredList, room, preferredList, targetCount);
+      } else if (room === "受付ヘルプ") {
+        fill(availAll, room, preferredList, targetCount);
+      } else {
+        fill(availGeneral, room, preferredList, targetCount);
+      }
+    });
 
     if (!skipSections.includes("受付")) {
-      fill(availReception, "受付", split(monthlyAssign.受付 || ""), 2);
+      const uTarget = customRules.capacity?.受付 ?? 2;
+      let currentUketsuke = split(dayCells["受付"]);
+      const uketsukeMonthly = split(monthlyAssign.受付 || "");
+      for (const name of uketsukeMonthly) {
+        if (availReception.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { currentUketsuke.push(name); addUsed(name); }
+      }
+      const neededUketsuke = uTarget - currentUketsuke.length;
+      if (neededUketsuke > 0) {
+        const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
+        currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
+      }
+      dayCells["受付"] = join(currentUketsuke);
     }
-    const uketsukeShortage = Math.max(0, 2 - split(dayCells["受付"]).length);
+    const uketsukeShortage = Math.max(0, (customRules.capacity?.受付 ?? 2) - split(dayCells["受付"]).length);
 
-    if (!skipSections.includes("検像")) {
+    if (!skipSections.includes("検像") && !extraPriorityRooms.includes("検像")) {
       fill(availGeneral, "検像", [], 1);
     }
 
@@ -820,35 +871,42 @@ export default function App() {
     }
 
     ["1号室", "2号室", "3号室", "5号室"].forEach(sec => {
-      fill(availGeneral, sec, helpMembers, 1);
+      if (!extraPriorityRooms.includes(sec)) {
+        fill(availGeneral, sec, helpMembers, 1);
+      }
     });
     
-    if (!skipSections.includes("透析後胸部")) {
+    if (!skipSections.includes("透析後胸部") && !extraPriorityRooms.includes("透析後胸部")) {
       const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
       fill(availGeneral, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
     }
 
-    if (!skipSections.includes("透視（6号）")) {
-      fill(availGeneral, "透視（6号）", helpMembers, 2);
-      let toshi6Members = split(dayCells["透視（6号）"]);
-      if (toshi6Members.length === 2 && !toshi6Members[0].includes("(") && !toshi6Members[1].includes("(")) {
-        toshi6Members[0] += "(〜17時)";
-        toshi6Members[1] += "(17時〜)";
-        dayCells["透視（6号）"] = join(toshi6Members);
+    if (!skipSections.includes("透視（6号）") && !extraPriorityRooms.includes("透視（6号）")) {
+      fill(availGeneral, "透視（6号）", helpMembers, 1);
+      let current = split(dayCells["透視（6号）"]);
+      if (!current.some(m => m.includes("17時〜"))) {
+        const yugataPicked = pick(availGeneral, helpMembers, 1, "透視（6号）", current.map(getCoreName), true);
+        if (yugataPicked.length > 0) {
+          current.push(`${yugataPicked[0]}(17時〜)`);
+          addUsed(yugataPicked[0]);
+        }
       }
+      dayCells["透視（6号）"] = join(current);
     }
 
-    if (!skipSections.includes("MMG")) {
+    if (!skipSections.includes("MMG") && !extraPriorityRooms.includes("MMG")) {
       const mmgMonthly = split(monthlyAssign.MMG || "").filter(s => availGeneral.includes(s));
       fill(availGeneral, "MMG", mmgMonthly, mmgMonthly.length > 0 ? 1 : 0);
     }
     
     fill(availGeneral, "透視（11号）", helpMembers, 1);
     ["骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => {
-      fill(availGeneral, sec, helpMembers, 1);
+      if (!extraPriorityRooms.includes(sec)) {
+        fill(availGeneral, sec, helpMembers, 1);
+      }
     });
 
-    if (!skipSections.includes("受付ヘルプ")) {
+    if (!skipSections.includes("受付ヘルプ") && !extraPriorityRooms.includes("受付ヘルプ")) {
       let currentUketsukeHelp = split(dayCells["受付ヘルプ"]);
       const helpMonthly = split(monthlyAssign.受付ヘルプ || "");
       for (const item of helpMonthly) {
@@ -879,7 +937,6 @@ export default function App() {
     currentKenmu.forEach((km: any) => {
       const p1 = split(dayCells[km.s1]);
       if (p1.length > 0 && !skipSections.includes(km.s2)) { 
-        // 元の部屋のアサイン情報をそのままコピーする（AM/PMなども）
         dayCells[km.s2] = join(p1); 
       }
     });
@@ -911,7 +968,6 @@ export default function App() {
     
     fill(availGeneral, "待機", [], 1);
 
-    // ★ 昼当番のロジック（最終手段枠の導入）
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
       let baseLunchTarget = customRules.lunchBaseCount ?? 3;
@@ -952,20 +1008,17 @@ export default function App() {
       }
       
       if (currentLunch.length < lunchTarget) {
-        // ★ なるべく除外する枠（治療など）を取得
         const lastResortSecs = split(customRules.lunchLastResortSections ?? "治療");
         const lastResortMembers: string[] = [];
         lastResortSecs.forEach(sec => {
           split(dayCells[sec]).forEach(name => lastResortMembers.push(getCoreName(name)));
         });
 
-        // 最終手段「以外」の一般スタッフから選ぶ
         const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
         for (const name of fallbackCandidates) { 
           if (currentLunch.length < lunchTarget) currentLunch.push(name); 
         }
         
-        // ★ それでも足りない（本当に人がいない）場合は、最終手段枠（治療等）から選出する
         if (currentLunch.length < lunchTarget) {
            const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
            for (const name of finalFallback) {
@@ -1014,7 +1067,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>半休自動パズル ＆ 昼当番の救済枠 (v60)</p>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>再計算クレンジング ＆ 絶対優先対応版 (v62)</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1055,16 +1108,34 @@ export default function App() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 20 }}>
-              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
-                <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👥 人数設定（自動割当用）</h4>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-                  {["CT", "MRI", "治療", "RI"].map(room => (
+              
+              {/* ★ 新設: 絶対優先の人数設定（自由に追加可能） */}
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👥 絶対優先の人数設定（自動割当用）</h4>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>ここで設定した部屋と人数は、AIが最優先でアサインします。（CT, MRI, 治療, RI 以外も自由に追加可能）</p>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  {Object.entries(customRules.capacity || {}).map(([room, count]) => (
                     <div key={room} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
                       <span style={{ fontSize: 13, fontWeight: 800, color: "#475569" }}>{room}:</span>
-                      <input type="number" min="0" value={customRules.capacity?.[room] ?? (room==="CT"||room==="MRI"||room==="治療"?3:1)} onChange={e => setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: Number(e.target.value)}})} style={{ width: 44, border: "none", outline: "none", fontSize: 15, fontWeight: 800, textAlign: "center", color: "#334155", background: "transparent" }} />
+                      <input type="number" min="0" value={count as number} onChange={e => setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: Number(e.target.value)}})} style={{ width: 44, border: "none", outline: "none", fontSize: 15, fontWeight: 800, textAlign: "center", color: "#334155", background: "transparent" }} />
                       <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>人</span>
+                      <span onClick={() => {
+                        const newCap = {...customRules.capacity};
+                        delete newCap[room];
+                        setCustomRules({...customRules, capacity: newCap});
+                      }} style={{ cursor: "pointer", color: "#ef4444", fontSize: 16, marginLeft: 4, fontWeight: "bold" }}>✖</span>
                     </div>
                   ))}
+                  <select onChange={e => {
+                    const room = e.target.value;
+                    if (room && !customRules.capacity?.[room]) {
+                      setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: 1}});
+                    }
+                    e.target.value = "";
+                  }} style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 13, color: "#64748b", borderRadius: 8, padding: "6px 24px 6px 12px", cursor: "pointer", fontWeight: 600 }}>
+                    <option value="">＋ 部屋を追加</option>
+                    {ROOM_SECTIONS.filter(r => !Object.keys(customRules.capacity || {}).includes(r)).map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 </div>
               </div>
 
@@ -1150,7 +1221,7 @@ export default function App() {
                     <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} style={{ flex: 1, minWidth: "120px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>と</span>
                     <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} style={{ flex: 1, minWidth: "120px", padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ padding: "6px 24px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c", minWidth: "110px" }}>
+                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c", minWidth: "120px" }}>
                       <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
                     </select>
                     <button onClick={() => removeRule("ngPairs", idx)} style={{ border: "none", background: "none", color: "#b91c1c", cursor: "pointer", fontSize: 16 }}>✖</button>
