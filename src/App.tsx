@@ -68,11 +68,11 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v94"; 
-const KEY_MONTHLY = "shifto_monthly_v94"; 
-const KEY_RULES = "shifto_rules_v94";
+const KEY_ALL_DAYS = "shifto_alldays_v97"; 
+const KEY_MONTHLY = "shifto_monthly_v97"; 
+const KEY_RULES = "shifto_rules_v97";
 
-const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
+const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)"];
 for (let h = 8; h <= 19; h++) {
   for (let m = 0; m < 60; m += 15) {
     if (h === 8 && m === 0) continue; 
@@ -572,6 +572,7 @@ export default function App() {
     }
   };
 
+  // ★ 賢いアラート機能
   const warnings = useMemo(() => {
     if (!cur || cur.isPublicHoliday) return [];
     const w: {type: 'alert'|'info'|'error', msg: string}[] = [];
@@ -616,8 +617,9 @@ export default function App() {
       const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === dayChar);
       if (specialDay) baseLunchTarget = Number(specialDay.count);
     }
-    const uketsukeShortage = Math.max(0, (customRules.capacity?.受付 ?? 2) - split(cells["受付"]).length);
-    const lunchTarget = baseLunchTarget + uketsukeShortage;
+    
+    // ★ ここでも絶対人数の表示に変更（受付不足分を足さない）
+    const lunchTarget = baseLunchTarget;
     const lunchCount = split(cells["昼当番"]).length;
     if (lunchCount < lunchTarget) {
       w.push({type: 'info', msg: `💡【昼当番】が不足（現在 ${lunchCount}人 / 目安 ${lunchTarget}人）`});
@@ -720,12 +722,17 @@ export default function App() {
     allStaff.forEach(s => { assignCounts[s] = 0; maxAssigns[s] = 1; });
 
     Object.keys(dayCells).forEach((key) => { 
-      if (["明け","入り","不在","土日休日代休","昼当番"].includes(key)) return; 
-      split(dayCells[key]).forEach(name => { const c = getCoreName(name); assignCounts[c] = (assignCounts[c] || 0) + 1; }); 
+      if (!REST_SECTIONS.includes(key) && key !== "昼当番") {
+        split(dayCells[key]).forEach(name => { 
+          const c = getCoreName(name); 
+          const isHalf = name.includes("(AM)") || name.includes("(PM)") || name.match(/\(〜/) || name.match(/〜\)/);
+          assignCounts[c] = (assignCounts[c] || 0) + (isHalf ? 0.5 : 1);
+        }); 
+      }
     });
 
     const isUsed = (name: string) => (assignCounts[name] || 0) >= (maxAssigns[name] || 1);
-    const addUsed = (name: string) => { assignCounts[name] = (assignCounts[name] || 0) + 1; };
+    const addU = (name: string, f = 1) => { assignCounts[name] = (assignCounts[name] || 0) + f; };
 
     const counts: Record<string, number> = {};
     allStaff.forEach(s => counts[s] = 0);
@@ -757,7 +764,7 @@ export default function App() {
         if (hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), true)) return false;
         return true;
       });
-      for (const name of primary) { result.push(name); addUsed(name); if (result.length >= n) return result; }
+      for (const name of primary) { result.push(name); addU(name, 1); if (result.length >= n) return result; }
 
       const fallback = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
@@ -769,14 +776,14 @@ export default function App() {
         if (hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), false)) return false;
         return true;
       });
-      for (const name of fallback) { result.push(name); addUsed(name); if (result.length >= n) return result; }
+      for (const name of fallback) { result.push(name); addU(name, 1); if (result.length >= n) return result; }
       
       const lastResort = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
         if (hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), false)) return false;
         return true;
       });
-      for (const name of lastResort) { result.push(name); addUsed(name); if (result.length >= n) return result; }
+      for (const name of lastResort) { result.push(name); addU(name, 1); if (result.length >= n) return result; }
 
       return result;
     }
@@ -829,30 +836,43 @@ export default function App() {
         if (pickedCoreList.length === 0) break;
 
         const core = pickedCoreList[0];
+        assignCounts[core] -= 1;
+
         const block = blockMap.get(core);
         
         let tag = "";
+        let f = 1;
         if (block === 'AM') { 
           tag = "(PM)";
           pmCount += 1;
+          f = 0.5;
+          blockMap.set(core, 'ALL');
         } else if (block === 'PM') { 
           tag = "(AM)";
           amCount += 1;
+          f = 0.5;
+          blockMap.set(core, 'ALL');
         } else {
           if (neededAM && !neededPM) {
             tag = "(AM)";
             amCount += 1;
+            f = 0.5;
+            blockMap.set(core, 'AM'); 
           } else if (neededPM && !neededAM) {
             tag = "(PM)";
             pmCount += 1;
+            f = 0.5;
+            blockMap.set(core, 'PM'); 
           } else {
             tag = "";
             amCount += 1;
             pmCount += 1;
+            f = 1;
+            blockMap.set(core, 'ALL');
           }
         }
         current.push(`${core}${tag}`);
-        addUsed(core);
+        addU(core, f);
       }
       dayCells[section] = join(current);
     }
@@ -871,13 +891,14 @@ export default function App() {
       const current = split(dayCells[rule.section]);
       if (current.map(getCoreName).includes(rule.staff) || hasNGPair(rule.staff, current.map(getCoreName), false)) return;
       
-      const block = blockMap.get(rule.staff);
-      let tag = "";
-      if (block === 'AM') tag = "(PM)";
-      if (block === 'PM') tag = "(AM)";
+      const b = blockMap.get(rule.staff);
+      let tag = ""; let f = 1;
+      if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(rule.staff, 'ALL'); }
+      else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(rule.staff, 'ALL'); }
+      else { blockMap.set(rule.staff, 'ALL'); }
 
       dayCells[rule.section] = join([...current, `${rule.staff}${tag}`]); 
-      addUsed(rule.staff);
+      addU(rule.staff, f);
     });
 
     Object.values(roleAssignments).forEach((ra: any) => {
@@ -887,12 +908,13 @@ export default function App() {
       const targetAvail = isRec ? availReception : availGeneral;
       const staff = candidates.find(s => targetAvail.includes(s) && !isUsed(s));
       if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { 
-        const block = blockMap.get(staff);
-        let tag = "";
-        if (block === 'AM') tag = "(PM)";
-        if (block === 'PM') tag = "(AM)";
+        const b = blockMap.get(staff);
+        let tag = ""; let f = 1;
+        if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+        else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+        else { blockMap.set(staff, 'ALL'); }
         dayCells[ra.section] = join([...split(dayCells[ra.section]), `${staff}${tag}`]); 
-        addUsed(staff); 
+        addU(staff, f); 
       }
     });
 
@@ -917,12 +939,13 @@ export default function App() {
               
               const actualCap = room === "CT" || room === "MRI" || room === "治療" ? 3 : (customRules.capacity?.[room] ?? 1);
               if (current.length < actualCap) {
-                const block = blockMap.get(s2);
-                let tag = "";
-                if (block === 'AM') tag = "(PM)";
-                if (block === 'PM') tag = "(AM)";
+                const b = blockMap.get(s2);
+                let tag = ""; let f = 1;
+                if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(s2, 'ALL'); }
+                else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(s2, 'ALL'); }
+                else { blockMap.set(s2, 'ALL'); }
                 dayCells[room] = join([...current, `${s2}${tag}`]);
-                addUsed(s2);
+                addU(s2, f);
                 dayCells[tSec] = join(split(dayCells[tSec]).filter(m => getCoreName(m) !== s2));
                 break;
               }
@@ -959,12 +982,13 @@ export default function App() {
           const currentSec = split(dayCells[sub.section]);
           for (const f of fallbackStaff) {
             if (!hasNGPair(f, currentSec.map(getCoreName), false) && currentSec.length < 6) {
-              const block = blockMap.get(f);
-              let tag = "";
-              if (block === 'AM') tag = "(PM)";
-              if (block === 'PM') tag = "(AM)";
+              const b = blockMap.get(f);
+              let tag = ""; let fr = 1;
+              if (b === 'AM') { tag = "(PM)"; fr = 0.5; blockMap.set(f, 'ALL'); }
+              else if (b === 'PM') { tag = "(AM)"; fr = 0.5; blockMap.set(f, 'ALL'); }
+              else { blockMap.set(f, 'ALL'); }
               dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); 
-              addUsed(f);
+              addU(f, fr);
               break; 
             }
           }
@@ -1009,7 +1033,7 @@ export default function App() {
       let currentUketsuke = split(dayCells["受付"]);
       const uketsukeMonthly = split(monthlyAssign.受付 || "");
       for (const name of uketsukeMonthly) {
-        if (availReception.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { currentUketsuke.push(name); addUsed(name); }
+        if (availReception.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { currentUketsuke.push(name); addU(name, 1); }
       }
       const neededUketsuke = uTarget - currentUketsuke.length;
       if (neededUketsuke > 0) {
@@ -1075,7 +1099,8 @@ export default function App() {
         
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
-          addUsed(picked);
+          addU(picked, 0.5);
+          blockMap.set(picked, blockMap.get(picked) === 'AM' ? 'ALL' : 'PM'); 
         }
       }
       dayCells[rule.section] = join(current);
@@ -1094,12 +1119,13 @@ export default function App() {
           }
         } else if (allStaff.includes(item)) {
           if (availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
-            const block = blockMap.get(item);
-            let tag = "";
-            if (block === 'AM') tag = "(PM)";
-            if (block === 'PM') tag = "(AM)";
+            const b = blockMap.get(item);
+            let tag = ""; let f = 1;
+            if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(item, 'ALL'); }
+            else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(item, 'ALL'); }
+            else { blockMap.set(item, 'ALL'); }
             currentUketsukeHelp.push(`${item}${tag}`);
-            addUsed(item); 
+            addU(item, f); 
           }
         }
       }
@@ -1120,22 +1146,24 @@ export default function App() {
       let currentReserve = split(dayCells["残り・待機"]);
       const unassigned = availAll.filter(name => !isUsed(name));
       unassigned.forEach(name => {
-        const block = blockMap.get(name);
-        let tag = "";
-        if (block === 'AM') tag = "(PM)";
-        if (block === 'PM') tag = "(AM)";
+        const b = blockMap.get(name);
+        let tag = ""; let f = 1;
+        if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(name, 'ALL'); }
+        else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(name, 'ALL'); }
+        else { blockMap.set(name, 'ALL'); }
         currentReserve.push(`${name}${tag}`);
-        addUsed(name);
+        addU(name, f);
       });
       if (currentReserve.length === 0) {
         const fallback = pick(availGeneral, availGeneral, 1, "残り・待機", currentReserve, true);
         fallback.forEach(name => {
-            const block = blockMap.get(name);
-            let tag = "";
-            if (block === 'AM') tag = "(PM)";
-            if (block === 'PM') tag = "(AM)";
+            const b = blockMap.get(name);
+            let tag = ""; let f = 1;
+            if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(name, 'ALL'); }
+            else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(name, 'ALL'); }
+            else { blockMap.set(name, 'ALL'); }
             currentReserve.push(`${name}${tag}`);
-            addUsed(name);
+            addU(name, f);
         });
       }
       dayCells["残り・待機"] = join(currentReserve);
@@ -1143,7 +1171,7 @@ export default function App() {
     
     fill(availGeneral, "待機", [], 1);
 
-    // ★ v94: 昼当番の選出ロジックを変更（優先部屋 → 条件付き → その他 → 緊急）
+    // ★ v97: 昼当番の絶対枠 ＆ 受付ヘルプへの自動追加ロジック
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
       
@@ -1153,9 +1181,9 @@ export default function App() {
         const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === dayChar);
         if (specialDay) baseLunchTarget = Number(specialDay.count);
       }
-      const lunchTarget = baseLunchTarget + uketsukeShortage;
+      // ★ 昼当番の枠は絶対に増やさない！
+      const lunchTarget = baseLunchTarget;
 
-      // 1. まず優先部屋から枠を埋める
       const prioritySecs = split(customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT");
       for (const sec of prioritySecs) {
         if (currentLunch.length >= lunchTarget) break;
@@ -1167,7 +1195,6 @@ export default function App() {
         });
       }
 
-      // 2. それでも足りない場合、条件付き選出で埋める
       if (currentLunch.length < lunchTarget) {
         (customRules.lunchConditional || []).forEach((cond: any) => {
           if (!cond.section) return;
@@ -1186,7 +1213,6 @@ export default function App() {
         });
       }
       
-      // 3. それでも足りなければそれ以外（緊急以外）から埋める
       if (currentLunch.length < lunchTarget) {
         const lastResortSecs = split(customRules.lunchLastResortSections ?? "治療");
         const lastResortMembers: string[] = [];
@@ -1199,7 +1225,6 @@ export default function App() {
           if (currentLunch.length < lunchTarget) currentLunch.push(name); 
         }
         
-        // 4. それでも足りなければ緊急（治療など）から埋める
         if (currentLunch.length < lunchTarget) {
            const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
            for (const name of finalFallback) {
@@ -1207,7 +1232,36 @@ export default function App() {
            }
         }
       }
+      
+      // 昼当番の保存
       dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
+
+      // ★ 受付不足分のカバー：昼当番から受付ヘルプ(12:15〜13:00)へアサイン
+      if (uketsukeShortage > 0 && !skipSections.includes("受付ヘルプ")) {
+        let helpMems = split(dayCells["受付ヘルプ"]);
+        let assignedCount = 0;
+        
+        // 1. 昼当番のメンバーから優先して兼任させる
+        const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
+        for (const name of lunchCores) {
+          if (assignedCount >= uketsukeShortage) break;
+          if (!helpMems.map(getCoreName).includes(name)) {
+            helpMems.push(`${name}(12:15〜13:00)`);
+            assignedCount++;
+          }
+        }
+        
+        // 2. 昼当番の人数より受付不足分の方が多い場合（まれ）は一般スタッフから
+        if (assignedCount < uketsukeShortage) {
+          const others = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+          for (const name of others) {
+            if (assignedCount >= uketsukeShortage) break;
+            helpMems.push(`${name}(12:15〜13:00)`);
+            assignedCount++;
+          }
+        }
+        dayCells["受付ヘルプ"] = join(helpMems);
+      }
     }
 
     return { ...day, cells: dayCells };
@@ -1407,7 +1461,7 @@ export default function App() {
                     </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>➔</span>
                     <div style={{ flex: 1, minWidth: "220px" }}>
-                      <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
+                      <MultiStaffPicker selected={rule.subs} onChange={(v: string) => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>を</span>
                     <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}>
@@ -1435,7 +1489,7 @@ export default function App() {
                       <button onClick={() => removeRule("pushOuts", idx)} className="rule-del">✖</button>
                     </div>
                     <div className="rule-row">
-                      <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
+                      <MultiSectionPicker selected={rule.targetSections} onChange={(v: string) => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
                       <span className="rule-label" style={{color:"#0284c7"}}>に移動</span>
                     </div>
                   </div>
@@ -1479,7 +1533,7 @@ export default function App() {
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} className="rule-del">✖</button>
                     </div>
-                    <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
+                    <MultiSectionPicker selected={rule.sections} onChange={(v: string) => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
                   </div>
                 ))}
                 <button className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}} onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
@@ -1551,7 +1605,7 @@ export default function App() {
                   const membersStr = monthlyAssign[key] || "";
                   const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
                   return (
-                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={(v: string) => updateMonthly(key, v)} noTime={true} customOptions={opts} />
                   )
                 })}
               </div>
