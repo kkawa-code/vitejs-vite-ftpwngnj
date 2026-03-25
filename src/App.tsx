@@ -62,9 +62,9 @@ const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
 const DEFAULT_RULES = { staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" };
 
-const KEY_ALL_DAYS = "shifto_alldays_v75"; 
-const KEY_MONTHLY = "shifto_monthly_v75"; 
-const KEY_RULES = "shifto_rules_v75";
+const KEY_ALL_DAYS = "shifto_alldays_v76"; 
+const KEY_MONTHLY = "shifto_monthly_v76"; 
+const KEY_RULES = "shifto_rules_v76";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -117,7 +117,8 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, alignItems: "center" }}>
       {current.map((sec, i) => (
         <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 16, padding: "4px 10px", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, border: "1px solid #bae6fd" }}>
-          {sec} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
+          {sec}
+          <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
         </div>
       ))}
       <select className="rule-sel" onChange={(e) => handleAdd(e.target.value)} value="">
@@ -137,7 +138,8 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
       {current.map((name, i) => (
         <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 16, padding: "4px 10px", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, border: "1px solid #cbd5e1" }}>
-          {name} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
+          {name}
+          <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
         </div>
       ))}
       <select className="rule-sel" onChange={(e) => handleAdd(e.target.value)} value="">
@@ -194,14 +196,14 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
       {isOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setIsOpen(false)}></div>
-          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "1px solid #cbd5e1", borderRadius: 16, padding: 20, zIndex: 50, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)", minWidth: 300 }}>
+          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "1px solid #cbd5e1", borderRadius: 16, padding: 20, zIndex: 50, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)", minWidth: 300 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <button onClick={handlePrev} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontWeight: "bold" }}>◀</button>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>{year}年 {month}月</div>
-              <button onClick={handleNext} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontWeight: "bold" }}>▶</button>
+              <button onClick={handlePrev} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: "#475569", fontWeight: "bold" }}>◀</button>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#1e293b", letterSpacing: "0.05em" }}>{year}年 {month}月</div>
+              <button onClick={handleNext} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: "#475569", fontWeight: "bold" }}>▶</button>
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 14 }}>
-              <thead><tr><th style={{ color: "#ef4444", padding: 6 }}>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th style={{ color: "#3b82f6", padding: 6 }}>土</th></tr></thead>
+              <thead><tr><th style={{ color: "#ef4444", padding: 6, fontWeight: 700 }}>日</th><th style={{ padding: 6, fontWeight: 700 }}>月</th><th style={{ padding: 6, fontWeight: 700 }}>火</th><th style={{ padding: 6, fontWeight: 700 }}>水</th><th style={{ padding: 6, fontWeight: 700 }}>木</th><th style={{ padding: 6, fontWeight: 700 }}>金</th><th style={{ color: "#3b82f6", padding: 6, fontWeight: 700 }}>土</th></tr></thead>
               <tbody>
                 {weeks.map((w, wIdx) => {
                   const isSelectedWeek = w.some(d => {
@@ -212,17 +214,24 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
                     const mon = new Date(new Date(dObj).setDate(diff));
                     return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}` === targetMonday;
                   });
+
                   return (
                     <tr key={wIdx} onClick={() => handleWeekClick(w)} className="calendar-row" style={{ background: isSelectedWeek ? "#eff6ff" : "transparent" }}>
                       {w.map((d, dIdx) => {
                         if (!d) return <td key={dIdx} style={{ padding: 10 }}></td>;
                         const dateStr = `${year}-${pad(month)}-${pad(d)}`;
-                        const isHoliday = !!(nationalHolidays[dateStr] || customHolidays.includes(dateStr));
+                        const holidayName = nationalHolidays[dateStr] || (customHolidays.includes(dateStr) ? "休診日" : null);
+                        const isHoliday = !!holidayName;
+                        const isSun = dIdx === 0;
+                        const isSat = dIdx === 6;
                         let color = "#334155";
-                        if (dIdx === 0 || isHoliday) color = "#ef4444"; else if (dIdx === 6) color = "#3b82f6";
+                        if (isSun || isHoliday) color = "#ef4444";
+                        else if (isSat) color = "#3b82f6";
+                        
                         return (
-                          <td key={dIdx} style={{ padding: 10, color, fontWeight: isHoliday ? 800 : 500, position: "relative" }}>
-                            {d} {isHoliday && <div style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, background: "#ef4444", borderRadius: "50%" }}></div>}
+                          <td key={dIdx} style={{ padding: 10, color, fontWeight: isHoliday ? 800 : 500, position: "relative" }} title={holidayName || ""}>
+                            {d}
+                            {isHoliday && <div style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, background: "#ef4444", borderRadius: "50%" }}></div>}
                           </td>
                         );
                       })}
@@ -242,7 +251,14 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   const members = split(value);
   const handleAdd = (name: string) => { if (name) onChange(join([...members, name])); };
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
-  const handleTimeChange = (idx: number, newTime: string) => { if (noTime) return; const next = [...members]; const core = getCoreName(next[idx]); next[idx] = core + newTime; onChange(join(next)); };
+  
+  const handleTimeChange = (idx: number, newTime: string) => {
+    if (noTime) return;
+    const next = [...members];
+    const core = getCoreName(next[idx]);
+    next[idx] = core + newTime;
+    onChange(join(next));
+  };
 
   return (
     <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
@@ -252,13 +268,22 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
           const coreName = getCoreName(m);
           const currentMod = m.substring(coreName.length);
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
+          
           return (
             <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 16, padding: "2px 8px 2px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 4, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
               <span style={{ userSelect: "none" }}>{coreName}</span>
               {!noTime && (
-                <select value={currentMod} onChange={(e) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 18px 0 2px" }}>
-                  <option value="">終日</option> <option value="(AM)">AM</option> <option value="(PM)">PM</option>
-                  {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}
+                <select 
+                  value={currentMod} 
+                  onChange={(e) => handleTimeChange(i, e.target.value)}
+                  style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 18px 0 2px" }}
+                >
+                  <option value="">終日</option>
+                  <option value="(AM)">AM</option>
+                  <option value="(PM)">PM</option>
+                  {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (
+                    <option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>
+                  )}
                   {TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                 </select>
               )}
@@ -268,9 +293,17 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
         })}
         <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 28px 4px 8px" }}>
           <option value="">＋追加</option>
-          <optgroup label="スタッフ">{activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}</optgroup>
-          {customOptions.length > 0 && <optgroup label="部屋連動（兼務）">{customOptions.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}</optgroup>}
-          <optgroup label="担当枠（未定）">{ROLE_PLACEHOLDERS.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}</optgroup>
+          <optgroup label="スタッフ">
+            {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+          </optgroup>
+          {customOptions.length > 0 && (
+            <optgroup label="部屋連動（兼務）">
+              {customOptions.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+            </optgroup>
+          )}
+          <optgroup label="担当枠（未定）">
+            {ROLE_PLACEHOLDERS.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+          </optgroup>
         </select>
       </div>
     </div>
@@ -278,14 +311,45 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
 };
 
 export default function App() {
-  const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { const saved = localStorage.getItem(KEY_ALL_DAYS); if (saved) return JSON.parse(saved); } catch {} return {}; });
-  const [targetMonday, setTargetMonday] = useState(() => { const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff)); return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`; });
-  const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => { try { const saved = localStorage.getItem(KEY_MONTHLY); if (saved) return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(saved) }; } catch {} return DEFAULT_MONTHLY_ASSIGN; });
-  const [customRules, setCustomRules] = useState<any>(() => { try { const saved = localStorage.getItem(KEY_RULES); if (saved) return { ...DEFAULT_RULES, ...JSON.parse(saved) }; } catch {} return DEFAULT_RULES; });
-  const [sel, setSel] = useState("");
-  const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
+  const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => {
+    try { const saved = localStorage.getItem(KEY_ALL_DAYS); if (saved) return JSON.parse(saved); } catch {} return {};
+  });
 
-  useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error("Holiday API Error", e)); }, []);
+  const [targetMonday, setTargetMonday] = useState(() => {
+    const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff));
+    return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
+  });
+
+  const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => {
+    try { 
+      const saved = localStorage.getItem(KEY_MONTHLY); 
+      if (saved) {
+        return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(saved) };
+      }
+    } catch {} 
+    return DEFAULT_MONTHLY_ASSIGN;
+  });
+  
+  const [customRules, setCustomRules] = useState<any>(() => {
+    try { 
+      const saved = localStorage.getItem(KEY_RULES); 
+      if (saved) {
+        return { ...DEFAULT_RULES, ...JSON.parse(saved) };
+      }
+    } catch {} 
+    return DEFAULT_RULES;
+  });
+
+  const [sel, setSel] = useState("");
+
+  const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
+  useEffect(() => {
+    fetch("https://holidays-jp.github.io/api/v1/date.json")
+      .then(res => res.json())
+      .then(data => setNationalHolidays(prev => ({ ...prev, ...data })))
+      .catch(e => console.error("祝日APIの取得に失敗しました", e));
+  }, []);
+
   useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); }, [allDays]);
   useEffect(() => { localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [monthlyAssign]);
   useEffect(() => { localStorage.setItem(KEY_RULES, JSON.stringify(customRules)); }, [customRules]);
@@ -297,9 +361,12 @@ export default function App() {
     return [0, 1, 2, 3, 4].map(i => {
       const curr = new Date(mon); curr.setDate(curr.getDate() + i);
       const id = `${curr.getFullYear()}-${pad(curr.getMonth()+1)}-${pad(curr.getDate())}`;
+      
       let holidayName = nationalHolidays[id] || "";
       if (!holidayName && customHolidays.includes(id)) holidayName = "休診日";
-      return { id, label: formatDay(curr), isPublicHoliday: !!holidayName, holidayName, cells: allDays[id] || Object.fromEntries(SECTIONS.map(s => [s, ""])) };
+      const isPublicHoliday = !!holidayName;
+
+      return { id, label: formatDay(curr), isPublicHoliday, holidayName, cells: allDays[id] || Object.fromEntries(SECTIONS.map(s => [s, ""])) };
     });
   }, [targetMonday, allDays, customHolidays, nationalHolidays]);
 
@@ -307,9 +374,17 @@ export default function App() {
 
   const cur = days.find(d => d.id === sel) || days[0];
 
-  const activeGeneralStaff = useMemo(() => parseAndSortStaff(customRules.staffList || DEFAULT_STAFF), [customRules.staffList]);
-  const activeReceptionStaff = useMemo(() => parseAndSortStaff(customRules.receptionStaffList || ""), [customRules.receptionStaffList]);
-  const allStaff = useMemo(() => Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff])), [activeGeneralStaff, activeReceptionStaff]);
+  const activeGeneralStaff = useMemo(() => {
+    return parseAndSortStaff(customRules.staffList || DEFAULT_STAFF);
+  }, [customRules.staffList]);
+
+  const activeReceptionStaff = useMemo(() => {
+    return parseAndSortStaff(customRules.receptionStaffList || "");
+  }, [customRules.receptionStaffList]);
+
+  const allStaff = useMemo(() => {
+    return Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff]));
+  }, [activeGeneralStaff, activeReceptionStaff]);
 
   const getStaffForSection = (section: string) => {
     if (section === "受付") return activeReceptionStaff;
@@ -326,17 +401,20 @@ export default function App() {
   const updateDay = (k: string, v: string) => { 
     setAllDays(prev => {
       const nextState = { ...prev, [cur.id]: { ...(prev[cur.id] || cur.cells), [k]: v } };
+      
       if (k === "入り") {
-        const dateObj = new Date(cur.id); dateObj.setDate(dateObj.getDate() + 1);
+        const dateObj = new Date(cur.id);
+        dateObj.setDate(dateObj.getDate() + 1);
         const nextId = `${dateObj.getFullYear()}-${pad(dateObj.getMonth()+1)}-${pad(dateObj.getDate())}`;
         const nextCells = nextState[nextId] || Object.fromEntries(SECTIONS.map(s => [s, ""]));
         nextState[nextId] = { ...nextCells, "明け": join(split(v).map(getCoreName)) };
       }
+      
       return nextState;
     }); 
   };
-  
   const updateMonthly = (category: string, value: string) => { setMonthlyAssign(prev => ({ ...prev, [category]: value })); };
+  
   const addRule = (type: string, defaultObj: any) => setCustomRules((r: any) => ({ ...r, [type]: [...(r[type] || []), defaultObj] }));
   const updateRule = (type: string, idx: number, key: string, val: string) => { setCustomRules((r: any) => { const arr = [...r[type]]; arr[idx] = { ...arr[idx], [key]: val }; return { ...r, [type]: arr }; }); };
   const removeRule = (type: string, idx: number) => { setCustomRules((r: any) => { const arr = [...r[type]]; arr.splice(idx, 1); return { ...r, [type]: arr }; }); };
@@ -344,7 +422,8 @@ export default function App() {
   const handleCopyYesterday = () => {
     const idx = days.findIndex(d => d.id === cur.id);
     if (idx <= 0) { alert("月曜日には前日のデータがありません。"); return; }
-    setAllDays(prev => ({ ...prev, [cur.id]: { ...days[idx - 1].cells } }));
+    const prevDay = days[idx - 1];
+    setAllDays(prev => ({ ...prev, [cur.id]: { ...prevDay.cells } }));
   };
 
   const handleClearRestDay = () => {
@@ -395,7 +474,6 @@ export default function App() {
     }
   };
 
-  // ★ 欠落していた handleResetAll を完璧に復元！
   const handleResetAll = () => {
     if (window.confirm("本当にすべてのデータを初期状態にリセットしますか？\n※これまで入力したシフト、特殊ルール、月間設定がすべて消去されます。")) {
       setAllDays({});
@@ -409,35 +487,58 @@ export default function App() {
   };
 
   const handleExport = () => {
-    const blob = new Blob([JSON.stringify({ allDays, monthlyAssign, customRules })], { type: "application/json" });
-    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `shifto_backup_${targetMonday}.json`; a.click(); URL.revokeObjectURL(url);
+    const dataObj = { allDays, monthlyAssign, customRules };
+    const jsonStr = JSON.stringify(dataObj);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shifto_backup_${targetMonday}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const dataObj = JSON.parse(event.target?.result as string);
         if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) {
-          setAllDays(dataObj.allDays); setMonthlyAssign({ ...DEFAULT_MONTHLY_ASSIGN, ...dataObj.monthlyAssign }); setCustomRules({ ...DEFAULT_RULES, ...dataObj.customRules }); alert("データを復元しました！");
-        } else alert("正しいバックアップファイルではありません。");
-      } catch (err) { alert("ファイルの読み込みに失敗しました。"); }
+          setAllDays(dataObj.allDays);
+          setMonthlyAssign({ ...DEFAULT_MONTHLY_ASSIGN, ...dataObj.monthlyAssign });
+          setCustomRules({ ...DEFAULT_RULES, ...dataObj.customRules });
+          alert("データを復元しました！");
+        } else {
+          alert("正しいバックアップファイルではありません。");
+        }
+      } catch (err) {
+        alert("ファイルの読み込みに失敗しました。");
+      }
     };
-    reader.readAsText(file); e.target.value = "";
+    reader.readAsText(file);
+    e.target.value = "";
   };
 
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
+    
     if (prevDay && prevDay.cells["入り"]) {
       const iriMembers = split(prevDay.cells["入り"]).map(getCoreName);
-      dayCells["明け"] = join(Array.from(new Set([...split(dayCells["明け"]), ...iriMembers])));
+      const currentAke = split(dayCells["明け"]);
+      dayCells["明け"] = join(Array.from(new Set([...currentAke, ...iriMembers])));
     }
+
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
 
     const blockMap = new Map<string, string>();
     allStaff.forEach(s => blockMap.set(s, 'NONE'));
-    ["明け","入り","土日休日代休"].forEach(sec => split(dayCells[sec]).forEach(m => blockMap.set(getCoreName(m), 'ALL')));
+
+    ["明け","入り","土日休日代休"].forEach(sec => {
+      split(dayCells[sec]).forEach(m => blockMap.set(getCoreName(m), 'ALL'));
+    });
+
     split(dayCells["不在"]).forEach(m => {
       const core = getCoreName(m);
       if (m.includes("(AM)")) blockMap.set(core, 'AM');
@@ -446,29 +547,36 @@ export default function App() {
     });
 
     const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
+
     const hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => members.some(member => (customRules.ngPairs || []).some((ng: any) => {
       const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate);
       if (!match) return false;
-      return (ng.level || "hard") === "hard" || checkSoft;
+      if ((ng.level || "hard") === "hard") return true;
+      if ((ng.level || "hard") === "soft" && checkSoft) return true;
+      return false;
     }));
 
     let skipSections: string[] = [];
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
+    
     const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
 
     (customRules.emergencies || []).forEach((em: any) => {
       if (tempAvailCount <= Number(em.threshold)) {
-        if (em.type === "role_assign" && (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold)) roleAssignments[em.role] = em;
-        if (em.type === "kenmu") currentKenmu.push(em);
-        if (em.type === "clear" && em.section) skipSections.push(em.section);
+        if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
+        if (em.type === "kenmu") { currentKenmu.push(em); }
+        if (em.type === "clear" && em.section) { skipSections.push(em.section); }
       }
     });
 
     const strictRooms = ["治療", "RI", "MMG", "透析後胸部"];
     Object.keys(dayCells).forEach(sec => {
       if (["明け","入り","不在","土日休日代休"].includes(sec)) return;
-      if (skipSections.includes(sec)) { dayCells[sec] = ""; return; }
+      if (skipSections.includes(sec)) {
+        dayCells[sec] = "";
+        return;
+      }
       
       let allowedForStrict: string[] | null = null;
       if (strictRooms.includes(sec)) {
@@ -478,249 +586,500 @@ export default function App() {
           allowedForStrict = allowedForStrict.map(getCoreName);
       }
 
-      dayCells[sec] = join(split(dayCells[sec]).map(m => {
+      let members = split(dayCells[sec]);
+      members = members.map(m => {
         const core = getCoreName(m);
         const block = blockMap.get(core);
-        if (allowedForStrict && allowedForStrict.length > 0 && !allowedForStrict.includes(core)) return null;
-        if (block === 'ALL' || (block === 'AM' && m.includes('(AM)')) || (block === 'PM' && m.includes('(PM)'))) return null; 
+        
+        if (allowedForStrict !== null && allowedForStrict.length > 0 && !allowedForStrict.includes(core)) return null;
+
+        if (block === 'ALL') return null; 
+        if (block === 'AM' && m.includes('(AM)')) return null; 
+        if (block === 'PM' && m.includes('(PM)')) return null; 
         if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) return `${core}(PM)`;
         if (block === 'PM' && !m.includes('(AM)') && !m.match(/\(.*\)/)) return `${core}(AM)`;
         return m;
-      }).filter(Boolean) as string[]);
+      }).filter(Boolean) as string[];
+      dayCells[sec] = join(members);
     });
 
-    const assignCounts: Record<string, number> = {}; const maxAssigns: Record<string, number> = {};
+    const assignCounts: Record<string, number> = {};
+    const maxAssigns: Record<string, number> = {};
     allStaff.forEach(s => { assignCounts[s] = 0; maxAssigns[s] = 1; });
+
     Object.keys(dayCells).forEach((key) => { 
-      if (!["明け","入り","不在","土日休日代休","昼当番"].includes(key)) split(dayCells[key]).forEach(name => assignCounts[getCoreName(name)] = (assignCounts[getCoreName(name)] || 0) + 1); 
+      if (["明け","入り","不在","土日休日代休","昼当番"].includes(key)) return; 
+      split(dayCells[key]).forEach(name => { const c = getCoreName(name); assignCounts[c] = (assignCounts[c] || 0) + 1; }); 
     });
 
     const isUsed = (name: string) => (assignCounts[name] || 0) >= (maxAssigns[name] || 1);
     const addUsed = (name: string) => { assignCounts[name] = (assignCounts[name] || 0) + 1; };
 
-    const counts: Record<string, number> = {}; allStaff.forEach(s => counts[s] = 0);
-    pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (!["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) split(val as string).forEach(m => { if (counts[getCoreName(m)] !== undefined) counts[getCoreName(m)]++; }); }); });
+    const counts: Record<string, number> = {};
+    allStaff.forEach(s => counts[s] = 0);
+    pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
     const availAll = allStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
-      const aBlock = blockMap.get(a) !== 'NONE'; const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return -1; if (!aBlock && bBlock) return 1;
-      return counts[a] !== counts[b] ? counts[a] - counts[b] : Math.random() - 0.5;
+      const aBlock = blockMap.get(a) !== 'NONE';
+      const bBlock = blockMap.get(b) !== 'NONE';
+      if (aBlock && !bBlock) return -1;
+      if (!aBlock && bBlock) return 1;
+      if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
+      return Math.random() - 0.5;
     });
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    const availCount = availGeneral.length;
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
-      const primary = Array.from(new Set(list.filter(Boolean))).filter(name => {
+      const uniqueList = Array.from(new Set(list.filter(Boolean)));
+
+      const primary = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
-        const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || (section === "RI" && split(monthlyAssign.RI || "").includes(name));
-        if (!allowRepeatFromPrev && prevDay && section && !isFixed && split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
-        return !hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), true);
+        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RI || "").includes(name) : false;
+        const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || isMonthlyMain;
+        if (!allowRepeatFromPrev && prevDay && section && !isFixed) {
+          if (split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
+        }
+        if (hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), true)) return false;
+        return true;
       });
       for (const name of primary) { result.push(name); addUsed(name); if (result.length >= n) return result; }
 
-      const fallback = Array.from(new Set(list.filter(Boolean))).filter(name => {
+      const fallback = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
-        const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || (section === "RI" && split(monthlyAssign.RI || "").includes(name));
-        if (!allowRepeatFromPrev && prevDay && section && !isFixed && split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
-        return !hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), false);
+        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RI || "").includes(name) : false;
+        const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || isMonthlyMain;
+        if (!allowRepeatFromPrev && prevDay && section && !isFixed) {
+          if (split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
+        }
+        if (hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), false)) return false;
+        return true;
       });
       for (const name of fallback) { result.push(name); addUsed(name); if (result.length >= n) return result; }
       
-      const lastResort = Array.from(new Set(list.filter(Boolean))).filter(name => !availList.includes(name) || isUsed(name) || (section && isForbidden(name, section)) ? false : !hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), false));
+      const lastResort = uniqueList.filter(name => {
+        if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
+        if (hasNGPair(name, [...currentAssigned, ...result].map(getCoreName), false)) return false;
+        return true;
+      });
       for (const name of lastResort) { result.push(name); addUsed(name); if (result.length >= n) return result; }
+
       return result;
     }
 
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
-      let amCount = 0; let pmCount = 0;
+      
+      let amCount = 0;
+      let pmCount = 0;
       
       current.forEach(m => {
-        let isAM = true; let isPM = true;
-        if (m.includes("(AM)") || m.match(/\(〜\d{1,2}:\d{2}\)/)) isPM = false;
-        if (m.includes("(PM)") || m.match(/\(\d{1,2}:\d{2}〜\)/)) isAM = false;
-        if (isAM) amCount += 1; if (isPM) pmCount += 1;
+        let isAM = true;
+        let isPM = true;
+        if (m.includes("(AM)")) { isPM = false; }
+        if (m.includes("(PM)")) { isAM = false; }
+        if (m.match(/\(〜\d{1,2}:\d{2}\)/)) { isPM = false; } 
+        if (m.match(/\(\d{1,2}:\d{2}〜\)/)) { isAM = false; } 
+        
+        if (isAM) amCount += 1;
+        if (isPM) pmCount += 1;
       });
 
       let safeCounter = 0;
       while ((amCount < targetCount || pmCount < targetCount) && safeCounter < 20) {
         safeCounter++;
+        const neededAM = amCount < targetCount;
+        const neededPM = pmCount < targetCount;
+
         const validPreferred = preferredList.filter(name => {
           if (isUsed(name) || isForbidden(name, section) || current.map(getCoreName).includes(name)) return false;
           const b = blockMap.get(name);
-          if (b === 'ALL' || (amCount < targetCount && pmCount >= targetCount && b === 'AM') || (pmCount < targetCount && amCount >= targetCount && b === 'PM')) return false;
+          if (b === 'ALL') return false;
+          if (neededAM && !neededPM && b === 'AM') return false; 
+          if (neededPM && !neededAM && b === 'PM') return false; 
           return true;
         });
         const validAvail = availList.filter(name => {
           if (isUsed(name) || isForbidden(name, section) || current.map(getCoreName).includes(name)) return false;
           const b = blockMap.get(name);
-          if (b === 'ALL' || (amCount < targetCount && pmCount >= targetCount && b === 'AM') || (pmCount < targetCount && amCount >= targetCount && b === 'PM')) return false;
+          if (b === 'ALL') return false;
+          if (neededAM && !neededPM && b === 'AM') return false;
+          if (neededPM && !neededAM && b === 'PM') return false;
           return true;
         });
 
         if (validPreferred.length === 0 && validAvail.length === 0) break;
-        const picked = pick(validAvail, [...validPreferred, ...validAvail], 1, section, current.map(getCoreName), false);
-        if (picked.length === 0) break;
 
-        const core = picked[0];
+        const pickedCoreList = pick(validAvail, [...validPreferred, ...validAvail], 1, section, current.map(getCoreName), false);
+        if (pickedCoreList.length === 0) break;
+
+        const core = pickedCoreList[0];
         const block = blockMap.get(core);
-        let tag = "";
         
-        if (block === 'AM') { tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)"; pmCount += 1; }
-        else if (block === 'PM') { tag = "(AM)"; amCount += 1; }
-        else {
-          if (amCount < targetCount && pmCount >= targetCount) { tag = "(AM)"; amCount += 1; }
-          else if (pmCount < targetCount && amCount >= targetCount) { tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)"; pmCount += 1; }
-          else { tag = section === "透視（6号）" ? "(〜17:00)" : ""; amCount += 1; pmCount += 1; }
+        let tag = "";
+        if (block === 'AM') { 
+          tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
+          pmCount += 1;
+        } else if (block === 'PM') { 
+          tag = "(AM)";
+          amCount += 1;
+        } else {
+          if (neededAM && !neededPM) {
+            tag = "(AM)";
+            amCount += 1;
+          } else if (neededPM && !neededAM) {
+            tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
+            pmCount += 1;
+          } else {
+            tag = section === "透視（6号）" ? "(〜17:00)" : "";
+            amCount += 1;
+            pmCount += 1;
+          }
         }
         current.push(`${core}${tag}`);
+        addUsed(core);
       }
       dayCells[section] = join(current);
     }
 
     (customRules.fixed || []).forEach((rule: any) => {
-      if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section) || skipSections.includes(rule.section)) return;
+      if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
+      if (skipSections.includes(rule.section)) return;
       const current = split(dayCells[rule.section]);
       if (current.map(getCoreName).includes(rule.staff) || hasNGPair(rule.staff, current.map(getCoreName), false)) return;
+      
       const block = blockMap.get(rule.staff);
-      dayCells[rule.section] = join([...current, `${rule.staff}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`]); 
+      let tag = "";
+      if (block === 'AM') tag = "(PM)";
+      if (block === 'PM') tag = "(AM)";
+
+      dayCells[rule.section] = join([...current, `${rule.staff}${tag}`]); 
       addUsed(rule.staff);
     });
 
     Object.values(roleAssignments).forEach((ra: any) => {
       if (skipSections.includes(ra.section)) return;
-      const staff = split(monthlyAssign[ra.role] || "").find(s => (ra.role === "受付" ? availReception : availGeneral).includes(s) && !isUsed(s));
+      const candidates = split(monthlyAssign[ra.role] || "");
+      const isRec = ["受付"].includes(ra.role);
+      const targetAvail = isRec ? availReception : availGeneral;
+      const staff = candidates.find(s => targetAvail.includes(s) && !isUsed(s));
       if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { 
         const block = blockMap.get(staff);
-        dayCells[ra.section] = join([...split(dayCells[ra.section]), `${staff}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`]); 
+        let tag = "";
+        if (block === 'AM') tag = "(PM)";
+        if (block === 'PM') tag = "(AM)";
+        dayCells[ra.section] = join([...split(dayCells[ra.section]), `${staff}${tag}`]); 
         addUsed(staff); 
       }
     });
 
-    if (!skipSections.includes("治療")) fill([...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)].filter(s => availGeneral.includes(s)), "治療", [...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)].filter(s => availGeneral.includes(s)), customRules.capacity?.治療 ?? 3);
-    if (!skipSections.includes("RI")) { fill([...split(monthlyAssign.RI), ...split(monthlyAssign.RIサブ)].filter(s => availGeneral.includes(s)), "RI", [...split(monthlyAssign.RI), ...split(monthlyAssign.RIサブ)].filter(s => availGeneral.includes(s)), customRules.capacity?.RI ?? 1); split(dayCells["RI"]).forEach(name => maxAssigns[getCoreName(name)] = 2); }
+    if (!skipSections.includes("治療")) {
+      const treatTarget = customRules.capacity?.治療 ?? 3;
+      const treatMain = split(monthlyAssign.治療 || "").filter(s => availGeneral.includes(s));
+      const treatPrioritySub = split(monthlyAssign.治療サブ優先 || "").filter(s => availGeneral.includes(s));
+      const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
+      
+      const preferred = [...treatMain, ...treatPrioritySub, ...treatSub];
+      fill(preferred, "治療", preferred, treatTarget);
+    }
+
+    if (!skipSections.includes("RI")) {
+      const riTarget = customRules.capacity?.RI ?? 1;
+      const riMain = split(monthlyAssign.RI || "").filter(s => availGeneral.includes(s));
+      const riSub = split(monthlyAssign.RIサブ || "").filter(s => availGeneral.includes(s));
+      const preferred = [...riMain, ...riSub];
+      fill(preferred, "RI", preferred, riTarget);
+      split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
+    }
 
     (customRules.substitutes || []).forEach((sub: any) => {
-      if (!sub.target || skipSections.includes(sub.section) || (availAll.includes(sub.target) && !isUsed(sub.target))) return; 
-      const currentSec = split(dayCells[sub.section]);
-      for (const f of split(sub.subs).filter(s => availGeneral.includes(s) && !isUsed(s))) {
-        if (!hasNGPair(f, currentSec.map(getCoreName), false) && currentSec.length < 6) {
-          const block = blockMap.get(f);
-          dayCells[sub.section] = join([...currentSec, `${f}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`]); 
-          addUsed(f); break; 
+      if (!sub.target || skipSections.includes(sub.section)) return; 
+      const trigger = !availAll.includes(sub.target) || isUsed(sub.target);
+      if (trigger) {
+        const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !isUsed(s));
+        if (fallbackStaff.length > 0) {
+          const currentSec = split(dayCells[sub.section]);
+          for (const f of fallbackStaff) {
+            if (!hasNGPair(f, currentSec.map(getCoreName), false) && currentSec.length < 6) {
+              const block = blockMap.get(f);
+              let tag = "";
+              if (block === 'AM') tag = "(PM)";
+              if (block === 'PM') tag = "(AM)";
+              dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); 
+              addUsed(f);
+              break; 
+            }
+          }
         }
       }
     });
 
-    if (!skipSections.includes("CT")) { fill(availGeneral, "CT", split(monthlyAssign.CT || ""), customRules.capacity?.CT ?? 3); const ct = split(dayCells["CT"]); if (ct.length >= 4) maxAssigns[getCoreName(ct[ct.length - 1])] = 2; }
+    if (!skipSections.includes("CT")) {
+      const ctTarget = customRules.capacity?.CT ?? 3;
+      fill(availGeneral, "CT", split(monthlyAssign.CT || ""), ctTarget);
+      const ctMembersAfter = split(dayCells["CT"]).map(getCoreName);
+      if (ctMembersAfter.length >= 4) { maxAssigns[ctMembersAfter[ctMembersAfter.length - 1]] = 2; }
+    }
 
     if (!skipSections.includes("MRI")) {
+      const currentMRI = split(dayCells["MRI"]);
+      const mriTarget = customRules.capacity?.MRI ?? 3;
       const addMRI = (name: string) => {
-        if (!name || !availGeneral.includes(name) || isUsed(name) || split(dayCells["MRI"]).map(getCoreName).includes(name) || isForbidden(name, "MRI") || hasNGPair(name, split(dayCells["MRI"]).map(getCoreName), false)) return;
+        if (!name || !availGeneral.includes(name) || isUsed(name) || currentMRI.map(getCoreName).includes(name) || isForbidden(name, "MRI") || hasNGPair(name, currentMRI.map(getCoreName), false)) return;
         const block = blockMap.get(name);
-        dayCells["MRI"] = join([...split(dayCells["MRI"]), `${name}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`]); 
+        let tag = "";
+        if (block === 'AM') tag = "(PM)";
+        if (block === 'PM') tag = "(AM)";
+        currentMRI.push(`${name}${tag}`); 
         addUsed(name);
       };
       (customRules.pushOuts || []).forEach((po: any) => {
-        if (split(dayCells[po.triggerSection]).map(getCoreName).includes(po.triggerStaff) || (split(monthlyAssign[po.triggerSection] || "").includes(po.triggerStaff) && availAll.includes(po.triggerStaff) && !isUsed(po.triggerStaff))) {
+        const isTriggerActive = split(dayCells[po.triggerSection]).map(getCoreName).includes(po.triggerStaff) || (split(monthlyAssign[po.triggerSection] || "").includes(po.triggerStaff) && availAll.includes(po.triggerStaff) && !isUsed(po.triggerStaff));
+        if (isTriggerActive) {
           addMRI(po.triggerStaff);
           if (availGeneral.includes(po.targetStaff) && !isUsed(po.targetStaff)) {
-            for (const room of split(po.targetSections).filter(s => !skipSections.includes(s))) {
+            const allowed = split(po.targetSections).filter(s => !skipSections.includes(s));
+            for (const room of allowed) {
               if (split(dayCells[room]).length === 0) { 
                 const block = blockMap.get(po.targetStaff);
-                dayCells[room] = `${po.targetStaff}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`; 
+                let tag = "";
+                if (block === 'AM') tag = "(PM)";
+                if (block === 'PM') tag = "(AM)";
+                dayCells[room] = `${po.targetStaff}${tag}`; 
                 addUsed(po.targetStaff); break; 
               }
             }
           }
-        } else addMRI(po.targetStaff);
+        } else { addMRI(po.targetStaff); }
       });
-      fill(availGeneral, "MRI", split(monthlyAssign.MRI || ""), customRules.capacity?.MRI ?? 3);
+      dayCells["MRI"] = join(currentMRI);
+      fill(availGeneral, "MRI", split(monthlyAssign.MRI || ""), mriTarget);
     }
     
     const extraPriorityRooms = Object.keys(customRules.capacity || {}).filter(r => !["治療", "RI", "CT", "MRI", "受付"].includes(r));
     extraPriorityRooms.forEach(room => {
       if (skipSections.includes(room)) return;
       const targetCount = customRules.capacity[room];
-      const pref = split(monthlyAssign[room] || "").filter(s => availGeneral.includes(s));
-      fill(room === "MMG" || room === "透析後胸部" ? pref : room === "受付ヘルプ" ? availAll : availGeneral, room, pref, targetCount);
+      const preferredList = split(monthlyAssign[room] || "").filter(s => availGeneral.includes(s));
+      
+      if (room === "MMG" || room === "透析後胸部") {
+        fill(preferredList, room, preferredList, targetCount);
+      } else if (room === "受付ヘルプ") {
+        fill(availAll, room, preferredList, targetCount);
+      } else {
+        fill(availGeneral, room, preferredList, targetCount);
+      }
     });
 
     if (!skipSections.includes("受付")) {
       const uTarget = customRules.capacity?.受付 ?? 2;
       let currentUketsuke = split(dayCells["受付"]);
-      split(monthlyAssign.受付 || "").forEach(name => { if (availReception.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { currentUketsuke.push(name); addUsed(name); } });
-      if (uTarget - currentUketsuke.length > 0) currentUketsuke = [...currentUketsuke, ...pick(availReception, availReception, uTarget - currentUketsuke.length, "受付", currentUketsuke)];
+      const uketsukeMonthly = split(monthlyAssign.受付 || "");
+      for (const name of uketsukeMonthly) {
+        if (availReception.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { currentUketsuke.push(name); addUsed(name); }
+      }
+      const neededUketsuke = uTarget - currentUketsuke.length;
+      if (neededUketsuke > 0) {
+        const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
+        currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
+      }
       dayCells["受付"] = join(currentUketsuke);
     }
+    const uketsukeShortage = Math.max(0, (customRules.capacity?.受付 ?? 2) - split(dayCells["受付"]).length);
 
-    if (!skipSections.includes("検像") && !extraPriorityRooms.includes("検像")) fill(availGeneral, "検像", [], 1);
-
-    let helpMembers: string[] = [];
-    if (availCount <= (customRules.helpThreshold ?? 17)) {
-      helpMembers = [...split(dayCells["RI"]).map(getCoreName)];
-      if (split(dayCells["CT"]).length >= 4) helpMembers.push(getCoreName(split(dayCells["CT"])[split(dayCells["CT"]).length - 1]));
+    if (!skipSections.includes("検像") && !extraPriorityRooms.includes("検像")) {
+      fill(availGeneral, "検像", [], 1);
     }
 
-    ["1号室", "2号室", "3号室", "5号室"].forEach(sec => { if (!extraPriorityRooms.includes(sec)) fill(availGeneral, sec, helpMembers, 1); });
-    if (!skipSections.includes("透析後胸部") && !extraPriorityRooms.includes("透析後胸部")) { const toseki = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s)); fill(toseki, "透析後胸部", toseki, toseki.length > 0 ? toseki.length : 0); }
+    let helpMembers: string[] = [];
+    if (tempAvailCount <= (customRules.helpThreshold ?? 17)) {
+      helpMembers = [...split(dayCells["RI"]).map(getCoreName)];
+      if (split(dayCells["CT"]).length >= 4) { helpMembers.push(getCoreName(split(dayCells["CT"])[split(dayCells["CT"]).length - 1])); }
+    }
+
+    ["1号室", "2号室", "3号室", "5号室"].forEach(sec => {
+      if (!extraPriorityRooms.includes(sec)) {
+        fill(availGeneral, sec, helpMembers, 1);
+      }
+    });
     
+    if (!skipSections.includes("透析後胸部") && !extraPriorityRooms.includes("透析後胸部")) {
+      const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
+      fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
+    }
+
+    // ★ 6号室の交代枠を完全に分離して確実にする
     if (!skipSections.includes("透視（6号）") && !extraPriorityRooms.includes("透視（6号）")) {
+      // 1. 日勤（1人）を決める
       fill(availGeneral, "透視（6号）", helpMembers, 1);
-      let current = split(dayCells["透視（6号）"]).map(m => (!m.includes("(") && !m.includes(")")) ? m + "(〜17:00)" : m);
+      
+      let current = split(dayCells["透視（6号）"]);
+      
+      // もし日勤で選ばれた人が終日の場合、明示的に (〜17:00) を付ける
+      current = current.map(m => (!m.includes("(") && !m.includes(")")) ? m + "(〜17:00)" : m);
+
+      // 2. 17:00〜の枠（1人）を追加する（手動で入っていなければ）
       if (!current.some(m => m.includes("17:00〜"))) {
-        const yugataPicked = pick(availGeneral, helpMembers, 1, "透視（6号）", current.map(getCoreName), true);
-        if (yugataPicked.length > 0) { current.push(`${yugataPicked[0]}(17:00〜)`); addUsed(yugataPicked[0]); }
+        const currentCore = current.map(getCoreName);
+        
+        // 17時からの候補者：すでに6号室にいない人、AMのみ出勤ではない人、NG対象ではない人
+        // （すでに別の日勤をやっている人＝isUsedがtrueの人も候補に含めるために、通常のpickではなく専用で探す）
+        const yugataCandidates = availGeneral.filter(name => {
+          if (currentCore.includes(name)) return false;
+          if (blockMap.get(name) === 'AM') return false;
+          if (isForbidden(name, "透視（6号）")) return false;
+          if (hasNGPair(name, currentCore, false)) return false;
+          return true;
+        });
+
+        // 優先度: helpMembers に含まれる人 -> それ以外
+        let yugataPicked = yugataCandidates.find(name => helpMembers.includes(name));
+        if (!yugataPicked && yugataCandidates.length > 0) {
+          yugataCandidates.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+          yugataPicked = yugataCandidates[0];
+        }
+
+        if (yugataPicked) {
+          current.push(`${yugataPicked}(17:00〜)`);
+        }
       }
       dayCells["透視（6号）"] = join(current);
     }
 
-    if (!skipSections.includes("MMG") && !extraPriorityRooms.includes("MMG")) { const mmg = split(monthlyAssign.MMG || "").filter(s => availGeneral.includes(s)); fill(mmg, "MMG", mmg, mmg.length > 0 ? 1 : 0); }
+    if (!skipSections.includes("MMG") && !extraPriorityRooms.includes("MMG")) {
+      const mmgMonthly = split(monthlyAssign.MMG || "").filter(s => availGeneral.includes(s));
+      fill(mmgMonthly, "MMG", mmgMonthly, mmgMonthly.length > 0 ? 1 : 0);
+    }
+    
     fill(availGeneral, "透視（11号）", helpMembers, 1);
-    ["骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => { if (!extraPriorityRooms.includes(sec)) fill(availGeneral, sec, helpMembers, 1); });
+    ["骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => {
+      if (!extraPriorityRooms.includes(sec)) {
+        fill(availGeneral, sec, helpMembers, 1);
+      }
+    });
 
     if (!skipSections.includes("受付ヘルプ") && !extraPriorityRooms.includes("受付ヘルプ")) {
       let currentUketsukeHelp = split(dayCells["受付ヘルプ"]);
-      split(monthlyAssign.受付ヘルプ || "").forEach(item => {
-        if (GENERAL_ROOMS.includes(item) || ROOM_SECTIONS.includes(item)) split(dayCells[item]).map(getCoreName).forEach(rs => { if (rs && !currentUketsukeHelp.map(getCoreName).includes(rs)) currentUketsukeHelp.push(rs); });
-        else if (allStaff.includes(item) && availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) { const block = blockMap.get(item); currentUketsukeHelp.push(`${item}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`); addUsed(item); }
-      });
+      const helpMonthly = split(monthlyAssign.受付ヘルプ || "");
+      for (const item of helpMonthly) {
+        if (GENERAL_ROOMS.includes(item) || ROOM_SECTIONS.includes(item)) {
+          const roomStaffs = split(dayCells[item]).map(getCoreName);
+          for (const rs of roomStaffs) {
+            if (rs && !currentUketsukeHelp.map(getCoreName).includes(rs)) {
+              currentUketsukeHelp.push(rs);
+            }
+          }
+        } else if (allStaff.includes(item)) {
+          if (availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
+            const block = blockMap.get(item);
+            let tag = "";
+            if (block === 'AM') tag = "(PM)";
+            if (block === 'PM') tag = "(AM)";
+            currentUketsukeHelp.push(`${item}${tag}`);
+            addUsed(item); 
+          }
+        }
+      }
       dayCells["受付ヘルプ"] = join(currentUketsukeHelp);
-      if (split(monthlyAssign.受付ヘルプ || "").length > 0 && currentUketsukeHelp.length === 0) fill(availGeneral, "受付ヘルプ", [], 1);
+      if (helpMonthly.length > 0 && currentUketsukeHelp.length === 0) {
+        fill(availGeneral, "受付ヘルプ", [], 1);
+      }
     }
 
-    currentKenmu.forEach((km: any) => { const p1 = split(dayCells[km.s1]); if (p1.length > 0 && !skipSections.includes(km.s2)) dayCells[km.s2] = join(p1); });
+    currentKenmu.forEach((km: any) => {
+      const p1 = split(dayCells[km.s1]);
+      if (p1.length > 0 && !skipSections.includes(km.s2)) { 
+        dayCells[km.s2] = join(p1); 
+      }
+    });
 
     if (!skipSections.includes("残り・待機")) {
       let currentReserve = split(dayCells["残り・待機"]);
-      availAll.filter(name => !isUsed(name)).forEach(name => { const block = blockMap.get(name); currentReserve.push(`${name}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`); addUsed(name); });
-      if (currentReserve.length === 0) pick(availGeneral, availGeneral, 1, "残り・待機", currentReserve, true).forEach(name => { const block = blockMap.get(name); currentReserve.push(`${name}${block === 'AM' ? "(PM)" : block === 'PM' ? "(AM)" : ""}`); addUsed(name); });
+      const unassigned = availAll.filter(name => !isUsed(name));
+      unassigned.forEach(name => {
+        const block = blockMap.get(name);
+        let tag = "";
+        if (block === 'AM') tag = "(PM)";
+        if (block === 'PM') tag = "(AM)";
+        currentReserve.push(`${name}${tag}`);
+        addUsed(name);
+      });
+      if (currentReserve.length === 0) {
+        const fallback = pick(availGeneral, availGeneral, 1, "残り・待機", currentReserve, true);
+        fallback.forEach(name => {
+            const block = blockMap.get(name);
+            let tag = "";
+            if (block === 'AM') tag = "(PM)";
+            if (block === 'PM') tag = "(AM)";
+            currentReserve.push(`${name}${tag}`);
+            addUsed(name);
+        });
+      }
       dayCells["残り・待機"] = join(currentReserve);
     }
+    
     fill(availGeneral, "待機", [], 1);
 
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
       let baseLunchTarget = customRules.lunchBaseCount ?? 3;
-      const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === day.label.match(/\((.*?)\)/)?.[1]);
-      if (specialDay) baseLunchTarget = Number(specialDay.count);
-      const lunchTarget = baseLunchTarget + Math.max(0, (customRules.capacity?.受付 ?? 2) - split(dayCells["受付"]).length);
+      const dayChar = day.label.match(/\((.*?)\)/)?.[1];
+      if (dayChar) {
+        const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === dayChar);
+        if (specialDay) baseLunchTarget = Number(specialDay.count);
+      }
+      const lunchTarget = baseLunchTarget + uketsukeShortage;
 
       (customRules.lunchConditional || []).forEach((cond: any) => {
-        if (!cond.section) return; const secMembers = split(dayCells[cond.section]);
-        if (secMembers.length >= Number(cond.min)) { let picked = 0; for (const name of secMembers) { if (picked >= Number(cond.out)) break; const core = getCoreName(name); if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) { currentLunch.push(core); picked++; } } }
+        if (!cond.section) return;
+        const secMembers = split(dayCells[cond.section]);
+        if (secMembers.length >= Number(cond.min)) {
+          let picked = 0;
+          for (const name of secMembers) {
+            if (picked >= Number(cond.out)) break;
+            const core = getCoreName(name);
+            if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) {
+              currentLunch.push(core);
+              picked++;
+            }
+          }
+        }
       });
       
-      split(customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT").forEach(sec => split(dayCells[sec]).forEach(name => { const core = getCoreName(name); if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) currentLunch.push(core); }));
+      const prioritySecs = split(customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT");
+      const lunchCandidates: string[] = [];
+      prioritySecs.forEach(sec => {
+        split(dayCells[sec]).forEach(name => lunchCandidates.push(name));
+      });
+
+      for (const name of lunchCandidates) { 
+        const core = getCoreName(name);
+        if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) {
+          currentLunch.push(core); 
+        }
+      }
       
       if (currentLunch.length < lunchTarget) {
-        const lastResortMembers: string[] = []; split(customRules.lunchLastResortSections ?? "治療").forEach(sec => split(dayCells[sec]).forEach(name => lastResortMembers.push(getCoreName(name))));
-        availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name)).forEach(name => { if (currentLunch.length < lunchTarget) currentLunch.push(name); });
-        if (currentLunch.length < lunchTarget) availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name)).forEach(name => { if (currentLunch.length < lunchTarget) currentLunch.push(name); });
+        const lastResortSecs = split(customRules.lunchLastResortSections ?? "治療");
+        const lastResortMembers: string[] = [];
+        lastResortSecs.forEach(sec => {
+          split(dayCells[sec]).forEach(name => lastResortMembers.push(getCoreName(name)));
+        });
+
+        const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
+        for (const name of fallbackCandidates) { 
+          if (currentLunch.length < lunchTarget) currentLunch.push(name); 
+        }
+        
+        if (currentLunch.length < lunchTarget) {
+           const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
+           for (const name of finalFallback) {
+             if (currentLunch.length < lunchTarget) currentLunch.push(name); 
+           }
+        }
       }
       dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
     }
@@ -728,21 +1087,52 @@ export default function App() {
     return { ...day, cells: dayCells };
   };
 
-  const handleAutoOne = () => { if(cur.isPublicHoliday) return; setAllDays(prev => { const nextAll = { ...prev }; const idx = days.findIndex(d => d.id === cur.id); const updatedDay = autoAssign({ ...days[idx], cells: nextAll[days[idx].id] || days[idx].cells }, idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells}))); nextAll[updatedDay.id] = updatedDay.cells; return nextAll; }); };
-  const handleAutoAll = () => { setAllDays(prev => { const nextAll = { ...prev }; let prevDayObj = null; const tempDays: any[] = []; for (let i = 0; i < 5; i++) { const updatedDay = autoAssign({ ...days[i], cells: nextAll[days[i].id] || days[i].cells }, prevDayObj, tempDays); nextAll[updatedDay.id] = updatedDay.cells; prevDayObj = updatedDay; tempDays.push(updatedDay); } return nextAll; }); };
+  const handleAutoOne = () => {
+    if(!cur || cur.isPublicHoliday) return;
+    setAllDays(prev => {
+      const nextAll = { ...prev };
+      const idx = days.findIndex(d => d.id === cur.id);
+      const baseDay = { ...days[idx], cells: nextAll[days[idx].id] || days[idx].cells };
+      const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
+      const updatedDay = autoAssign(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})));
+      nextAll[updatedDay.id] = updatedDay.cells;
+      return nextAll;
+    });
+  };
+
+  const handleAutoAll = () => {
+    setAllDays(prev => {
+      const nextAll = { ...prev };
+      let prevDayObj = null;
+      const tempDays: any[] = [];
+      for (let i = 0; i < 5; i++) {
+        const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
+        const updatedDay = autoAssign(baseDay, prevDayObj, tempDays);
+        nextAll[updatedDay.id] = updatedDay.cells;
+        prevDayObj = updatedDay;
+        tempDays.push(updatedDay);
+      }
+      return nextAll;
+    });
+  };
 
   return (
     <div style={{ padding: "20px 12px", maxWidth: 1400, margin: "0 auto", background: "#f4f7f9" }}>
       <style>{globalStyle}</style>
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <div><h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2></div>
+        <div>
+          <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
+        </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
           <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
           <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
           <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
-          <label className="btn-hover" style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-flex" }}>📂 読込<input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} /></label>
+          <label className="btn-hover" style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-flex" }}>
+            📂 読込
+            <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
+          </label>
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
@@ -754,6 +1144,7 @@ export default function App() {
             <span>⚙️</span> スタッフ名簿 ＆ 特殊ルールの設定を開く
           </summary>
           <div style={{ paddingTop: 20, borderTop: "2px dashed #e2e8f0", marginTop: 16 }}>
+            
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>在籍スタッフ名簿（一般）</label>
@@ -771,19 +1162,32 @@ export default function App() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 20 }}>
+              
               <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👥 絶対優先の人数設定（自動割当用）</h4>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>ここで設定した部屋と人数は、AIが最優先でアサインします。（CT, MRI, 治療, RI 以外も自由に追加可能）</p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   {Object.entries(customRules.capacity || {}).map(([room, count]) => (
                     <div key={room} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
                       <span style={{ fontSize: 13, fontWeight: 800, color: "#475569" }}>{room}:</span>
                       <input type="number" min="0" value={count as number} onChange={e => setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: Number(e.target.value)}})} style={{ width: 44, border: "none", outline: "none", fontSize: 15, fontWeight: 800, textAlign: "center", color: "#334155", background: "transparent" }} />
                       <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>人</span>
-                      <span onClick={() => { const newCap = {...customRules.capacity}; delete newCap[room]; setCustomRules({...customRules, capacity: newCap}); }} className="rule-del">✖</span>
+                      <span onClick={() => {
+                        const newCap = {...customRules.capacity};
+                        delete newCap[room];
+                        setCustomRules({...customRules, capacity: newCap});
+                      }} className="rule-del">✖</span>
                     </div>
                   ))}
-                  <select onChange={e => { const room = e.target.value; if (room && !customRules.capacity?.[room]) setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: 1}}); e.target.value = ""; }} className="rule-sel">
-                    <option value="">＋ 部屋を追加</option>{ROOM_SECTIONS.filter(r => !Object.keys(customRules.capacity || {}).includes(r)).map(r => <option key={r} value={r}>{r}</option>)}
+                  <select onChange={e => {
+                    const room = e.target.value;
+                    if (room && !customRules.capacity?.[room]) {
+                      setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: 1}});
+                    }
+                    e.target.value = "";
+                  }} className="rule-sel" style={{ flexShrink: 0 }}>
+                    <option value="">＋ 部屋を追加</option>
+                    {ROOM_SECTIONS.filter(r => !Object.keys(customRules.capacity || {}).includes(r)).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
               </div>
@@ -799,28 +1203,33 @@ export default function App() {
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>📅 曜日で人数を変える</h5>
                     {(customRules.lunchSpecialDays || []).map((rule: any, idx: number) => (
                       <div key={idx} className="rule-row">
-                        <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} className="rule-sel">{["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}</select>
+                        <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} className="rule-sel">
+                          {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
+                        </select>
                         <span className="rule-label">は</span>
                         <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", e.target.value)} className="rule-num" />
                         <button onClick={() => removeRule("lunchSpecialDays", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
-                    <button onClick={() => addRule("lunchSpecialDays", { day: "火", count: 4 })} className="rule-add">＋ 曜日ルールを追加</button>
+                    <button className="rule-add" onClick={() => addRule("lunchSpecialDays", { day: "火", count: 4 })}>＋ 曜日ルールを追加</button>
                   </div>
                   <div style={{ flex: 1, minWidth: "260px", background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
-                    <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚖️ 条件付き選出</h5>
+                    <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚖️ 条件付き選出（特定部屋が多い時）</h5>
                     {(customRules.lunchConditional || []).map((rule: any, idx: number) => (
                       <div key={idx} className="rule-row">
-                        <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} className="rule-sel"><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} className="rule-sel">
+                          <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                         <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", e.target.value)} className="rule-num" />
                         <span className="rule-label">人以上➔</span>
                         <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", e.target.value)} className="rule-num" />
                         <button onClick={() => removeRule("lunchConditional", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
-                    <button onClick={() => addRule("lunchConditional", { section: "CT", min: 4, out: 1 })} className="rule-add">＋ 条件ルールを追加</button>
+                    <button className="rule-add" onClick={() => addRule("lunchConditional", { section: "CT", min: 4, out: 1 })}>＋ 条件ルールを追加</button>
                   </div>
                 </div>
+                
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
                   <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
                     <h5 style={{ margin: "0 0 6px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>🎯 優先的に選出する部屋</h5>
@@ -831,22 +1240,31 @@ export default function App() {
                     <MultiSectionPicker selected={customRules.lunchLastResortSections ?? "治療"} onChange={v => setCustomRules({...customRules, lunchLastResortSections: v})} options={ROOM_SECTIONS} />
                   </div>
                 </div>
+
               </div>
 
               <div style={{ background: "#fff7ed", padding: 16, borderRadius: 12, border: "1px solid #fed7aa", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#c2410c", fontSize: 14, fontWeight: 800 }}>🔄 代打ルール</h4>
+                <p style={{ fontSize: 12, color: "#9a3412", marginBottom: 12, fontWeight: 600 }}>特定のスタッフが休みの時に、指定した代打スタッフを優先してアサインするルールです。</p>
                 {(customRules.substitutes || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74" }}>
-                    <select value={rule.target} onChange={e => updateRule("substitutes", idx, "target", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}><option value="" disabled>対象</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
+                    <select value={rule.target} onChange={e => updateRule("substitutes", idx, "target", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}>
+                      <option value="" disabled>対象スタッフ</option>
+                      {activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>➔</span>
-                    <div style={{ flex: 1, minWidth: "220px" }}><MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフ" /></div>
+                    <div style={{ flex: 1, minWidth: "220px" }}>
+                      <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
+                    </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>を</span>
-                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}><option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}>
+                      <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>に優先</span>
                     <button onClick={() => removeRule("substitutes", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })} className="rule-add" style={{color:"#c2410c", borderColor:"#fdba74"}}>＋ 代打ルールを追加</button>
+                <button className="rule-add" style={{color:"#c2410c", borderColor:"#fdba74"}} onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })}>＋ 代打ルールを追加</button>
               </div>
 
               <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
@@ -856,11 +1274,13 @@ export default function App() {
                     <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span className="rule-label">と</span>
                     <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5", color:"#b91c1c", flex:"0 0 auto", minWidth:"120px"}}><option value="hard">絶対NG</option><option value="soft">なるべくNG</option></select>
+                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5", color:"#b91c1c", flex:"0 0 auto", minWidth:"120px"}}>
+                      <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
+                    </select>
                     <button onClick={() => removeRule("ngPairs", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })} className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}} onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })}>＋ 追加</button>
               </div>
 
               <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
@@ -872,7 +1292,7 @@ export default function App() {
                     <button onClick={() => removeRule("fixed", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button onClick={() => addRule("fixed", { staff: "", section: "" })} className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("fixed", { staff: "", section: "" })}>＋ 追加</button>
               </div>
 
               <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1" }}>
@@ -886,7 +1306,7 @@ export default function App() {
                     <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
                   </div>
                 ))}
-                <button onClick={() => addRule("forbidden", { staff: "", sections: "" })} className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}} onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
               </div>
 
               <div style={{ background: "#e0f2fe", padding: 16, borderRadius: 12, border: "1px solid #bae6fd", gridColumn: "1 / -1" }}>
@@ -904,7 +1324,7 @@ export default function App() {
                     <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
                   </div>
                 ))}
-                <button onClick={() => addRule("pushOuts", { triggerStaff: "", triggerSection: "", targetStaff: "", targetSections: "" })} className="rule-add" style={{color:"#0369a1", borderColor:"#7dd3fc"}}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#0369a1", borderColor:"#7dd3fc"}} onClick={() => addRule("pushOuts", { triggerStaff: "", triggerSection: "", targetStaff: "", targetSections: "" })}>＋ 追加</button>
               </div>
 
               <div style={{ background: "#fef08a", padding: 16, borderRadius: 12, border: "1px solid #fde047", gridColumn: "1 / -1" }}>
@@ -919,9 +1339,11 @@ export default function App() {
                     <span className="rule-label" style={{color:"#854d0e"}}>出勤</span>
                     <input type="number" value={rule.threshold} onChange={e => updateRule("emergencies", idx, "threshold", e.target.value)} className="rule-num" style={{borderColor:"#fde047"}} />
                     <span className="rule-label" style={{color:"#854d0e"}}>人以下➔</span>
+                    
                     <select value={rule.type === "kenmu" ? "kenmu" : rule.type === "clear" ? "clear" : "role_assign"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"120px", borderColor:"#fde047"}}>
                       <option value="role_assign">担当配置</option><option value="kenmu">兼務</option><option value="clear">配置なし</option>
                     </select>
+
                     {rule.type === "role_assign" ? (
                       <>
                         <select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
@@ -945,7 +1367,7 @@ export default function App() {
                     <button onClick={() => removeRule("emergencies", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button onClick={() => addRule("emergencies", { threshold: 16, type: "clear", role: "", section: "", s1: "", s2: "" })} className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "clear", role: "", section: "", s1: "", s2: "" })}>＋ 追加</button>
               </div>
 
             </div>
@@ -954,7 +1376,13 @@ export default function App() {
               <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
               <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                {MONTHLY_CATEGORIES.map(({ key, label }) => <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={(key === "受付ヘルプ") ? GENERAL_ROOMS : []} />)}
+                {MONTHLY_CATEGORIES.map(({ key, label }) => {
+                  const membersStr = monthlyAssign[key] || "";
+                  const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
+                  return (
+                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -968,19 +1396,25 @@ export default function App() {
             <thead>
               <tr>
                 <th style={{...cellStyle(true, false, false, true), minWidth: "100px", borderRight: "2px solid #e2e8f0"}}>区分</th>
-                {days.map(day => (
-                  <th key={day.id} style={cellStyle(true, day.isPublicHoliday, day.id === sel)}>
-                    <div style={{ fontSize: 14, letterSpacing: "0.02em" }}>{day.label}</div>
-                    {day.isPublicHoliday && <div style={{ fontSize: 10, color: "#ef4444", marginTop: 4, fontWeight: 600 }}>🎌 {day.holidayName}</div>}
-                  </th>
-                ))}
+                {days.map(day => {
+                  return (
+                    <th key={day.id} style={cellStyle(true, day.isPublicHoliday, day.id === sel)}>
+                      <div style={{ fontSize: 14, letterSpacing: "0.02em" }}>{day.label}</div>
+                      {day.isPublicHoliday && <div style={{ fontSize: 10, color: "#ef4444", marginTop: 4, fontWeight: 600 }}>🎌 {day.holidayName}</div>}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               {SECTIONS.map(section => (
                 <tr key={section}>
                   <td style={{...cellStyle(true, false, false, true), borderRight: "2px solid #e2e8f0"}}>{section}</td>
-                  {days.map(day => <td key={day.id + section} style={cellStyle(false, day.isPublicHoliday, day.id === sel)}>{!day.isPublicHoliday && split(day.cells[section]).join("、")}</td>)}
+                  {days.map(day => {
+                    return <td key={day.id + section} style={cellStyle(false, day.isPublicHoliday, day.id === sel)}>
+                      {!day.isPublicHoliday && split(day.cells[section]).join("、")}
+                    </td>
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -990,11 +1424,13 @@ export default function App() {
 
       <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
         <div className="scroll-container hide-scrollbar" style={{ display: "flex", gap: 6, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 20, alignItems: "center" }}>
-          {days.map(d => (
-            <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
-              {d.label} {d.isPublicHoliday && "🎌"}
-            </button>
-          ))}
+          {days.map(d => {
+            return (
+              <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
+                {d.label} {d.isPublicHoliday && "🎌"}
+              </button>
+            )
+          })}
           <div style={{ flex: 1 }}></div>
           <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1", flexShrink: 0 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
         </div>
@@ -1027,7 +1463,9 @@ export default function App() {
                   )}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                  {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={(v: string) => updateDay(s, v)} />)}
+                  {group.sections.map((s: string) => (
+                    <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={(v: string) => updateDay(s, v)} />
+                  ))}
                 </div>
               </div>
             ))}
