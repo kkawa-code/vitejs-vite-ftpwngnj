@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -62,9 +62,9 @@ const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
 const DEFAULT_RULES = { staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" };
 
-const KEY_ALL_DAYS = "shifto_alldays_v82"; 
-const KEY_MONTHLY = "shifto_monthly_v82"; 
-const KEY_RULES = "shifto_rules_v82";
+const KEY_ALL_DAYS = "shifto_alldays_v84"; 
+const KEY_MONTHLY = "shifto_monthly_v84"; 
+const KEY_RULES = "shifto_rules_v84";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -314,6 +314,9 @@ export default function App() {
   });
 
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
+  
+  // ★ 強制的にファイルを選択させるための仕掛け（useRef）
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [targetMonday, setTargetMonday] = useState(() => {
     const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff));
@@ -515,6 +518,7 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  // ★ Androidの強すぎるセキュリティを突破するための読み込み関数
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -537,6 +541,40 @@ export default function App() {
     reader.readAsText(file);
     e.target.value = "";
   };
+
+  const warnings = useMemo(() => {
+    if (!cur || cur.isPublicHoliday) return [];
+    const w: string[] = [];
+    const cells = cur.cells;
+
+    const capacity = customRules.capacity || {};
+    Object.entries(capacity).forEach(([room, target]) => {
+      const count = split(cells[room]).length;
+      if (count < (target as number)) {
+        w.push(`【${room}】が不足しています（現在 ${count}人 / 目安 ${target}人）`);
+      }
+    });
+
+    let baseLunchTarget = customRules.lunchBaseCount ?? 3;
+    const dayChar = cur.label.match(/\((.*?)\)/)?.[1];
+    if (dayChar) {
+      const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === dayChar);
+      if (specialDay) baseLunchTarget = Number(specialDay.count);
+    }
+    const uketsukeShortage = Math.max(0, (customRules.capacity?.受付 ?? 2) - split(cells["受付"]).length);
+    const lunchTarget = baseLunchTarget + uketsukeShortage;
+    const lunchCount = split(cells["昼当番"]).length;
+    if (lunchCount < lunchTarget) {
+      w.push(`【昼当番】が不足しています（現在 ${lunchCount}人 / 目安 ${lunchTarget}人）`);
+    }
+    
+    const roku = split(cells["透視（6号）"]);
+    if (roku.length > 0 && !roku.some(m => m.includes("17:00〜"))) {
+       w.push(`【透視（6号）】に17:00〜の担当がいません`);
+    }
+
+    return w;
+  }, [cur, customRules]);
 
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
@@ -801,7 +839,6 @@ export default function App() {
       }
     });
 
-    // ★ 玉突き・同室回避ルール（マッピング関数で安全に先読み）
     (customRules.pushOuts || []).forEach((po: any) => {
       const s1 = po.s1 || po.triggerStaff;
       const s2 = po.s2 || po.targetStaff;
@@ -1164,10 +1201,10 @@ export default function App() {
           <button className="btn-hover" onClick={handleUndo} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), cursor: history.length === 0 ? "not-allowed" : "pointer"}} disabled={history.length === 0}>↩️ 戻る</button>
           <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
-          <label className="btn-hover" style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-flex" }}>
-            📂 読込
-            <input type="file" accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
-          </label>
+          
+          <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
+          <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleImport} />
+          
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
@@ -1481,6 +1518,22 @@ export default function App() {
           </div>
         ) : (
           <div style={{ display: "grid", gap: 32 }}>
+            {warnings.length > 0 && (
+              <div style={{ background: "#f8fafc", border: "1px dashed #cbd5e1", padding: "12px 16px", borderRadius: "12px", display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                <div style={{ fontSize: "16px" }}>💡</div>
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#64748b", marginBottom: "4px" }}>配置のヒント（設定された人数に満たない項目があります）</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {warnings.map((w, i) => (
+                      <div key={i} style={{ background: "#fff", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", color: "#475569", fontWeight: 600 }}>
+                        {w}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {RENDER_GROUPS.map((group: RenderGroup) => (
               <div key={group.title}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
