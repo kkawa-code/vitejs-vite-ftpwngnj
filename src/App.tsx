@@ -68,9 +68,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v99"; 
-const KEY_MONTHLY = "shifto_monthly_v99"; 
-const KEY_RULES = "shifto_rules_v99";
+const KEY_ALL_DAYS = "shifto_alldays_v100"; 
+const KEY_MONTHLY = "shifto_monthly_v100"; 
+const KEY_RULES = "shifto_rules_v100";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)"];
 for (let h = 8; h <= 19; h++) {
@@ -594,7 +594,6 @@ export default function App() {
     return Object.entries(stats).sort((a, b) => b[1].total - a[1].total);
   }, [days, activeGeneralStaff]);
 
-  // ★ 新設: AIが内部で持っている「今日の優先アサイン候補ランキング」を可視化
   const aiRanking = useMemo(() => {
     if (!cur || cur.isPublicHoliday) return [];
     
@@ -638,6 +637,11 @@ export default function App() {
       block: blockMap.get(name)
     }));
   }, [cur, days, activeGeneralStaff]);
+
+  // ★ 優先部屋のリストアップ
+  const priorityRoomsList = useMemo(() => {
+    return Object.keys(customRules.capacity || {}).filter(r => !["治療", "RI", "CT", "MRI", "受付"].includes(r));
+  }, [customRules.capacity]);
 
   const warnings = useMemo(() => {
     if (!cur || cur.isPublicHoliday) return [];
@@ -962,6 +966,7 @@ export default function App() {
       return staff.map(getCoreName);
     };
 
+    // 【1. 強制ルール】
     (customRules.fixed || []).forEach((rule: any) => {
       if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
       if (skipSections.includes(rule.section)) return;
@@ -1031,25 +1036,6 @@ export default function App() {
       }
     });
 
-    if (!skipSections.includes("治療")) {
-      const treatTarget = customRules.capacity?.治療 ?? 3;
-      const treatMain = split(monthlyAssign.治療 || "").filter(s => availGeneral.includes(s));
-      const treatPrioritySub = split(monthlyAssign.治療サブ優先 || "").filter(s => availGeneral.includes(s));
-      const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
-      
-      const preferred = [...treatMain, ...treatPrioritySub, ...treatSub];
-      fill(preferred, "治療", preferred, treatTarget);
-    }
-
-    if (!skipSections.includes("RI")) {
-      const riTarget = customRules.capacity?.RI ?? 1;
-      const riMain = split(monthlyAssign.RI || "").filter(s => availGeneral.includes(s));
-      const riSub = split(monthlyAssign.RIサブ || "").filter(s => availGeneral.includes(s));
-      const preferred = [...riMain, ...riSub];
-      fill(preferred, "RI", preferred, riTarget);
-      split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
-    }
-
     (customRules.substitutes || []).forEach((sub: any) => {
       if (!sub.target || skipSections.includes(sub.section)) return; 
       const trigger = !availAll.includes(sub.target) || isUsed(sub.target);
@@ -1073,6 +1059,26 @@ export default function App() {
       }
     });
 
+    // 【2. 主要モダリティ】
+    if (!skipSections.includes("治療")) {
+      const treatTarget = customRules.capacity?.治療 ?? 3;
+      const treatMain = split(monthlyAssign.治療 || "").filter(s => availGeneral.includes(s));
+      const treatPrioritySub = split(monthlyAssign.治療サブ優先 || "").filter(s => availGeneral.includes(s));
+      const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
+      
+      const preferred = [...treatMain, ...treatPrioritySub, ...treatSub];
+      fill(preferred, "治療", preferred, treatTarget);
+    }
+
+    if (!skipSections.includes("RI")) {
+      const riTarget = customRules.capacity?.RI ?? 1;
+      const riMain = split(monthlyAssign.RI || "").filter(s => availGeneral.includes(s));
+      const riSub = split(monthlyAssign.RIサブ || "").filter(s => availGeneral.includes(s));
+      const preferred = [...riMain, ...riSub];
+      fill(preferred, "RI", preferred, riTarget);
+      split(dayCells["RI"]).map(getCoreName).forEach(name => { maxAssigns[name] = 2; });
+    }
+
     if (!skipSections.includes("CT")) {
       const ctTarget = customRules.capacity?.CT ?? 3;
       fill(availGeneral, "CT", split(monthlyAssign.CT || ""), ctTarget);
@@ -1090,6 +1096,7 @@ export default function App() {
       }
     }
     
+    // 【3. ユーザー指定の優先部屋】
     const extraPriorityRooms = Object.keys(customRules.capacity || {}).filter(r => !["治療", "RI", "CT", "MRI", "受付"].includes(r));
     extraPriorityRooms.forEach(room => {
       if (skipSections.includes(room)) return;
@@ -1105,6 +1112,7 @@ export default function App() {
       }
     });
 
+    // 【4. 受付】
     let uketsukeShortage = 0;
     if (!skipSections.includes("受付")) {
       const uTarget = customRules.capacity?.受付 ?? 2;
@@ -1122,6 +1130,7 @@ export default function App() {
       uketsukeShortage = Math.max(0, uTarget - currentUketsuke.length);
     }
 
+    // 【5. 一般の部屋（未指定）】
     if (!skipSections.includes("検像") && !extraPriorityRooms.includes("検像")) {
       fill(availGeneral, "検像", [], 1);
     }
@@ -1143,6 +1152,7 @@ export default function App() {
       fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
     }
 
+    // 【6. 後処理（遅番、兼務、待機）】
     (customRules.lateShifts || []).forEach((rule: any) => {
       if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
       if (skipSections.includes(rule.section)) return;
@@ -1182,6 +1192,42 @@ export default function App() {
         }
       }
       dayCells[rule.section] = join(current);
+    });
+
+    if (!skipSections.includes("受付ヘルプ") && !extraPriorityRooms.includes("受付ヘルプ")) {
+      let currentUketsukeHelp = split(dayCells["受付ヘルプ"]);
+      const helpMonthly = split(monthlyAssign.受付ヘルプ || "");
+      for (const item of helpMonthly) {
+        if (GENERAL_ROOMS.includes(item) || ROOM_SECTIONS.includes(item)) {
+          const roomStaffs = split(dayCells[item]).map(getCoreName);
+          for (const rs of roomStaffs) {
+            if (rs && !currentUketsukeHelp.map(getCoreName).includes(rs)) {
+              currentUketsukeHelp.push(rs);
+            }
+          }
+        } else if (allStaff.includes(item)) {
+          if (availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
+            const b = blockMap.get(item);
+            let tag = ""; let f = 1;
+            if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(item, 'ALL'); }
+            else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(item, 'ALL'); }
+            else { blockMap.set(item, 'ALL'); }
+            currentUketsukeHelp.push(`${item}${tag}`);
+            addU(item, f); 
+          }
+        }
+      }
+      dayCells["受付ヘルプ"] = join(currentUketsukeHelp);
+      if (helpMonthly.length > 0 && currentUketsukeHelp.length === 0) {
+        fill(availGeneral, "受付ヘルプ", [], 1);
+      }
+    }
+
+    currentKenmu.forEach((km: any) => {
+      const p1 = split(dayCells[km.s1]);
+      if (p1.length > 0 && !skipSections.includes(km.s2)) { 
+        dayCells[km.s2] = join(p1); 
+      }
     });
 
     if (!skipSections.includes("残り・待機")) {
@@ -1683,15 +1729,16 @@ export default function App() {
             <span>🤖</span> AIの思考回路（自動割当のルールと、本日の優先度ランキング）を開く
           </summary>
           <div style={{ marginTop: 16, borderTop: "2px dashed #c4b5fd", paddingTop: 16 }}>
-            <h4 style={{ margin: "0 0 10px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>📌 AIが部屋を埋める順番（基本ルール）</h4>
+            <h4 style={{ margin: "0 0 10px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>📌 部屋が埋まる順番（処理の優先度ランキング）</h4>
+            <p style={{ fontSize: 12, color: "#7c3aed", marginBottom: 12, fontWeight: 600 }}>※上にある部屋・ルールから順番に、スタッフが割り当てられていきます。「絶対優先人数」で追加した部屋は、追加した順番に優先して処理されます。</p>
             <div style={{ fontSize: 13, color: "#4c1d95", lineHeight: 1.6, background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #ddd6fe", marginBottom: 16 }}>
               <ol style={{ margin: 0, paddingLeft: 20 }}>
-                <li><strong>専従・絶対優先</strong>：設定された「専従ルール」「代打ルール」「月間担当の絶対枠（治療・RI）」を最優先で配置します。</li>
-                <li><strong>CT・MRI</strong>：「月間担当」の中から、稼働数が少ない人を優先して配置します。</li>
-                <li><strong>一般撮影（1号室・ポータブル等）</strong>：残りのスタッフから、稼働数が少ない人を優先して配置します。（※ポータブルは前日入った人を避けます）</li>
-                <li><strong>待機・残り</strong>：ここまでで部屋に当たらなかった人を配置します。</li>
-                <li><strong>昼当番</strong>：ここまでに決まった「優先部屋（CTなど）」のメンバーから抽出して配置します。</li>
-                <li><strong>受付ヘルプ</strong>：受付が不足している場合、昼当番のメンバーから(12:15〜13:00)で配置します。</li>
+                <li><strong>【強制ルール】</strong> 専従、代打、玉突き・同室回避</li>
+                <li><strong>【主力モダリティ】</strong> 治療 → RI → CT → MRI</li>
+                <li><strong>【指定優先部屋】</strong> 「絶対優先人数」で追加した部屋（<span style={{fontWeight:800, color:"#be185d"}}>追加した順番で処理</span>：現在は {priorityRoomsList.length > 0 ? priorityRoomsList.join(' → ') : "指定なし"}）</li>
+                <li><strong>【受付】</strong> 受付</li>
+                <li><strong>【一般撮影】</strong> 指定優先部屋以外の残りの部屋（1号室、ポータブル、検像など）</li>
+                <li><strong>【後処理】</strong> 遅番、兼務、残り・待機、昼当番</li>
               </ol>
             </div>
 
