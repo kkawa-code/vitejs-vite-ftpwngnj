@@ -59,7 +59,13 @@ const MONTHLY_CATEGORIES = [
 
 const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
-const DEFAULT_RULES = { staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" };
+const DEFAULT_RULES = { 
+  staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, 
+  ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
+  lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
+  helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
+  lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
+};
 
 const KEY_ALL_DAYS = "shifto_alldays_v90"; 
 const KEY_MONTHLY = "shifto_monthly_v90"; 
@@ -107,39 +113,200 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
   return { border: "1px solid #e2e8f0", padding: "12px", background: bg, fontWeight: isHeader ? 800 : 500, textAlign: isHeader ? "center" : "left", fontSize: 13, minWidth: isHeader && !isSticky ? "100px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 5px -2px rgba(0,0,0,0.05)" : "none" }; 
 }
 
+const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
+  const current = split(selected);
+  const handleAdd = (sec: string) => { if (sec && !current.includes(sec)) onChange(join([...current, sec])); };
+  const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, alignItems: "center" }}>
+      {current.map((sec, i) => (
+        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 16, padding: "4px 10px", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, border: "1px solid #bae6fd" }}>
+          {sec} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
+        </div>
+      ))}
+      <select className="rule-sel" onChange={(e) => handleAdd(e.target.value)} value="">
+        <option value="">＋追加</option>
+        {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+    </div>
+  );
+};
+
+const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
+  const current = split(selected);
+  const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
+  const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+      {current.map((name, i) => (
+        <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 16, padding: "4px 10px", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, border: "1px solid #cbd5e1" }}>
+          {name} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
+        </div>
+      ))}
+      <select className="rule-sel" onChange={(e) => handleAdd(e.target.value)} value="">
+        <option value="">{placeholder}</option>
+        {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+    </div>
+  );
+};
+
+const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHolidays }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date(targetMonday));
+
+  useEffect(() => { setViewDate(new Date(targetMonday)); }, [targetMonday]);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth() + 1;
+
+  const handlePrev = () => setViewDate(new Date(year, month - 2, 1));
+  const handleNext = () => setViewDate(new Date(year, month, 1));
+
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  
+  const weeks: (number | null)[][] = [];
+  let currentWeek: (number | null)[] = new Array(7).fill(null);
+  for (let i = 0; i < firstDay; i++) currentWeek[i] = null;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayOfWeek = (firstDay + d - 1) % 7;
+    currentWeek[dayOfWeek] = d;
+    if (dayOfWeek === 6 || d === daysInMonth) {
+      weeks.push(currentWeek);
+      currentWeek = new Array(7).fill(null);
+    }
+  }
+
+  const handleWeekClick = (weekObj: (number|null)[]) => {
+    const validDay = weekObj.find(d => d !== null);
+    if (!validDay) return;
+    const dObj = new Date(year, month - 1, validDay);
+    const day = dObj.getDay();
+    const diff = dObj.getDate() - day + (day === 0 ? -6 : 1);
+    const mon = new Date(new Date(dObj).setDate(diff));
+    onChange(`${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`);
+    setIsOpen(false);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff"), color: "#2563eb", border: "1px solid #bfdbfe" }}>
+        📅 {targetMonday} の週 ▼
+      </button>
+      {isOpen && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setIsOpen(false)}></div>
+          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "1px solid #cbd5e1", borderRadius: 16, padding: 20, zIndex: 50, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)", minWidth: 300 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <button onClick={handlePrev} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: "#475569", fontWeight: "bold" }}>◀</button>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#1e293b", letterSpacing: "0.05em" }}>{year}年 {month}月</div>
+              <button onClick={handleNext} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: "#475569", fontWeight: "bold" }}>▶</button>
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 14 }}>
+              <thead><tr><th style={{ color: "#ef4444", padding: 6, fontWeight: 700 }}>日</th><th style={{ padding: 6, fontWeight: 700 }}>月</th><th style={{ padding: 6, fontWeight: 700 }}>火</th><th style={{ padding: 6, fontWeight: 700 }}>水</th><th style={{ padding: 6, fontWeight: 700 }}>木</th><th style={{ padding: 6, fontWeight: 700 }}>金</th><th style={{ color: "#3b82f6", padding: 6, fontWeight: 700 }}>土</th></tr></thead>
+              <tbody>
+                {weeks.map((w, wIdx) => {
+                  const isSelectedWeek = w.some(d => {
+                    if(!d) return false;
+                    const dObj = new Date(year, month - 1, d);
+                    const day = dObj.getDay();
+                    const diff = dObj.getDate() - day + (day === 0 ? -6 : 1);
+                    const mon = new Date(new Date(dObj).setDate(diff));
+                    return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}` === targetMonday;
+                  });
+
+                  return (
+                    <tr key={wIdx} onClick={() => handleWeekClick(w)} className="calendar-row" style={{ background: isSelectedWeek ? "#eff6ff" : "transparent" }}>
+                      {w.map((d, dIdx) => {
+                        if (!d) return <td key={dIdx} style={{ padding: 10 }}></td>;
+                        const dateStr = `${year}-${pad(month)}-${pad(d)}`;
+                        const holidayName = nationalHolidays[dateStr] || (customHolidays.includes(dateStr) ? "休診日" : null);
+                        const isHoliday = !!holidayName;
+                        const isSun = dIdx === 0;
+                        const isSat = dIdx === 6;
+                        let color = "#334155";
+                        if (isSun || isHoliday) color = "#ef4444";
+                        else if (isSat) color = "#3b82f6";
+                        
+                        return (
+                          <td key={dIdx} style={{ padding: 10, color, fontWeight: isHoliday ? 800 : 500, position: "relative" }} title={holidayName || ""}>
+                            {d}
+                            {isHoliday && <div style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, background: "#ef4444", borderRadius: "50%" }}></div>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [] }: { section: string, value: string, activeStaff: string[], onChange: (v: string) => void, noTime?: boolean, customOptions?: string[] }) => {
   const members = split(value);
   const handleAdd = (name: string) => { if (name) onChange(join([...members, name])); };
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
-  const handleTimeChange = (idx: number, newTime: string) => { if (noTime) return; const next = [...members]; const core = getCoreName(next[idx]); next[idx] = core + newTime; onChange(join(next)); };
+  
+  const handleTimeChange = (idx: number, newTime: string) => {
+    if (noTime) return;
+    const next = [...members];
+    const core = getCoreName(next[idx]);
+    next[idx] = core + newTime;
+    onChange(join(next));
+  };
 
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px" }}>
-      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8 }}>{section}</label>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
+      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = getCoreName(m);
           const currentMod = m.substring(coreName.length);
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
+          
           return (
             <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 16, padding: "2px 8px 2px 10px", fontSize: 12, display: "flex", alignItems: "center", gap: 4, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
-              <span>{coreName}</span>
+              <span style={{ userSelect: "none" }}>{coreName}</span>
               {!noTime && (
-                <select value={currentMod} onChange={(e) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 18px 0 2px" }}>
-                  <option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>
-                  {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}
+                <select 
+                  value={currentMod} 
+                  onChange={(e) => handleTimeChange(i, e.target.value)}
+                  style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 18px 0 2px" }}
+                >
+                  <option value="">終日</option>
+                  <option value="(AM)">AM</option>
+                  <option value="(PM)">PM</option>
+                  {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (
+                    <option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>
+                  )}
                   {TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                 </select>
               )}
-              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
+              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 4 }}>✖</span>
             </div>
           )
         })}
-        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 32px 4px 8px" }}>
+        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 28px 4px 8px" }}>
           <option value="">＋追加</option>
-          <optgroup label="スタッフ">{activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}</optgroup>
-          {customOptions.length > 0 && <optgroup label="兼務連動">{customOptions.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}</optgroup>}
-          <optgroup label="枠">{ROLE_PLACEHOLDERS.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}</optgroup>
+          <optgroup label="スタッフ">
+            {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+          </optgroup>
+          {customOptions.length > 0 && (
+            <optgroup label="部屋連動（兼務）">
+              {customOptions.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+            </optgroup>
+          )}
+          <optgroup label="担当枠（未定）">
+            {ROLE_PLACEHOLDERS.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+          </optgroup>
         </select>
       </div>
     </div>
@@ -147,17 +314,49 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
 };
 
 export default function App() {
-  const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { const saved = localStorage.getItem(KEY_ALL_DAYS); if (saved) return JSON.parse(saved); } catch {} return {}; });
+  const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => {
+    try { const saved = localStorage.getItem(KEY_ALL_DAYS); if (saved) return JSON.parse(saved); } catch {} return {};
+  });
+
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
-  const [targetMonday, setTargetMonday] = useState(() => { const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff)); return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`; });
-  const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => { try { const saved = localStorage.getItem(KEY_MONTHLY); if (saved) return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(saved) }; } catch {} return DEFAULT_MONTHLY_ASSIGN; });
-  const [customRules, setCustomRules] = useState<any>(() => { try { const saved = localStorage.getItem(KEY_RULES); if (saved) return { ...DEFAULT_RULES, ...JSON.parse(saved) }; } catch {} return DEFAULT_RULES; });
+
+  const [targetMonday, setTargetMonday] = useState(() => {
+    const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff));
+    return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
+  });
+
+  const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => {
+    try { 
+      const saved = localStorage.getItem(KEY_MONTHLY); 
+      if (saved) {
+        return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(saved) };
+      }
+    } catch {} 
+    return DEFAULT_MONTHLY_ASSIGN;
+  });
+  
+  const [customRules, setCustomRules] = useState<any>(() => {
+    try { 
+      const saved = localStorage.getItem(KEY_RULES); 
+      if (saved) {
+        return { ...DEFAULT_RULES, ...JSON.parse(saved) };
+      }
+    } catch {} 
+    return DEFAULT_RULES;
+  });
+
   const [sel, setSel] = useState("");
   const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
 
-  useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
+  useEffect(() => {
+    fetch("https://holidays-jp.github.io/api/v1/date.json")
+      .then(res => res.json())
+      .then(data => setNationalHolidays(prev => ({ ...prev, ...data })))
+      .catch(e => console.error(e));
+  }, []);
+
   useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); }, [allDays]);
   useEffect(() => { localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [monthlyAssign]);
   useEffect(() => { localStorage.setItem(KEY_RULES, JSON.stringify(customRules)); }, [customRules]);
@@ -176,25 +375,50 @@ export default function App() {
   }, [targetMonday, allDays, customHolidays, nationalHolidays]);
 
   useEffect(() => { if (!sel || !days.find(d => d.id === sel)) setSel(days[0].id); }, [days, sel]);
+
   const cur = days.find(d => d.id === sel) || days[0];
 
   const activeGeneralStaff = useMemo(() => parseAndSortStaff(customRules.staffList || DEFAULT_STAFF), [customRules.staffList]);
   const activeReceptionStaff = useMemo(() => parseAndSortStaff(customRules.receptionStaffList || ""), [customRules.receptionStaffList]);
   const allStaff = useMemo(() => Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff])), [activeGeneralStaff, activeReceptionStaff]);
 
-  const getStaffForSection = (section: string) => (section === "受付" ? activeReceptionStaff : ["明け", "入り", "土日休日代休", "不在", "待機", "残り・待機", "昼当番", "受付ヘルプ"].includes(section) ? allStaff : activeGeneralStaff);
-  const getStaffForCategory = (category: string) => (category === "受付" ? activeReceptionStaff : category === "受付ヘルプ" ? allStaff : activeGeneralStaff);
+  const getStaffForSection = (section: string) => {
+    if (section === "受付") return activeReceptionStaff;
+    if (REST_SECTIONS.includes(section) || ["待機", "残り・待機", "昼当番", "受付ヘルプ"].includes(section)) return allStaff;
+    return activeGeneralStaff;
+  };
 
-  const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); return next; }); };
-  const handleUndo = () => { setHistory(h => { if (h.length === 0) return h; setAllDays(h[h.length - 1]); return h.slice(0, -1); }); };
+  const getStaffForCategory = (category: string) => {
+    if (category === "受付") return activeReceptionStaff;
+    if (category === "受付ヘルプ") return allStaff;
+    return activeGeneralStaff;
+  };
+
+  const setAllDaysWithHistory = (updater: any) => {
+    setAllDays(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); 
+      return next;
+    });
+  };
+
+  const handleUndo = () => {
+    setHistory(h => {
+      if (h.length === 0) return h;
+      setAllDays(h[h.length - 1]);
+      return h.slice(0, -1);
+    });
+  };
 
   const updateDay = (k: string, v: string) => { 
     setAllDaysWithHistory((prev: any) => {
       const nextState = { ...prev, [cur.id]: { ...(prev[cur.id] || cur.cells), [k]: v } };
       if (k === "入り") {
-        const dateObj = new Date(cur.id); dateObj.setDate(dateObj.getDate() + 1);
+        const dateObj = new Date(cur.id);
+        dateObj.setDate(dateObj.getDate() + 1);
         const nextId = `${dateObj.getFullYear()}-${pad(dateObj.getMonth()+1)}-${pad(dateObj.getDate())}`;
-        nextState[nextId] = { ...(nextState[nextId] || {}), "明け": join(split(v).map(getCoreName)) };
+        const nextCells = nextState[nextId] || Object.fromEntries(SECTIONS.map(s => [s, ""]));
+        nextState[nextId] = { ...nextCells, "明け": join(split(v).map(getCoreName)) };
       }
       return nextState;
     }); 
@@ -205,16 +429,132 @@ export default function App() {
   const updateRule = (type: string, idx: number, key: string, val: string) => { setCustomRules((r: any) => { const arr = [...r[type]]; arr[idx] = { ...arr[idx], [key]: val }; return { ...r, [type]: arr }; }); };
   const removeRule = (type: string, idx: number) => { setCustomRules((r: any) => { const arr = [...r[type]]; arr.splice(idx, 1); return { ...r, [type]: arr }; }); };
 
-  const handleCopyYesterday = () => { const idx = days.findIndex(d => d.id === cur.id); if (idx <= 0) return; setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...days[idx - 1].cells } })); };
-  const handleClearRestDay = () => { if (window.confirm("休務をクリア？")) setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...prev[cur.id], ...Object.fromEntries(REST_SECTIONS.map(s => [s, ""])) } })); };
-  const handleClearWorkDay = () => { if (window.confirm("業務をクリア？")) setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...prev[cur.id], ...Object.fromEntries(ASSIGNABLE_SECTIONS.map(s => [s, ""])) } })); };
+  const handleCopyYesterday = () => {
+    const idx = days.findIndex(d => d.id === cur.id);
+    if (idx <= 0) { alert("月曜日には前日のデータがありません。"); return; }
+    setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...days[idx - 1].cells } }));
+  };
 
-  const handleResetAll = () => { if (window.confirm("全リセット？")) { setAllDaysWithHistory({}); setMonthlyAssign(DEFAULT_MONTHLY_ASSIGN); setCustomRules(DEFAULT_RULES); localStorage.clear(); } };
-  const handleExport = () => { const blob = new Blob([JSON.stringify({ allDays, monthlyAssign, customRules })], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `shifto_${targetMonday}.json`; a.click(); };
-  const handleImport = (e: any) => { const r = new FileReader(); r.onload = (ev: any) => { const d = JSON.parse(ev.target.result); if (d.allDays) { setAllDaysWithHistory(d.allDays); setMonthlyAssign(d.monthlyAssign); setCustomRules(d.customRules); } }; r.readAsText(e.target.files[0]); };
-  
-  const handleCopyToClipboard = () => navigator.clipboard.writeText(JSON.stringify({ allDays, monthlyAssign, customRules })).then(() => alert("コピー完了！LINEやメールでスマホに送付してください。")).catch(()=>alert("コピー失敗"));
-  const handleTextImport = () => { try { const d = JSON.parse(importText); setAllDaysWithHistory(d.allDays); setMonthlyAssign(d.monthlyAssign); setCustomRules(d.customRules); alert("復元完了！"); setImportText(""); } catch(e) { alert("形式エラー"); } };
+  const handleClearRestDay = () => {
+    if (window.confirm(`${cur.label} の「休務・夜勤・不在」をクリアしますか？`)) {
+      setAllDaysWithHistory((prev: any) => {
+        const nextCells = { ...(prev[cur.id] || cur.cells) };
+        REST_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
+        return { ...prev, [cur.id]: nextCells };
+      });
+    }
+  };
+
+  const handleClearRestWeek = () => {
+    if (window.confirm(`表示中の「休務・夜勤・不在」を1週間分すべてクリアしますか？`)) {
+      setAllDaysWithHistory((prev: any) => {
+        const nextState = { ...prev };
+        days.forEach(d => {
+          const nextCells = { ...(prev[d.id] || d.cells) };
+          REST_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
+          nextState[d.id] = nextCells;
+        });
+        return nextState;
+      });
+    }
+  };
+
+  const handleClearWorkDay = () => {
+    if (window.confirm(`${cur.label} の「業務配置（モダリティ・一般・当番など）」をクリアしますか？`)) {
+      setAllDaysWithHistory((prev: any) => {
+        const nextCells = { ...(prev[cur.id] || cur.cells) };
+        ASSIGNABLE_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
+        return { ...prev, [cur.id]: nextCells };
+      });
+    }
+  };
+
+  const handleClearWorkWeek = () => {
+    if (window.confirm(`表示中の「業務配置（モダリティ・一般・当番など）」を1週間分すべてクリアしますか？`)) {
+      setAllDaysWithHistory((prev: any) => {
+        const nextState = { ...prev };
+        days.forEach(d => {
+          const nextCells = { ...(prev[d.id] || d.cells) };
+          ASSIGNABLE_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
+          nextState[d.id] = nextCells;
+        });
+        return nextState;
+      });
+    }
+  };
+
+  const handleResetAll = () => {
+    if (window.confirm("本当にすべてのデータを初期状態にリセットしますか？\n※これまで入力したシフト、特殊ルール、月間設定がすべて消去されます。")) {
+      setAllDaysWithHistory({});
+      setMonthlyAssign(DEFAULT_MONTHLY_ASSIGN);
+      setCustomRules(DEFAULT_RULES);
+      localStorage.removeItem(KEY_ALL_DAYS);
+      localStorage.removeItem(KEY_MONTHLY);
+      localStorage.removeItem(KEY_RULES);
+      alert("すべてのデータをリセットしました。");
+    }
+  };
+
+  const handleExport = () => {
+    const dataObj = { allDays, monthlyAssign, customRules };
+    const blob = new Blob([JSON.stringify(dataObj)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shifto_backup_${targetMonday}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event: any) => {
+      try {
+        const dataObj = JSON.parse(event.target.result);
+        if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) {
+          setAllDaysWithHistory(dataObj.allDays);
+          setMonthlyAssign(dataObj.monthlyAssign);
+          setCustomRules(dataObj.customRules);
+          alert("データを復元しました！");
+        } else {
+          alert("正しいデータ形式ではありません。");
+        }
+      } catch (err) {
+        alert("読み込みに失敗しました。");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleCopyToClipboard = () => {
+    const dataObj = { allDays, monthlyAssign, customRules };
+    navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => {
+      alert("データをコピーしました！LINEのKeepメモなどに貼り付けてスマホに送ってください。");
+    }).catch(() => {
+      alert("コピーに失敗しました。お使いのブラウザでは許可されていません。");
+    });
+  };
+
+  const handleTextImport = () => {
+    if(!importText) return;
+    try {
+      const dataObj = JSON.parse(importText);
+      if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) {
+        setAllDaysWithHistory(dataObj.allDays);
+        setMonthlyAssign(dataObj.monthlyAssign);
+        setCustomRules(dataObj.customRules);
+        alert("テキストからデータを復元しました！");
+        setImportText("");
+      } else {
+        alert("正しいデータ形式ではありません。");
+      }
+    } catch (err) {
+      alert("テキストの読み込みに失敗しました。コピー漏れがないか確認してください。");
+    }
+  };
 
   const warnings = useMemo(() => {
     if (!cur || cur.isPublicHoliday) return [];
@@ -223,31 +563,52 @@ export default function App() {
 
     Object.entries(customRules.capacity || {}).forEach(([room, target]) => {
       const count = split(cells[room]).length;
-      if (count === 0 && (target as number) > 0) w.push({type: 'error', msg: `⚠️【${room}】に誰も配置されていません！`});
-      else if (count < (target as number)) w.push({type: 'info', msg: `💡【${room}】が不足（${count}/${target}人）`});
+      if (count === 0 && (target as number) > 0) {
+        w.push({type: 'error', msg: `⚠️【${room}】に誰も配置されていません！`});
+      } else if (count < (target as number)) {
+        w.push({type: 'info', msg: `💡【${room}】が不足（${count}/${target}人）`});
+      }
     });
 
     (customRules.ngPairs || []).forEach((ng: any) => {
       if (ng.level === 'soft' && ng.s1 && ng.s2) {
         SECTIONS.forEach(sec => {
           const names = split(cells[sec]).map(getCoreName);
-          if (names.includes(ng.s1) && names.includes(ng.s2)) w.push({type: 'alert', msg: `🤝【${sec}】${ng.s1}さんと${ng.s2}さんが一緒です`});
+          if (names.includes(ng.s1) && names.includes(ng.s2)) {
+            w.push({type: 'alert', msg: `🤝【${sec}】${ng.s1}さんと${ng.s2}さんが一緒です`});
+          }
         });
       }
     });
 
+    let baseLunchTarget = customRules.lunchBaseCount ?? 3;
+    const dayChar = cur.label.match(/\((.*?)\)/)?.[1];
+    if (dayChar) {
+      const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === dayChar);
+      if (specialDay) baseLunchTarget = Number(specialDay.count);
+    }
+    const uketsukeShortage = Math.max(0, (customRules.capacity?.受付 ?? 2) - split(cells["受付"]).length);
+    const lunchTarget = baseLunchTarget + uketsukeShortage;
+    const lunchCount = split(cells["昼当番"]).length;
+    if (lunchCount < lunchTarget) {
+      w.push({type: 'info', msg: `💡【昼当番】が不足（現在 ${lunchCount}人 / 目安 ${lunchTarget}人）`});
+    }
+    
     (customRules.lateShifts || []).forEach((rule: any) => {
        const m = split(cells[rule.section]);
-       if (m.length > 0 && !m.some(x => x.includes(rule.lateTime))) w.push({type: 'alert', msg: `🌇【${rule.section}】${rule.lateTime}がいません`});
+       if (m.length > 0 && !m.some(x => x.includes(rule.lateTime))) {
+         w.push({type: 'alert', msg: `🌇【${rule.section}】${rule.lateTime}の担当がいません`});
+       }
     });
 
     return w;
-  }, [cur.cells, customRules]);
+  }, [cur, customRules]);
 
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     if (prevDay && prevDay.cells["入り"]) dayCells["明け"] = join(Array.from(new Set([...split(dayCells["明け"]), ...split(prevDay.cells["入り"]).map(getCoreName)])));
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
+    
     const blockMap = new Map<string, string>();
     allStaff.forEach(s => blockMap.set(s, 'NONE'));
     ["明け","入り","土日休日代休"].forEach(sec => split(dayCells[sec]).forEach(m => blockMap.set(getCoreName(m), 'ALL')));
@@ -261,11 +622,12 @@ export default function App() {
 
     let skip: string[] = []; let roleRA: Record<string, any> = {}; let kenmu: any[] = [];
     const availCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
+    
     (customRules.emergencies || []).forEach((em: any) => {
       if (availCount <= Number(em.threshold)) {
         if (em.type === "role_assign" && (!roleRA[em.role] || em.threshold < roleRA[em.role].threshold)) roleRA[em.role] = em;
         if (em.type === "kenmu") kenmu.push(em);
-        if (em.type === "clear") skip.push(em.section);
+        if (em.type === "clear" && em.section) skip.push(em.section);
       }
     });
 
@@ -372,15 +734,21 @@ export default function App() {
       dayCells["受付"] = join(curU);
     }
 
-    ["1号室", "2号室", "3号室", "5号室", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => { if (!skip.includes(sec) && !Object.keys(customRules.capacity || {}).includes(sec)) fill(availG, sec, [], 1); });
+    const helpMembers: string[] = [];
+    if (availCount <= (customRules.helpThreshold ?? 17)) {
+      split(dayCells["RI"]).forEach(n => helpMembers.push(getCoreName(n)));
+      const ctM = split(dayCells["CT"]); if (ctM.length >= 4) helpMembers.push(getCoreName(ctM[ctM.length - 1]));
+    }
+
+    ["1号室", "2号室", "3号室", "5号室", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => { if (!skip.includes(sec) && !Object.keys(customRules.capacity || {}).includes(sec)) fill(availG, sec, helpMembers, 1); });
 
     (customRules.lateShifts || []).forEach((rule: any) => {
-      if (skip.includes(rule.section)) return; fill(availG, rule.section, [], 1);
+      if (skip.includes(rule.section)) return; fill(availG, rule.section, helpMembers, 1);
       let m = split(dayCells[rule.section]); if (m.length === 0) return;
       m = m.map(x => (!x.includes("(")) ? x + rule.dayEndTime : x);
       if (!m.some(x => x.includes(rule.lateTime))) {
         const cand = availG.filter(n => !m.map(getCoreName).includes(n) && blockMap.get(n) !== 'AM' && !isForbidden(n, rule.section) && !hasNGPair(n, m.map(getCoreName), false));
-        let p = cand.sort((a,b)=>(assignCounts[a]||0)-(assignCounts[b]||0))[0];
+        let p = cand.find(n => helpMembers.includes(n)) || cand.sort((a,b)=>(assignCounts[a]||0)-(assignCounts[b]||0))[0];
         if (!p) { const f = availG.filter(n => !m.map(getCoreName).includes(n) && blockMap.get(n) !== 'AM'); if (f.length>0) p=f[0]; }
         if (p) { m.push(`${p}${rule.lateTime}`); addU(p); }
       }
@@ -402,7 +770,7 @@ export default function App() {
   };
 
   const handleAutoOne = () => { if(cur.isPublicHoliday) return; setAllDaysWithHistory((prev: any) => { const idx = days.findIndex(d => d.id === cur.id); const updated = autoAssign({ ...days[idx], cells: prev[days[idx].id] || days[idx].cells }, idx > 0 ? { ...days[idx-1], cells: prev[days[idx-1].id] || days[idx-1].cells } : null, days.slice(0, idx).map(d => ({...d, cells: prev[d.id] || d.cells}))); return { ...prev, [updated.id]: updated.cells }; }); };
-  const handleAutoAll = () => { setAllDaysWithHistory((prev: any) => { const next = { ...prev }; let pDay = null; const temp = []; for (let i = 0; i < 5; i++) { const up = autoAssign({ ...days[i], cells: next[days[i].id] || days[i].cells }, pDay, temp); next[up.id] = up.cells; pDay = up; temp.push(up); } return next; }); };
+  const handleAutoAll = () => { setAllDaysWithHistory((prev: any) => { const next = { ...prev }; let pDay = null; const temp: any[] = []; for (let i = 0; i < 5; i++) { const up = autoAssign({ ...days[i], cells: next[days[i].id] || days[i].cells }, pDay, temp); next[up.id] = up.cells; pDay = up; temp.push(up); } return next; }); };
 
   return (
     <div style={{ padding: "20px 12px", maxWidth: 1400, margin: "0 auto", background: "#f4f7f9" }}>
@@ -416,7 +784,7 @@ export default function App() {
           <button className="btn-hover" onClick={handleUndo} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), cursor: history.length === 0 ? "not-allowed" : "pointer"}} disabled={history.length === 0}>↩️ 戻る</button>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
-          <input type="file" ref={fileInputRef} accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
+          <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleImport} />
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
@@ -427,9 +795,9 @@ export default function App() {
           <summary style={{ fontWeight: 800, color: "#0f766e", padding: "4px", fontSize: 16 }}>⚙️ スタッフ・ルール設定</summary>
           <div style={{ paddingTop: 20, borderTop: "2px dashed #e2e8f0", marginTop: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 20 }}>
-              <div><label style={{ fontSize: 13, fontWeight: 800 }}>スタッフ(一般)</label><textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80 }} /></div>
-              <div><label style={{ fontSize: 13, fontWeight: 800 }}>スタッフ(受付)</label><textarea value={customRules.receptionStaffList} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80 }} /></div>
-              <div><label style={{ fontSize: 13, fontWeight: 800 }}>追加休診日</label><textarea value={customRules.customHolidays} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80 }} /></div>
+              <div><label style={{ fontSize: 13, fontWeight: 800 }}>スタッフ(一般)</label><textarea value={customRules.staffList} onChange={(e) => setCustomRules({...customRules, staffList: e.target.value})} style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80 }} /></div>
+              <div><label style={{ fontSize: 13, fontWeight: 800 }}>スタッフ(受付)</label><textarea value={customRules.receptionStaffList} onChange={(e) => setCustomRules({...customRules, receptionStaffList: e.target.value})} style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80 }} /></div>
+              <div><label style={{ fontSize: 13, fontWeight: 800 }}>追加休診日</label><textarea value={customRules.customHolidays} onChange={(e) => setCustomRules({...customRules, customHolidays: e.target.value})} style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80 }} /></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
               <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12 }}>
@@ -437,18 +805,18 @@ export default function App() {
                 {Object.entries(customRules.capacity || {}).map(([room, count]) => (
                   <div key={room} className="rule-row" style={{background:"#fff", padding:4, borderRadius:8}}>
                     <span style={{flex:1, fontWeight:700}}>{room}</span>
-                    <input type="number" value={count as number} onChange={e => setCustomRules({...customRules, capacity: {...customRules.capacity, [room]: Number(e.target.value)}})} className="rule-num" />
+                    <input type="number" value={count as number} onChange={(e) => setCustomRules({...customRules, capacity: {...customRules.capacity, [room]: Number(e.target.value)}})} className="rule-num" />
                     <button onClick={() => { const n = {...customRules.capacity}; delete n[room]; setCustomRules({...customRules, capacity: n}); }} className="rule-del">✖</button>
                   </div>
                 ))}
-                <select onChange={e => { if(e.target.value) setCustomRules({...customRules, capacity: {...customRules.capacity, [e.target.value]: 1}}); e.target.value=""; }} className="rule-sel"><option value="">＋追加</option>{ROOM_SECTIONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                <select onChange={(e) => { if(e.target.value) setCustomRules({...customRules, capacity: {...customRules.capacity, [e.target.value]: 1}}); e.target.value=""; }} className="rule-sel"><option value="">＋追加</option>{ROOM_SECTIONS.map(r => <option key={r} value={r}>{r}</option>)}</select>
               </div>
               <div style={{ background: "#f5f3ff", padding: 16, borderRadius: 12 }}>
                 <h4 style={{ margin: "0 0 12px 0" }}>🌆 遅番・引き継ぎ</h4>
                 {(customRules.lateShifts || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row" style={{background:"#fff", padding:8, borderRadius:8}}>
-                    <select value={rule.section} onChange={e => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{flex:1}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{flex:1}}>{TIME_OPTIONS.filter(t => t.includes("〜)")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</select>
+                    <select value={rule.section} onChange={(e) => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{flex:1}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.lateTime} onChange={(e) => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{flex:1}}>{TIME_OPTIONS.filter(t => t.includes("〜)")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</select>
                     <button onClick={() => removeRule("lateShifts", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
@@ -459,38 +827,35 @@ export default function App() {
                 {(customRules.pushOuts || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ background:"#fff", padding:8, borderRadius:8, marginBottom:8 }}>
                     <div className="rule-row">
-                      <select value={rule.s1} onChange={e => updateRule("pushOuts", idx, "s1", e.target.value)} className="rule-sel"><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.s1} onChange={(e) => updateRule("pushOuts", idx, "s1", e.target.value)} className="rule-sel"><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <span>と</span>
-                      <select value={rule.s2} onChange={e => updateRule("pushOuts", idx, "s2", e.target.value)} className="rule-sel"><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.s2} onChange={(e) => updateRule("pushOuts", idx, "s2", e.target.value)} className="rule-sel"><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     </div>
                     <div className="rule-row" style={{marginTop:4}}>
                       <span>が同じ</span>
-                      <select value={rule.triggerSection} onChange={e => updateRule("pushOuts", idx, "triggerSection", e.target.value)} className="rule-sel"><option value="">部屋</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <select value={rule.triggerSection} onChange={(e) => updateRule("pushOuts", idx, "triggerSection", e.target.value)} className="rule-sel"><option value="">部屋</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <span>なら後者を移動</span>
                       <button onClick={() => removeRule("pushOuts", idx)} className="rule-del">✖</button>
                     </div>
-                    <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
+                    <MultiSectionPicker selected={rule.targetSections} onChange={(v: string) => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
                   </div>
                 ))}
                 <button className="rule-add" onClick={() => addRule("pushOuts", { s1: "", s2: "", triggerSection: "", targetSections: "" })}>＋ 追加</button>
               </div>
-
-              {/* ★ ここがスマホ連携用エリア！ */}
               <div style={{ background: "#fdf2f8", padding: 16, borderRadius: 12, gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 12px 0" }}>📱 スマホ・PC間データ移行（コピペ用）</h4>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, minWidth: 150, justifyContent: "center" }}>📋 データをコピー</button>
-                  <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="スマホでコピーした文字をここに貼り付け" style={{ flex: 2, padding: "10px 12px", borderRadius: 8, border: "1px solid #f9a8d4", outline: "none", minWidth: 200 }} />
-                  <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1, minWidth: 150, justifyContent: "center" }}>✨ 復元する</button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1 }}>📋 データをコピー</button>
+                  <input type="text" value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="スマホでコピーした文字をここに貼り付け" style={{ flex: 2, padding: 10, borderRadius: 8, border: "1px solid #f9a8d4" }} />
+                  <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1 }}>✨ 復元</button>
                 </div>
               </div>
-
             </div>
             <div style={{ marginTop: 24, paddingTop: 20, borderTop: "2px dashed #cbd5e1" }}>
               <h4 style={{ margin: "0 0 12px 0" }}>📅 月間担当</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                 {MONTHLY_CATEGORIES.map(({ key, label }) => (
-                  <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={(key === "受付ヘルプ") ? GENERAL_ROOMS : []} />
+                  <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={getStaffForCategory(key)} onChange={(v: string) => updateMonthly(key, v)} noTime={true} customOptions={(key === "受付ヘルプ") ? GENERAL_ROOMS : []} />
                 ))}
               </div>
             </div>
