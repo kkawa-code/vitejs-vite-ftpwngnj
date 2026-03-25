@@ -84,9 +84,9 @@ const DEFAULT_RULES = {
   lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v69"; 
-const KEY_MONTHLY = "shifto_monthly_v69"; 
-const KEY_RULES = "shifto_rules_v69";
+const KEY_ALL_DAYS = "shifto_alldays_v70"; 
+const KEY_MONTHLY = "shifto_monthly_v70"; 
+const KEY_RULES = "shifto_rules_v70";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -444,6 +444,7 @@ export default function App() {
       return nextState;
     }); 
   };
+  
   const updateMonthly = (category: string, value: string) => { setMonthlyAssign(prev => ({ ...prev, [category]: value })); };
   
   const addRule = (type: string, defaultObj: any) => setCustomRules((r: any) => ({ ...r, [type]: [...(r[type] || []), defaultObj] }));
@@ -477,6 +478,18 @@ export default function App() {
           nextState[d.id] = nextCells;
         });
         return nextState;
+      });
+    }
+  };
+
+  const handleClearCategory = (sectionsToClear: string[]) => {
+    if (window.confirm("この項目の割り当てをクリアしますか？")) {
+      setAllDays(prev => {
+        const nextCells = { ...(prev[cur.id] || cur.cells) };
+        sectionsToClear.forEach(sec => {
+          nextCells[sec] = "";
+        });
+        return { ...prev, [cur.id]: nextCells };
       });
     }
   };
@@ -567,11 +580,10 @@ export default function App() {
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
     
-    // ★ ここがエラーの原因でした。変数を確実に定義します！
-    const availCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
+    const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
 
     (customRules.emergencies || []).forEach((em: any) => {
-      if (availCount <= Number(em.threshold)) {
+      if (tempAvailCount <= Number(em.threshold)) {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
         if (em.type === "kenmu") { currentKenmu.push(em); }
         if (em.type === "clear" && em.section) { skipSections.push(em.section); }
@@ -638,6 +650,7 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
+    const availCount = availGeneral.length;
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -903,7 +916,8 @@ export default function App() {
     }
 
     let helpMembers: string[] = [];
-    if (availCount <= (customRules.helpThreshold ?? 17)) {
+    const threshold = customRules.helpThreshold ?? 17;
+    if (availCount <= threshold) {
       helpMembers = [...split(dayCells["RI"]).map(getCoreName)];
       if (split(dayCells["CT"]).length >= 4) { helpMembers.push(split(dayCells["CT"])[split(dayCells["CT"]).length - 1]); }
     }
@@ -1120,6 +1134,7 @@ export default function App() {
             <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
           </label>
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
+          <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
       </div>
 
@@ -1410,6 +1425,97 @@ export default function App() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
+        <div className="scroll-container hide-scrollbar" style={{ display: "flex", gap: 6, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 20, alignItems: "center" }}>
+          {days.map(d => {
+            return (
+              <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
+                {d.label} {d.isPublicHoliday && "🎌"}
+              </button>
+            )
+          })}
+          <div style={{ flex: 1 }}></div>
+          <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1", flexShrink: 0 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
+        </div>
+
+        {cur.isPublicHoliday ? (
+          <div style={{ padding: "60px 20px", textAlign: "center", background: "#f8fafc", borderRadius: 16, border: "2px dashed #cbd5e1" }}>
+            <h3 style={{ margin: 0, color: "#64748b", fontSize: 18, fontWeight: 800 }}>🎌 この日（{cur.holidayName}）は祝日・休診日のため、シフトは入力できません。</h3>
+            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 12, fontWeight: 600 }}>※「特殊ルールの設定」から追加の休診日を変更できます。</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 32 }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#94a3b8", borderRadius: 2 }}></span>
+                  休務・夜勤
+                </h4>
+                <button onClick={() => handleClearCategory(["明け","入り","土日休日代休","不在"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                {["明け","入り","土日休日代休","不在"].map(s => (
+                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#3b82f6", borderRadius: 2 }}></span>
+                  モダリティ・受付
+                </h4>
+                <button onClick={() => handleClearCategory(["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                {["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"].map(s => (
+                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#10b981", borderRadius: 2 }}></span>
+                  一般撮影・透視・その他
+                </h4>
+                <button onClick={() => handleClearCategory(["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                {["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"].map(s => (
+                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#f59e0b", borderRadius: 2 }}></span>
+                  待機・当番
+                </h4>
+                <button onClick={() => handleClearCategory(["待機","残り・待機","昼当番"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
+                  🧹 クリア
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                {["待機","残り・待機","昼当番"].map(s => (
+                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
