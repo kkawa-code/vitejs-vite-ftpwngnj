@@ -68,9 +68,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v92"; 
-const KEY_MONTHLY = "shifto_monthly_v92"; 
-const KEY_RULES = "shifto_rules_v92";
+const KEY_ALL_DAYS = "shifto_alldays_v94"; 
+const KEY_MONTHLY = "shifto_monthly_v94"; 
+const KEY_RULES = "shifto_rules_v94";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -349,8 +349,8 @@ export default function App() {
   });
 
   const [sel, setSel] = useState("");
-
   const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
+
   useEffect(() => {
     fetch("https://holidays-jp.github.io/api/v1/date.json")
       .then(res => res.json())
@@ -572,7 +572,6 @@ export default function App() {
     }
   };
 
-  // ★ 空室をまとめて表示する賢いアラート機能
   const warnings = useMemo(() => {
     if (!cur || cur.isPublicHoliday) return [];
     const w: {type: 'alert'|'info'|'error', msg: string}[] = [];
@@ -583,7 +582,6 @@ export default function App() {
       const count = split(cells[room]).length;
       const target = customRules.capacity?.[room];
 
-      // 絶対優先（目標人数）が設定されている部屋
       if (target !== undefined && target > 0) {
         if (count === 0) {
           w.push({type: 'alert', msg: `💡【${room}】が空室です（目安 ${target}人）`});
@@ -591,7 +589,6 @@ export default function App() {
           w.push({type: 'info', msg: `💡【${room}】が不足（${count}/${target}人）`});
         }
       } else {
-        // 目標人数が設定されていない一般の部屋（1号室など）で、0人の場合
         if (count === 0) {
           emptyRooms.push(room);
         }
@@ -1146,8 +1143,10 @@ export default function App() {
     
     fill(availGeneral, "待機", [], 1);
 
+    // ★ v94: 昼当番の選出ロジックを変更（優先部屋 → 条件付き → その他 → 緊急）
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
+      
       let baseLunchTarget = customRules.lunchBaseCount ?? 3;
       const dayChar = day.label.match(/\((.*?)\)/)?.[1];
       if (dayChar) {
@@ -1156,35 +1155,38 @@ export default function App() {
       }
       const lunchTarget = baseLunchTarget + uketsukeShortage;
 
-      (customRules.lunchConditional || []).forEach((cond: any) => {
-        if (!cond.section) return;
-        const secMembers = split(dayCells[cond.section]);
-        if (secMembers.length >= Number(cond.min)) {
-          let picked = 0;
-          for (const name of secMembers) {
-            if (picked >= Number(cond.out)) break;
-            const core = getCoreName(name);
-            if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) {
-              currentLunch.push(core);
-              picked++;
+      // 1. まず優先部屋から枠を埋める
+      const prioritySecs = split(customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT");
+      for (const sec of prioritySecs) {
+        if (currentLunch.length >= lunchTarget) break;
+        split(dayCells[sec]).forEach(name => {
+          const core = getCoreName(name);
+          if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) {
+            currentLunch.push(core);
+          }
+        });
+      }
+
+      // 2. それでも足りない場合、条件付き選出で埋める
+      if (currentLunch.length < lunchTarget) {
+        (customRules.lunchConditional || []).forEach((cond: any) => {
+          if (!cond.section) return;
+          const secMembers = split(dayCells[cond.section]);
+          if (secMembers.length >= Number(cond.min)) {
+            let picked = 0;
+            for (const name of secMembers) {
+              if (picked >= Number(cond.out) || currentLunch.length >= lunchTarget) break;
+              const core = getCoreName(name);
+              if (!currentLunch.map(getCoreName).includes(core)) {
+                currentLunch.push(core);
+                picked++;
+              }
             }
           }
-        }
-      });
-      
-      const prioritySecs = split(customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT");
-      const lunchCandidates: string[] = [];
-      prioritySecs.forEach(sec => {
-        split(dayCells[sec]).forEach(name => lunchCandidates.push(name));
-      });
-
-      for (const name of lunchCandidates) { 
-        const core = getCoreName(name);
-        if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) {
-          currentLunch.push(core); 
-        }
+        });
       }
       
+      // 3. それでも足りなければそれ以外（緊急以外）から埋める
       if (currentLunch.length < lunchTarget) {
         const lastResortSecs = split(customRules.lunchLastResortSections ?? "治療");
         const lastResortMembers: string[] = [];
@@ -1197,6 +1199,7 @@ export default function App() {
           if (currentLunch.length < lunchTarget) currentLunch.push(name); 
         }
         
+        // 4. それでも足りなければ緊急（治療など）から埋める
         if (currentLunch.length < lunchTarget) {
            const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
            for (const name of finalFallback) {
@@ -1290,6 +1293,7 @@ export default function App() {
               
               <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👥 絶対優先の人数設定（自動割当用）</h4>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>ここで設定した部屋と人数は、AIが最優先でアサインします。（CT, MRI, 治療, RI 以外も自由に追加可能）</p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   {Object.entries(customRules.capacity || {}).map(([room, count]) => (
                     <div key={room} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
@@ -1357,11 +1361,11 @@ export default function App() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
                   <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
                     <h5 style={{ margin: "0 0 6px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>🎯 優先的に選出する部屋</h5>
-                    <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={(v: string) => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} />
+                    <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={v => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} />
                   </div>
                   <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
                     <h5 style={{ margin: "0 0 6px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚠️ 緊急時のみ選出する部屋（なるべく除外）</h5>
-                    <MultiSectionPicker selected={customRules.lunchLastResortSections ?? "治療"} onChange={(v: string) => setCustomRules({...customRules, lunchLastResortSections: v})} options={ROOM_SECTIONS} />
+                    <MultiSectionPicker selected={customRules.lunchLastResortSections ?? "治療"} onChange={v => setCustomRules({...customRules, lunchLastResortSections: v})} options={ROOM_SECTIONS} />
                   </div>
                 </div>
 
@@ -1403,7 +1407,7 @@ export default function App() {
                     </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>➔</span>
                     <div style={{ flex: 1, minWidth: "220px" }}>
-                      <MultiStaffPicker selected={rule.subs} onChange={(v: string) => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
+                      <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>を</span>
                     <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}>
@@ -1431,7 +1435,7 @@ export default function App() {
                       <button onClick={() => removeRule("pushOuts", idx)} className="rule-del">✖</button>
                     </div>
                     <div className="rule-row">
-                      <MultiSectionPicker selected={rule.targetSections} onChange={(v: string) => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
+                      <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
                       <span className="rule-label" style={{color:"#0284c7"}}>に移動</span>
                     </div>
                   </div>
@@ -1475,7 +1479,7 @@ export default function App() {
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} className="rule-del">✖</button>
                     </div>
-                    <MultiSectionPicker selected={rule.sections} onChange={(v: string) => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
+                    <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
                   </div>
                 ))}
                 <button className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}} onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
@@ -1547,7 +1551,7 @@ export default function App() {
                   const membersStr = monthlyAssign[key] || "";
                   const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
                   return (
-                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={(v: string) => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
                   )
                 })}
               </div>
