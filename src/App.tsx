@@ -61,9 +61,9 @@ const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
 const DEFAULT_RULES = { staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" };
 
-const KEY_ALL_DAYS = "shifto_alldays_v78"; 
-const KEY_MONTHLY = "shifto_monthly_v78"; 
-const KEY_RULES = "shifto_rules_v78";
+const KEY_ALL_DAYS = "shifto_alldays_v79"; 
+const KEY_MONTHLY = "shifto_monthly_v79"; 
+const KEY_RULES = "shifto_rules_v79";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -288,7 +288,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </div>
           )
         })}
-        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 28px 4px 8px" }}>
+        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 32px 4px 8px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">
             {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
@@ -646,7 +646,6 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    const availCount = availGeneral.length;
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -777,35 +776,6 @@ export default function App() {
       addUsed(rule.staff);
     });
 
-    // ★ 新設: 玉突きルール（条件付き優先配置）
-    (customRules.pushOuts || []).forEach((po: any) => {
-      if (!po.triggerStaff || !po.targetStaff || !po.targetSections) return;
-      
-      // 条件スタッフが出勤しているか
-      if (availAll.includes(po.triggerStaff)) {
-        // 対象スタッフが出勤していて、まだ未使用か
-        if (availGeneral.includes(po.targetStaff) && !isUsed(po.targetStaff)) {
-          const allowedRooms = split(po.targetSections).filter(s => !skipSections.includes(s));
-          for (const room of allowedRooms) {
-            if (isForbidden(po.targetStaff, room)) continue;
-            const current = split(dayCells[room]);
-            if (hasNGPair(po.targetStaff, current.map(getCoreName), false)) continue;
-            
-            const cap = customRules.capacity?.[room] ?? 1;
-            if (current.length < cap) {
-              const block = blockMap.get(po.targetStaff);
-              let tag = "";
-              if (block === 'AM') tag = "(PM)";
-              if (block === 'PM') tag = "(AM)";
-              dayCells[room] = join([...current, `${po.targetStaff}${tag}`]);
-              addUsed(po.targetStaff);
-              break; 
-            }
-          }
-        }
-      }
-    });
-
     Object.values(roleAssignments).forEach((ra: any) => {
       if (skipSections.includes(ra.section)) return;
       const candidates = split(monthlyAssign[ra.role] || "");
@@ -819,6 +789,41 @@ export default function App() {
         if (block === 'PM') tag = "(AM)";
         dayCells[ra.section] = join([...split(dayCells[ra.section]), `${staff}${tag}`]); 
         addUsed(staff); 
+      }
+    });
+
+    // ★ 玉突き・同室回避ルール
+    (customRules.pushOuts || []).forEach((po: any) => {
+      const s1 = po.s1 || po.triggerStaff;
+      const s2 = po.s2 || po.targetStaff;
+      const tSec = po.triggerSection;
+      
+      if (!s1 || !s2 || !tSec || !po.targetSections) return;
+      
+      if (availGeneral.includes(s1) && availGeneral.includes(s2) && !isUsed(s2)) {
+         const s1In = split(dayCells[tSec]).map(getCoreName).includes(s1) || split(monthlyAssign[tSec] || "").includes(s1);
+         const s2In = split(dayCells[tSec]).map(getCoreName).includes(s2) || split(monthlyAssign[tSec] || "").includes(s2);
+         
+         if (s1In && s2In) {
+            const allowedRooms = split(po.targetSections).filter(s => !skipSections.includes(s));
+            for (const room of allowedRooms) {
+              if (isForbidden(s2, room)) continue;
+              const current = split(dayCells[room]);
+              if (hasNGPair(s2, current.map(getCoreName), false)) continue;
+              
+              const actualCap = room === "CT" || room === "MRI" || room === "治療" ? 3 : (customRules.capacity?.[room] ?? 1);
+              if (current.length < actualCap) {
+                const block = blockMap.get(s2);
+                let tag = "";
+                if (block === 'AM') tag = "(PM)";
+                if (block === 'PM') tag = "(AM)";
+                dayCells[room] = join([...current, `${s2}${tag}`]);
+                addUsed(s2);
+                dayCells[tSec] = join(split(dayCells[tSec]).filter(m => getCoreName(m) !== s2));
+                break;
+              }
+            }
+         }
       }
     });
 
@@ -870,13 +875,10 @@ export default function App() {
       if (ctMembersAfter.length >= 4) { maxAssigns[ctMembersAfter[ctMembersAfter.length - 1]] = 2; }
     }
 
-    // 古いMRIのpushOutsハードコードを削除し、綺麗に修正
     if (!skipSections.includes("MRI")) {
       const mriTarget = customRules.capacity?.MRI ?? 3;
       const mriPref = split(monthlyAssign.MRI || "").filter(s => availGeneral.includes(s));
       fill(mriPref, "MRI", mriPref, mriTarget);
-      
-      // 不足分を一般から補充
       const mriCurrent = split(dayCells["MRI"]);
       if (mriCurrent.length < mriTarget) {
          fill(availGeneral, "MRI", [], mriTarget);
@@ -1284,24 +1286,26 @@ export default function App() {
               </div>
 
               <div style={{ background: "#e0f2fe", padding: 16, borderRadius: 12, border: "1px solid #bae6fd", gridColumn: "1 / -1" }}>
-                <h4 style={{ margin: "0 0 12px 0", color: "#0369a1", fontSize: 14, fontWeight: 800 }}>🎱 玉突き・条件付き配置ルール</h4>
-                <p style={{ fontSize: 12, color: "#0284c7", marginBottom: 12, fontWeight: 600 }}>「Aさんが基本担当だけど、Bさんが出勤している日は、Aさんは別の部屋に行く」といった運用に使えます。</p>
+                <h4 style={{ margin: "0 0 12px 0", color: "#0369a1", fontSize: 14, fontWeight: 800 }}>🎱 玉突き・同室回避ルール</h4>
+                <p style={{ fontSize: 12, color: "#0284c7", marginBottom: 12, fontWeight: 600 }}>「AさんとBさんが同じ部屋になりそうな時、Bさんを別の部屋に押し出す」ルールです。</p>
                 {(customRules.pushOuts || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #bae6fd", paddingBottom: 16 }}>
                     <div className="rule-row">
-                      <select value={rule.triggerStaff} onChange={e => updateRule("pushOuts", idx, "triggerStaff", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">条件スタッフ</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                      <span className="rule-label" style={{color:"#0284c7"}}>が出勤している時➔</span>
-                      <select value={rule.targetStaff} onChange={e => updateRule("pushOuts", idx, "targetStaff", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">対象スタッフ</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                      <span className="rule-label" style={{color:"#0284c7"}}>を</span>
+                      <select value={rule.s1 || rule.triggerStaff} onChange={e => updateRule("pushOuts", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#0284c7"}}>と</span>
+                      <select value={rule.s2 || rule.targetStaff} onChange={e => updateRule("pushOuts", idx, "s2", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#0284c7"}}>が同じ</span>
+                      <select value={rule.triggerSection} onChange={e => updateRule("pushOuts", idx, "triggerSection", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#0284c7"}}>になる時➔ 後者を</span>
                       <button onClick={() => removeRule("pushOuts", idx)} className="rule-del">✖</button>
                     </div>
                     <div className="rule-row">
                       <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
-                      <span className="rule-label" style={{color:"#0284c7"}}>に優先配置</span>
+                      <span className="rule-label" style={{color:"#0284c7"}}>に移動</span>
                     </div>
                   </div>
                 ))}
-                <button className="rule-add" style={{color:"#0369a1", borderColor:"#7dd3fc"}} onClick={() => addRule("pushOuts", { triggerStaff: "", targetStaff: "", targetSections: "" })}>＋ 玉突きルールを追加</button>
+                <button className="rule-add" style={{color:"#0369a1", borderColor:"#7dd3fc"}} onClick={() => addRule("pushOuts", { s1: "", s2: "", triggerSection: "", targetSections: "" })}>＋ 玉突きルールを追加</button>
               </div>
 
               <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
@@ -1386,7 +1390,7 @@ export default function App() {
                     <button onClick={() => removeRule("emergencies", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "clear", role: "", section: "", s1: "", s2: "" })}>＋ 追加</button>
+                <button onClick={() => addRule("emergencies", { threshold: 16, type: "clear", role: "", section: "", s1: "", s2: "" })} className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}}>＋ 追加</button>
               </div>
 
             </div>
