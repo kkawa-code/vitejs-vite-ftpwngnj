@@ -84,9 +84,9 @@ const DEFAULT_RULES = {
   lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v66"; 
-const KEY_MONTHLY = "shifto_monthly_v66"; 
-const KEY_RULES = "shifto_rules_v66";
+const KEY_ALL_DAYS = "shifto_alldays_v67"; 
+const KEY_MONTHLY = "shifto_monthly_v67"; 
+const KEY_RULES = "shifto_rules_v67";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -97,6 +97,9 @@ for (let h = 8; h <= 19; h++) {
     TIME_OPTIONS.push(`(〜${h}:${mm})`);
   }
 }
+
+// 古い手動タップ変更用のモディファイア（UIにはもう出しませんが互換性維持）
+const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜12:00)", "(12:00〜)", "(〜17:00)", "(17:00〜)", "(19:00〜)", "✍️カスタム"];
 
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
@@ -457,14 +460,28 @@ export default function App() {
     setAllDays(prev => ({ ...prev, [cur.id]: { ...prevDay.cells } }));
   };
 
-  const handleClearCategory = (sectionsToClear: string[]) => {
-    if (window.confirm("この項目の割り当てをクリアしますか？")) {
+  // ★ 新しい一括クリア機能（1日）
+  const handleClearDay = () => {
+    if (window.confirm(`${cur.label} のシフト割り当て（不在・休務を除く）をすべてクリアしますか？`)) {
       setAllDays(prev => {
         const nextCells = { ...(prev[cur.id] || cur.cells) };
-        sectionsToClear.forEach(sec => {
-          nextCells[sec] = "";
-        });
+        ASSIGNABLE_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
         return { ...prev, [cur.id]: nextCells };
+      });
+    }
+  };
+
+  // ★ 新しい一括クリア機能（1週間）
+  const handleClearWeek = () => {
+    if (window.confirm(`表示中の一週間（${targetMonday}〜）のシフト割り当て（不在・休務を除く）をすべてクリアしますか？`)) {
+      setAllDays(prev => {
+        const nextState = { ...prev };
+        days.forEach(d => {
+          const nextCells = { ...(prev[d.id] || d.cells) };
+          ASSIGNABLE_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
+          nextState[d.id] = nextCells;
+        });
+        return nextState;
       });
     }
   };
@@ -626,9 +643,6 @@ export default function App() {
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
 
-    // ★ 定義を復活 ★
-    const availCount = availGeneral.length;
-
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
@@ -719,7 +733,7 @@ export default function App() {
         
         let tag = "";
         if (block === 'AM') { 
-          tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
+          tag = "(PM)";
           pmCount += 1;
         } else if (block === 'PM') { 
           tag = "(AM)";
@@ -729,10 +743,10 @@ export default function App() {
             tag = "(AM)";
             amCount += 1;
           } else if (neededPM && !neededAM) {
-            tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
+            tag = "(PM)";
             pmCount += 1;
           } else {
-            tag = section === "透視（6号）" ? "(〜17:00)" : "";
+            tag = "";
             amCount += 1;
             pmCount += 1;
           }
@@ -907,12 +921,21 @@ export default function App() {
     
     if (!skipSections.includes("透析後胸部") && !extraPriorityRooms.includes("透析後胸部")) {
       const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
-      fill(availGeneral, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
+      fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
     }
 
+    // ★ 6号室のバトンタッチ処理
     if (!skipSections.includes("透視（6号）") && !extraPriorityRooms.includes("透視（6号）")) {
       fill(availGeneral, "透視（6号）", helpMembers, 1);
+      
       let current = split(dayCells["透視（6号）"]);
+      current = current.map(m => {
+        if (!m.includes("(") && !m.includes(")")) {
+          return m + "(〜17:00)";
+        }
+        return m;
+      });
+
       if (!current.some(m => m.includes("17:00〜"))) {
         const yugataPicked = pick(availGeneral, helpMembers, 1, "透視（6号）", current.map(getCoreName), true);
         if (yugataPicked.length > 0) {
@@ -925,7 +948,7 @@ export default function App() {
 
     if (!skipSections.includes("MMG") && !extraPriorityRooms.includes("MMG")) {
       const mmgMonthly = split(monthlyAssign.MMG || "").filter(s => availGeneral.includes(s));
-      fill(availGeneral, "MMG", mmgMonthly, mmgMonthly.length > 0 ? 1 : 0);
+      fill(mmgMonthly, "MMG", mmgMonthly, mmgMonthly.length > 0 ? 1 : 0);
     }
     
     fill(availGeneral, "透視（11号）", helpMembers, 1);
@@ -1102,13 +1125,17 @@ export default function App() {
           <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
           <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
           <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
+          
+          <button className="btn-hover" onClick={handleClearDay} style={btnStyle("#f59e0b")}>🧹 1日クリア</button>
+          <button className="btn-hover" onClick={handleClearWeek} style={btnStyle("#ea580c")}>🧹 週間クリア</button>
+
+          <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           <label className="btn-hover" style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-flex" }}>
             📂 読込
             <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
           </label>
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
-          <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
       </div>
 
@@ -1176,7 +1203,7 @@ export default function App() {
                   <div style={{ flex: 1, minWidth: "260px", background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>📅 曜日で人数を変える</h5>
                     {(customRules.lunchSpecialDays || []).map((rule: any, idx: number) => (
-                      <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
+                      <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, alignItems: "center" }}>
                         <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} style={{ flexShrink: 0, padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
                           {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
                         </select>
@@ -1190,7 +1217,7 @@ export default function App() {
                   <div style={{ flex: 1, minWidth: "260px", background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚖️ 条件付き選出（特定部屋が多い時）</h5>
                     {(customRules.lunchConditional || []).map((rule: any, idx: number) => (
-                      <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, alignItems: "center" }}>
                         <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} style={{ flexShrink: 0, padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #c7d2fe", fontWeight: 600 }}>
                           <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -1221,7 +1248,7 @@ export default function App() {
                 <h4 style={{ margin: "0 0 12px 0", color: "#c2410c", fontSize: 14, fontWeight: 800 }}>🔄 代打ルール</h4>
                 <p style={{ fontSize: 12, color: "#9a3412", marginBottom: 12, fontWeight: 600 }}>特定のスタッフが休みの時に、指定した代打スタッフを優先してアサインするルールです。</p>
                 {(customRules.substitutes || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center", flexWrap: "wrap", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
+                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
                     <select value={rule.target} onChange={e => updateRule("substitutes", idx, "target", e.target.value)} style={{ flexShrink: 0, padding: "8px 28px 8px 8px", borderRadius: 6, border: "1px solid #fed7aa", fontWeight: 700, color: rule.target ? "#c2410c" : "#64748b" }}>
                       <option value="" disabled>対象スタッフ</option>
                       {activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}
@@ -1244,11 +1271,11 @@ export default function App() {
               <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#b91c1c", fontSize: 14, fontWeight: 800 }}>🚫 NGペア</h4>
                 {(customRules.ngPairs || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
+                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, alignItems: "center" }}>
                     <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} style={{ flex: "1 1 120px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700, flexShrink: 0 }}>と</span>
                     <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} style={{ flex: "1 1 120px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ flex: "0 0 auto", width: "140px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c" }}>
+                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} style={{ flex: "0 0 auto", minWidth: "120px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #fca5a5", color: "#b91c1c" }}>
                       <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
                     </select>
                     <button onClick={() => removeRule("ngPairs", idx)} style={{ border: "none", background: "none", color: "#b91c1c", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>✖</button>
@@ -1260,7 +1287,7 @@ export default function App() {
               <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🔒 専従（必ずここに配置）</h4>
                 {(customRules.fixed || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                     <select value={rule.staff} onChange={e => updateRule("fixed", idx, "staff", e.target.value)} style={{ flex: "1 1 120px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #86efac" }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <select value={rule.section} onChange={e => updateRule("fixed", idx, "section", e.target.value)} style={{ flex: "1 1 120px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #86efac" }}><option value="">選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <button onClick={() => removeRule("fixed", idx)} style={{ border: "none", background: "none", color: "#15803d", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>✖</button>
@@ -1273,7 +1300,7 @@ export default function App() {
                 <h4 style={{ margin: "0 0 12px 0", color: "#475569", fontSize: 14, fontWeight: 800 }}>🙅 担当不可（複数選択可）</h4>
                 {(customRules.forbidden || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
-                    <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6, alignItems: "center" }}>
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} style={{ flexShrink: 0, width: "160px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #cbd5e1", fontWeight: 700 }}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} style={{ border: "none", background: "none", color: "#475569", cursor: "pointer", fontSize: 16 }}>✖</button>
                     </div>
@@ -1287,7 +1314,7 @@ export default function App() {
                 <h4 style={{ margin: "0 0 12px 0", color: "#0369a1", fontSize: 14, fontWeight: 800 }}>➡️ 連動・押し出し（誰かが入ったら別の人を動かす）</h4>
                 {(customRules.pushOuts || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #bae6fd", paddingBottom: 16 }}>
-                    <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, alignItems: "center" }}>
                       <select value={rule.triggerStaff} onChange={e => updateRule("pushOuts", idx, "triggerStaff", e.target.value)} style={{ flex: "1 1 110px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">誰が</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <span style={{ fontSize: 12, fontWeight: 600, color: "#0284c7", flexShrink: 0 }}>が</span>
                       <select value={rule.triggerSection} onChange={e => updateRule("pushOuts", idx, "triggerSection", e.target.value)} style={{ flex: "1 1 110px", padding: "6px 28px 6px 8px", borderRadius: 6, border: "1px solid #93c5fd", fontWeight: 600 }}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
@@ -1309,7 +1336,7 @@ export default function App() {
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#a16207" }}>人以下</span>
                 </div>
                 {(customRules.emergencies || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center", flexWrap: "wrap", background: "#fff", padding: "8px 12px", borderRadius: 8, border: "1px dashed #fde047" }}>
+                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10, alignItems: "center", background: "#fff", padding: "8px 12px", borderRadius: 8, border: "1px dashed #fde047" }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e", flexShrink: 0 }}>出勤</span>
                     <input type="number" value={rule.threshold} onChange={e => updateRule("emergencies", idx, "threshold", e.target.value)} style={{ width: "50px", padding: "4px", borderRadius: 6, border: "1px solid #fde047", textAlign: "center", flexShrink: 0 }} />
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#854d0e", flexShrink: 0 }}>人以下➔</span>
@@ -1399,97 +1426,6 @@ export default function App() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
-        <div className="scroll-container hide-scrollbar" style={{ display: "flex", gap: 6, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 20, alignItems: "center" }}>
-          {days.map(d => {
-            return (
-              <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
-                {d.label} {d.isPublicHoliday && "🎌"}
-              </button>
-            )
-          })}
-          <div style={{ flex: 1 }}></div>
-          <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1", flexShrink: 0 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
-        </div>
-
-        {cur.isPublicHoliday ? (
-          <div style={{ padding: "60px 20px", textAlign: "center", background: "#f8fafc", borderRadius: 16, border: "2px dashed #cbd5e1" }}>
-            <h3 style={{ margin: 0, color: "#64748b", fontSize: 18, fontWeight: 800 }}>🎌 この日（{cur.holidayName}）は祝日・休診日のため、シフトは入力できません。</h3>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 12, fontWeight: 600 }}>※「特殊ルールの設定」から追加の休診日を変更できます。</p>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gap: 32 }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#94a3b8", borderRadius: 2 }}></span>
-                  休務・夜勤
-                </h4>
-                <button onClick={() => handleClearCategory(["明け","入り","土日休日代休","不在"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["明け","入り","土日休日代休","不在"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#3b82f6", borderRadius: 2 }}></span>
-                  モダリティ・受付
-                </h4>
-                <button onClick={() => handleClearCategory(["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#10b981", borderRadius: 2 }}></span>
-                  一般撮影・透視・その他
-                </h4>
-                <button onClick={() => handleClearCategory(["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#f59e0b", borderRadius: 2 }}></span>
-                  待機・当番
-                </h4>
-                <button onClick={() => handleClearCategory(["待機","残り・待機","昼当番"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["待機","残り・待機","昼当番"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
