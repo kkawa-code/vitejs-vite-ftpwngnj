@@ -98,9 +98,6 @@ for (let h = 8; h <= 19; h++) {
   }
 }
 
-// 古い手動タップ変更用のモディファイア（UIにはもう出しませんが互換性維持）
-const TIME_MODIFIERS = ["", "(AM)", "(PM)", "(〜12:00)", "(12:00〜)", "(〜17:00)", "(17:00〜)", "(19:00〜)", "✍️カスタム"];
-
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
@@ -460,7 +457,7 @@ export default function App() {
     setAllDays(prev => ({ ...prev, [cur.id]: { ...prevDay.cells } }));
   };
 
-  // ★ 新しい一括クリア機能（1日）
+  // ★ 1日クリア
   const handleClearDay = () => {
     if (window.confirm(`${cur.label} のシフト割り当て（不在・休務を除く）をすべてクリアしますか？`)) {
       setAllDays(prev => {
@@ -471,7 +468,7 @@ export default function App() {
     }
   };
 
-  // ★ 新しい一括クリア機能（1週間）
+  // ★ 週間クリア
   const handleClearWeek = () => {
     if (window.confirm(`表示中の一週間（${targetMonday}〜）のシフト割り当て（不在・休務を除く）をすべてクリアしますか？`)) {
       setAllDays(prev => {
@@ -642,6 +639,9 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
+    
+    // ★ 復活した変数
+    const availCount = availGeneral.length;
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -733,7 +733,7 @@ export default function App() {
         
         let tag = "";
         if (block === 'AM') { 
-          tag = "(PM)";
+          tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
           pmCount += 1;
         } else if (block === 'PM') { 
           tag = "(AM)";
@@ -743,10 +743,10 @@ export default function App() {
             tag = "(AM)";
             amCount += 1;
           } else if (neededPM && !neededAM) {
-            tag = "(PM)";
+            tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
             pmCount += 1;
           } else {
-            tag = "";
+            tag = section === "透視（6号）" ? "(〜17:00)" : "";
             amCount += 1;
             pmCount += 1;
           }
@@ -924,18 +924,9 @@ export default function App() {
       fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
     }
 
-    // ★ 6号室のバトンタッチ処理
     if (!skipSections.includes("透視（6号）") && !extraPriorityRooms.includes("透視（6号）")) {
       fill(availGeneral, "透視（6号）", helpMembers, 1);
-      
       let current = split(dayCells["透視（6号）"]);
-      current = current.map(m => {
-        if (!m.includes("(") && !m.includes(")")) {
-          return m + "(〜17:00)";
-        }
-        return m;
-      });
-
       if (!current.some(m => m.includes("17:00〜"))) {
         const yugataPicked = pick(availGeneral, helpMembers, 1, "透視（6号）", current.map(getCoreName), true);
         if (yugataPicked.length > 0) {
@@ -1125,10 +1116,8 @@ export default function App() {
           <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
           <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
           <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
-          
           <button className="btn-hover" onClick={handleClearDay} style={btnStyle("#f59e0b")}>🧹 1日クリア</button>
           <button className="btn-hover" onClick={handleClearWeek} style={btnStyle("#ea580c")}>🧹 週間クリア</button>
-
           <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           <label className="btn-hover" style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-flex" }}>
@@ -1136,6 +1125,7 @@ export default function App() {
             <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
           </label>
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
+          <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
       </div>
 
