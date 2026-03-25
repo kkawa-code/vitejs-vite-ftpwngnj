@@ -84,9 +84,9 @@ const DEFAULT_RULES = {
   lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v70"; 
-const KEY_MONTHLY = "shifto_monthly_v70"; 
-const KEY_RULES = "shifto_rules_v70";
+const KEY_ALL_DAYS = "shifto_alldays_v71"; 
+const KEY_MONTHLY = "shifto_monthly_v71"; 
+const KEY_RULES = "shifto_rules_v71";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -444,7 +444,6 @@ export default function App() {
       return nextState;
     }); 
   };
-  
   const updateMonthly = (category: string, value: string) => { setMonthlyAssign(prev => ({ ...prev, [category]: value })); };
   
   const addRule = (type: string, defaultObj: any) => setCustomRules((r: any) => ({ ...r, [type]: [...(r[type] || []), defaultObj] }));
@@ -650,7 +649,6 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    const availCount = availGeneral.length;
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -916,8 +914,7 @@ export default function App() {
     }
 
     let helpMembers: string[] = [];
-    const threshold = customRules.helpThreshold ?? 17;
-    if (availCount <= threshold) {
+    if (tempAvailCount <= (customRules.helpThreshold ?? 17)) {
       helpMembers = [...split(dayCells["RI"]).map(getCoreName)];
       if (split(dayCells["CT"]).length >= 4) { helpMembers.push(split(dayCells["CT"])[split(dayCells["CT"]).length - 1]); }
     }
@@ -1125,16 +1122,12 @@ export default function App() {
           <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
           <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
           <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
-          <button className="btn-hover" onClick={handleClearDay} style={btnStyle("#f59e0b")}>🧹 1日クリア</button>
-          <button className="btn-hover" onClick={handleClearWeek} style={btnStyle("#ea580c")}>🧹 週間クリア</button>
-          <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           <label className="btn-hover" style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-flex" }}>
             📂 読込
             <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
           </label>
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
-          <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
       </div>
 
