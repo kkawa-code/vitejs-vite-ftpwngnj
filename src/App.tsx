@@ -84,9 +84,9 @@ const DEFAULT_RULES = {
   lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v68"; 
-const KEY_MONTHLY = "shifto_monthly_v68"; 
-const KEY_RULES = "shifto_rules_v68";
+const KEY_ALL_DAYS = "shifto_alldays_v69"; 
+const KEY_MONTHLY = "shifto_monthly_v69"; 
+const KEY_RULES = "shifto_rules_v69";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -567,10 +567,11 @@ export default function App() {
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
     
-    const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
+    // ★ ここがエラーの原因でした。変数を確実に定義します！
+    const availCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
 
     (customRules.emergencies || []).forEach((em: any) => {
-      if (tempAvailCount <= Number(em.threshold)) {
+      if (availCount <= Number(em.threshold)) {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
         if (em.type === "kenmu") { currentKenmu.push(em); }
         if (em.type === "clear" && em.section) { skipSections.push(em.section); }
@@ -637,7 +638,6 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    const availCount = availGeneral.length;
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -903,8 +903,7 @@ export default function App() {
     }
 
     let helpMembers: string[] = [];
-    const threshold = customRules.helpThreshold ?? 17;
-    if (availCount <= threshold) {
+    if (availCount <= (customRules.helpThreshold ?? 17)) {
       helpMembers = [...split(dayCells["RI"]).map(getCoreName)];
       if (split(dayCells["CT"]).length >= 4) { helpMembers.push(split(dayCells["CT"])[split(dayCells["CT"]).length - 1]); }
     }
