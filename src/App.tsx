@@ -84,9 +84,9 @@ const DEFAULT_RULES = {
   lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v67"; 
-const KEY_MONTHLY = "shifto_monthly_v67"; 
-const KEY_RULES = "shifto_rules_v67";
+const KEY_ALL_DAYS = "shifto_alldays_v68"; 
+const KEY_MONTHLY = "shifto_monthly_v68"; 
+const KEY_RULES = "shifto_rules_v68";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -457,7 +457,6 @@ export default function App() {
     setAllDays(prev => ({ ...prev, [cur.id]: { ...prevDay.cells } }));
   };
 
-  // ★ 1日クリア
   const handleClearDay = () => {
     if (window.confirm(`${cur.label} のシフト割り当て（不在・休務を除く）をすべてクリアしますか？`)) {
       setAllDays(prev => {
@@ -468,7 +467,6 @@ export default function App() {
     }
   };
 
-  // ★ 週間クリア
   const handleClearWeek = () => {
     if (window.confirm(`表示中の一週間（${targetMonday}〜）のシフト割り当て（不在・休務を除く）をすべてクリアしますか？`)) {
       setAllDays(prev => {
@@ -639,8 +637,6 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
-    
-    // ★ 復活した変数
     const availCount = availGeneral.length;
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
@@ -1125,7 +1121,6 @@ export default function App() {
             <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
           </label>
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
-          <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
       </div>
 
