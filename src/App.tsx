@@ -84,9 +84,9 @@ const DEFAULT_RULES = {
   lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v71"; 
-const KEY_MONTHLY = "shifto_monthly_v71"; 
-const KEY_RULES = "shifto_rules_v71";
+const KEY_ALL_DAYS = "shifto_alldays_v69"; 
+const KEY_MONTHLY = "shifto_monthly_v69"; 
+const KEY_RULES = "shifto_rules_v69";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -1122,12 +1122,16 @@ export default function App() {
           <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
           <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
           <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
+          <button className="btn-hover" onClick={handleClearDay} style={btnStyle("#f59e0b")}>🧹 1日クリア</button>
+          <button className="btn-hover" onClick={handleClearWeek} style={btnStyle("#ea580c")}>🧹 週間クリア</button>
+          <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           <label className="btn-hover" style={{ ...btnStyle("#8b5cf6"), cursor: "pointer", display: "inline-flex" }}>
             📂 読込
             <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
           </label>
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
+          <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
       </div>
 
@@ -1418,97 +1422,6 @@ export default function App() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
-        <div className="scroll-container hide-scrollbar" style={{ display: "flex", gap: 6, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 20, alignItems: "center" }}>
-          {days.map(d => {
-            return (
-              <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
-                {d.label} {d.isPublicHoliday && "🎌"}
-              </button>
-            )
-          })}
-          <div style={{ flex: 1 }}></div>
-          <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1", flexShrink: 0 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
-        </div>
-
-        {cur.isPublicHoliday ? (
-          <div style={{ padding: "60px 20px", textAlign: "center", background: "#f8fafc", borderRadius: 16, border: "2px dashed #cbd5e1" }}>
-            <h3 style={{ margin: 0, color: "#64748b", fontSize: 18, fontWeight: 800 }}>🎌 この日（{cur.holidayName}）は祝日・休診日のため、シフトは入力できません。</h3>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 12, fontWeight: 600 }}>※「特殊ルールの設定」から追加の休診日を変更できます。</p>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gap: 32 }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#94a3b8", borderRadius: 2 }}></span>
-                  休務・夜勤
-                </h4>
-                <button onClick={() => handleClearCategory(["明け","入り","土日休日代休","不在"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["明け","入り","土日休日代休","不在"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#3b82f6", borderRadius: 2 }}></span>
-                  モダリティ・受付
-                </h4>
-                <button onClick={() => handleClearCategory(["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#10b981", borderRadius: 2 }}></span>
-                  一般撮影・透視・その他
-                </h4>
-                <button onClick={() => handleClearCategory(["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                  <span style={{ display: "inline-block", width: 4, height: 16, background: "#f59e0b", borderRadius: 2 }}></span>
-                  待機・当番
-                </h4>
-                <button onClick={() => handleClearCategory(["待機","残り・待機","昼当番"])} style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }} className="btn-hover">
-                  🧹 クリア
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {["待機","残り・待機","昼当番"].map(s => (
-                  <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getStaffForSection(s)} onChange={v => updateDay(s, v)} />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
