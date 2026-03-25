@@ -60,11 +60,17 @@ const MONTHLY_CATEGORIES = [
 
 const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
-const DEFAULT_RULES = { staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" };
+const DEFAULT_RULES = { 
+  staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, 
+  ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
+  lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
+  helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
+  lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
+};
 
-const KEY_ALL_DAYS = "shifto_alldays_v84"; 
-const KEY_MONTHLY = "shifto_monthly_v84"; 
-const KEY_RULES = "shifto_rules_v84";
+const KEY_ALL_DAYS = "shifto_alldays_v86"; 
+const KEY_MONTHLY = "shifto_monthly_v86"; 
+const KEY_RULES = "shifto_rules_v86";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -315,7 +321,6 @@ export default function App() {
 
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   
-  // ★ 強制的にファイルを選択させるための仕掛け（useRef）
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [targetMonday, setTargetMonday] = useState(() => {
@@ -518,7 +523,6 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // ★ Androidの強すぎるセキュリティを突破するための読み込み関数
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -568,10 +572,13 @@ export default function App() {
       w.push(`【昼当番】が不足しています（現在 ${lunchCount}人 / 目安 ${lunchTarget}人）`);
     }
     
-    const roku = split(cells["透視（6号）"]);
-    if (roku.length > 0 && !roku.some(m => m.includes("17:00〜"))) {
-       w.push(`【透視（6号）】に17:00〜の担当がいません`);
-    }
+    // ★ 汎用化された遅番ルールの不足チェック
+    (customRules.lateShifts || []).forEach((rule: any) => {
+       const mems = split(cells[rule.section]);
+       if (mems.length > 0 && !mems.some(m => m.includes(rule.lateTime))) {
+         w.push(`【${rule.section}】に${rule.lateTime}の担当がいません`);
+       }
+    });
 
     return w;
   }, [cur, customRules]);
@@ -776,7 +783,7 @@ export default function App() {
         
         let tag = "";
         if (block === 'AM') { 
-          tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
+          tag = "(PM)";
           pmCount += 1;
         } else if (block === 'PM') { 
           tag = "(AM)";
@@ -786,10 +793,10 @@ export default function App() {
             tag = "(AM)";
             amCount += 1;
           } else if (neededPM && !neededAM) {
-            tag = section === "透視（6号）" ? "(12:00〜17:00)" : "(PM)";
+            tag = "(PM)";
             pmCount += 1;
           } else {
-            tag = section === "透視（6号）" ? "(〜17:00)" : "";
+            tag = "";
             amCount += 1;
             pmCount += 1;
           }
@@ -973,62 +980,48 @@ export default function App() {
       if (split(dayCells["CT"]).length >= 4) { helpMembers.push(getCoreName(split(dayCells["CT"])[split(dayCells["CT"]).length - 1])); }
     }
 
-    ["1号室", "2号室", "3号室", "5号室"].forEach(sec => {
+    // ★ 汎用化された「一般撮影」のループ
+    ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => {
       if (!extraPriorityRooms.includes(sec)) {
         fill(availGeneral, sec, helpMembers, 1);
       }
     });
-    
-    if (!skipSections.includes("透析後胸部") && !extraPriorityRooms.includes("透析後胸部")) {
-      const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
-      fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
-    }
 
-    if (!skipSections.includes("透視（6号）") && !extraPriorityRooms.includes("透視（6号）")) {
-      fill(availGeneral, "透視（6号）", helpMembers, 1);
+    // ★ 汎用化された「遅番・引き継ぎルール」を適用
+    (customRules.lateShifts || []).forEach((rule: any) => {
+      if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
+      if (skipSections.includes(rule.section)) return;
       
-      let current = split(dayCells["透視（6号）"]);
-      current = current.map(m => (!m.includes("(") && !m.includes(")")) ? m + "(〜17:00)" : m);
+      let current = split(dayCells[rule.section]);
+      if (current.length === 0) return;
 
-      if (!current.some(m => m.includes("17:00〜"))) {
+      current = current.map(m => (!m.includes("(") && !m.includes(")")) ? m + rule.dayEndTime : m);
+
+      if (!current.some(m => m.includes(rule.lateTime))) {
         const currentCore = current.map(getCoreName);
-        const yugataCandidates = availGeneral.filter(name => {
+        const candidates = availGeneral.filter(name => {
           if (currentCore.includes(name)) return false;
           if (blockMap.get(name) === 'AM') return false;
-          if (isForbidden(name, "透視（6号）")) return false;
+          if (isForbidden(name, rule.section)) return false;
           if (hasNGPair(name, currentCore, false)) return false;
           return true;
         });
 
-        let yugataPicked = yugataCandidates.find(name => helpMembers.includes(name));
-        if (!yugataPicked && yugataCandidates.length > 0) {
-          yugataCandidates.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
-          yugataPicked = yugataCandidates[0];
+        let picked = candidates.find(name => helpMembers.includes(name));
+        if (!picked && candidates.length > 0) {
+          candidates.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+          picked = candidates[0];
         }
-        
-        if (!yugataPicked) {
+        if (!picked) {
           const forceCandidates = availGeneral.filter(name => !currentCore.includes(name) && blockMap.get(name) !== 'AM');
-          if (forceCandidates.length > 0) yugataPicked = forceCandidates[0];
+          if (forceCandidates.length > 0) picked = forceCandidates[0];
         }
-        
-        if (yugataPicked) {
-          current.push(`${yugataPicked}(17:00〜)`);
-          addUsed(yugataPicked);
+        if (picked) {
+          current.push(`${picked}${rule.lateTime}`);
+          addUsed(picked);
         }
       }
-      dayCells["透視（6号）"] = join(current);
-    }
-
-    if (!skipSections.includes("MMG") && !extraPriorityRooms.includes("MMG")) {
-      const mmgMonthly = split(monthlyAssign.MMG || "").filter(s => availGeneral.includes(s));
-      fill(mmgMonthly, "MMG", mmgMonthly, mmgMonthly.length > 0 ? 1 : 0);
-    }
-    
-    fill(availGeneral, "透視（11号）", helpMembers, 1);
-    ["骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => {
-      if (!extraPriorityRooms.includes(sec)) {
-        fill(availGeneral, sec, helpMembers, 1);
-      }
+      dayCells[rule.section] = join(current);
     });
 
     if (!skipSections.includes("受付ヘルプ") && !extraPriorityRooms.includes("受付ヘルプ")) {
@@ -1203,7 +1196,7 @@ export default function App() {
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
-          <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleImport} />
+          <input type="file" ref={fileInputRef} accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
           
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
@@ -1312,6 +1305,32 @@ export default function App() {
                   </div>
                 </div>
 
+              </div>
+
+              {/* ★ 新設：遅番・引き継ぎルール */}
+              <div style={{ background: "#f5f3ff", padding: 16, borderRadius: 12, border: "1px solid #ddd6fe", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>🌆 遅番・引き継ぎルール</h4>
+                <p style={{ fontSize: 12, color: "#7c3aed", marginBottom: 12, fontWeight: 600 }}>「17時以降も稼働する部屋」を指定できます。日勤者には自動で終了時間が付き、遅番が1名追加されます。</p>
+                {(customRules.lateShifts || []).map((rule: any, idx: number) => (
+                  <div key={idx} className="rule-row" style={{background:"#fff", padding:"8px 12px", border:"1px solid #ddd6fe", borderRadius:8}}>
+                    <select value={rule.section} onChange={e => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe"}}>
+                      <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <span className="rule-label" style={{color:"#6d28d9"}}>に</span>
+                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 110px"}}>
+                      <option value="">遅番の時間</option>
+                      {TIME_OPTIONS.filter(t => t.includes("〜)")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
+                    </select>
+                    <span className="rule-label" style={{color:"#6d28d9"}}>の担当を追加する（日勤は</span>
+                    <select value={rule.dayEndTime} onChange={e => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 110px"}}>
+                      <option value="">日勤の終了時間</option>
+                      {TIME_OPTIONS.filter(t => t.includes("(〜")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
+                    </select>
+                    <span className="rule-label" style={{color:"#6d28d9"}}>とする）</span>
+                    <button onClick={() => removeRule("lateShifts", idx)} className="rule-del">✖</button>
+                  </div>
+                ))}
+                <button className="rule-add" style={{color:"#6d28d9", borderColor:"#c4b5fd"}} onClick={() => addRule("lateShifts", { section: "", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" })}>＋ 遅番ルールを追加</button>
               </div>
 
               <div style={{ background: "#fff7ed", padding: 16, borderRadius: 12, border: "1px solid #fed7aa", gridColumn: "1 / -1" }}>
