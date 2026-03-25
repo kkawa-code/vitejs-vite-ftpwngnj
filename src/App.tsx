@@ -62,9 +62,9 @@ const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
 const DEFAULT_RULES = { staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" };
 
-const KEY_ALL_DAYS = "shifto_alldays_v80"; 
-const KEY_MONTHLY = "shifto_monthly_v80"; 
-const KEY_RULES = "shifto_rules_v80";
+const KEY_ALL_DAYS = "shifto_alldays_v82"; 
+const KEY_MONTHLY = "shifto_monthly_v82"; 
+const KEY_RULES = "shifto_rules_v82";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)"];
 for (let h = 8; h <= 19; h++) {
@@ -762,16 +762,11 @@ export default function App() {
       dayCells[section] = join(current);
     }
 
-    // ★ マッピング関数（月間設定から部屋の予定者を取得）
     const getMonthlyStaffForSection = (sec: string) => {
       let staff: string[] = [];
-      if (sec === "治療") {
-        staff = [...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)];
-      } else if (sec === "RI") {
-        staff = [...split(monthlyAssign.RI), ...split(monthlyAssign.RIサブ)];
-      } else if (monthlyAssign[sec] !== undefined) {
-        staff = split(monthlyAssign[sec]);
-      }
+      if (sec === "治療") staff = [...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)];
+      else if (sec === "RI") staff = [...split(monthlyAssign.RI), ...split(monthlyAssign.RIサブ)];
+      else if (monthlyAssign[sec] !== undefined) staff = split(monthlyAssign[sec]);
       return staff.map(getCoreName);
     };
 
@@ -973,8 +968,15 @@ export default function App() {
           yugataCandidates.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
           yugataPicked = yugataCandidates[0];
         }
+        
+        if (!yugataPicked) {
+          const forceCandidates = availGeneral.filter(name => !currentCore.includes(name) && blockMap.get(name) !== 'AM');
+          if (forceCandidates.length > 0) yugataPicked = forceCandidates[0];
+        }
+        
         if (yugataPicked) {
           current.push(`${yugataPicked}(17:00〜)`);
+          addUsed(yugataPicked);
         }
       }
       dayCells["透視（6号）"] = join(current);
