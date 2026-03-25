@@ -68,9 +68,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v97"; 
-const KEY_MONTHLY = "shifto_monthly_v97"; 
-const KEY_RULES = "shifto_rules_v97";
+const KEY_ALL_DAYS = "shifto_alldays_v99"; 
+const KEY_MONTHLY = "shifto_monthly_v99"; 
+const KEY_RULES = "shifto_rules_v99";
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)"];
 for (let h = 8; h <= 19; h++) {
@@ -572,7 +572,73 @@ export default function App() {
     }
   };
 
-  // ★ 賢いアラート機能
+  const weeklyStats = useMemo(() => {
+    const stats: Record<string, { total: number, portable: number, ct: number, mri: number }> = {};
+    activeGeneralStaff.forEach(s => { stats[s] = { total: 0, portable: 0, ct: 0, mri: 0 }; });
+    
+    days.forEach(d => {
+      if (d.isPublicHoliday) return;
+      const taskRooms = ASSIGNABLE_SECTIONS.filter(s => !["待機", "残り・待機", "昼当番", "受付", "受付ヘルプ"].includes(s));
+      taskRooms.forEach(sec => {
+        const members = split(d.cells[sec]).map(getCoreName);
+        members.forEach(m => {
+          if (stats[m]) {
+            stats[m].total += 1;
+            if (sec === "ポータブル") stats[m].portable += 1;
+            if (sec === "CT") stats[m].ct += 1;
+            if (sec === "MRI") stats[m].mri += 1;
+          }
+        });
+      });
+    });
+    return Object.entries(stats).sort((a, b) => b[1].total - a[1].total);
+  }, [days, activeGeneralStaff]);
+
+  // ★ 新設: AIが内部で持っている「今日の優先アサイン候補ランキング」を可視化
+  const aiRanking = useMemo(() => {
+    if (!cur || cur.isPublicHoliday) return [];
+    
+    const curIndex = days.findIndex(d => d.id === cur.id);
+    const pastDays = days.slice(0, curIndex);
+    
+    const counts: Record<string, number> = {};
+    activeGeneralStaff.forEach(s => counts[s] = 0);
+    
+    pastDays.forEach(pd => {
+      Object.entries(pd.cells).forEach(([sec, val]) => {
+        if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return;
+        split(val as string).forEach(m => {
+          const c = getCoreName(m);
+          if (counts[c] !== undefined) counts[c]++;
+        });
+      });
+    });
+
+    const blockMap = new Map<string, string>();
+    activeGeneralStaff.forEach(s => blockMap.set(s, 'NONE'));
+    ["明け","入り","土日休日代休"].forEach(sec => split(cur.cells[sec]).forEach(m => blockMap.set(getCoreName(m), 'ALL')));
+    split(cur.cells["不在"]).forEach(m => {
+      const core = getCoreName(m);
+      if (m.includes("(AM)")) blockMap.set(core, 'AM');
+      else if (m.includes("(PM)")) blockMap.set(core, 'PM');
+      else blockMap.set(core, 'ALL');
+    });
+
+    const activeMembers = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
+      const aBlock = blockMap.get(a) !== 'NONE';
+      const bBlock = blockMap.get(b) !== 'NONE';
+      if (aBlock && !bBlock) return 1; 
+      if (!aBlock && bBlock) return -1;
+      return counts[a] - counts[b]; 
+    });
+
+    return activeMembers.map(name => ({
+      name,
+      count: counts[name],
+      block: blockMap.get(name)
+    }));
+  }, [cur, days, activeGeneralStaff]);
+
   const warnings = useMemo(() => {
     if (!cur || cur.isPublicHoliday) return [];
     const w: {type: 'alert'|'info'|'error', msg: string}[] = [];
@@ -617,8 +683,6 @@ export default function App() {
       const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === dayChar);
       if (specialDay) baseLunchTarget = Number(specialDay.count);
     }
-    
-    // ★ ここでも絶対人数の表示に変更（受付不足分を足さない）
     const lunchTarget = baseLunchTarget;
     const lunchCount = split(cells["昼当番"]).length;
     if (lunchCount < lunchTarget) {
@@ -632,8 +696,21 @@ export default function App() {
        }
     });
 
+    const curIndex = days.findIndex(d => d.id === cur.id);
+    if (curIndex > 0) {
+      const prevDay = days[curIndex - 1];
+      if (!prevDay.isPublicHoliday) {
+        const prevPortable = split(prevDay.cells["ポータブル"]).map(getCoreName);
+        const curPortable = split(cells["ポータブル"]).map(getCoreName);
+        const consecutive = curPortable.filter(n => prevPortable.includes(n));
+        consecutive.forEach(n => {
+          w.push({ type: 'error', msg: `🚨【ポータブル連続】${n}さんが昨日と連続で入っています！` });
+        });
+      }
+    }
+
     return w;
-  }, [cur, customRules]);
+  }, [cur, days, customRules]);
 
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
@@ -1028,6 +1105,7 @@ export default function App() {
       }
     });
 
+    let uketsukeShortage = 0;
     if (!skipSections.includes("受付")) {
       const uTarget = customRules.capacity?.受付 ?? 2;
       let currentUketsuke = split(dayCells["受付"]);
@@ -1041,8 +1119,8 @@ export default function App() {
         currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
       }
       dayCells["受付"] = join(currentUketsuke);
+      uketsukeShortage = Math.max(0, uTarget - currentUketsuke.length);
     }
-    const uketsukeShortage = Math.max(0, (customRules.capacity?.受付 ?? 2) - split(dayCells["受付"]).length);
 
     if (!skipSections.includes("検像") && !extraPriorityRooms.includes("検像")) {
       fill(availGeneral, "検像", [], 1);
@@ -1106,42 +1184,6 @@ export default function App() {
       dayCells[rule.section] = join(current);
     });
 
-    if (!skipSections.includes("受付ヘルプ") && !extraPriorityRooms.includes("受付ヘルプ")) {
-      let currentUketsukeHelp = split(dayCells["受付ヘルプ"]);
-      const helpMonthly = split(monthlyAssign.受付ヘルプ || "");
-      for (const item of helpMonthly) {
-        if (GENERAL_ROOMS.includes(item) || ROOM_SECTIONS.includes(item)) {
-          const roomStaffs = split(dayCells[item]).map(getCoreName);
-          for (const rs of roomStaffs) {
-            if (rs && !currentUketsukeHelp.map(getCoreName).includes(rs)) {
-              currentUketsukeHelp.push(rs);
-            }
-          }
-        } else if (allStaff.includes(item)) {
-          if (availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
-            const b = blockMap.get(item);
-            let tag = ""; let f = 1;
-            if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(item, 'ALL'); }
-            else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(item, 'ALL'); }
-            else { blockMap.set(item, 'ALL'); }
-            currentUketsukeHelp.push(`${item}${tag}`);
-            addU(item, f); 
-          }
-        }
-      }
-      dayCells["受付ヘルプ"] = join(currentUketsukeHelp);
-      if (helpMonthly.length > 0 && currentUketsukeHelp.length === 0) {
-        fill(availGeneral, "受付ヘルプ", [], 1);
-      }
-    }
-
-    currentKenmu.forEach((km: any) => {
-      const p1 = split(dayCells[km.s1]);
-      if (p1.length > 0 && !skipSections.includes(km.s2)) { 
-        dayCells[km.s2] = join(p1); 
-      }
-    });
-
     if (!skipSections.includes("残り・待機")) {
       let currentReserve = split(dayCells["残り・待機"]);
       const unassigned = availAll.filter(name => !isUsed(name));
@@ -1171,7 +1213,6 @@ export default function App() {
     
     fill(availGeneral, "待機", [], 1);
 
-    // ★ v97: 昼当番の絶対枠 ＆ 受付ヘルプへの自動追加ロジック
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
       
@@ -1181,7 +1222,6 @@ export default function App() {
         const specialDay = (customRules.lunchSpecialDays || []).find((sd:any) => sd.day === dayChar);
         if (specialDay) baseLunchTarget = Number(specialDay.count);
       }
-      // ★ 昼当番の枠は絶対に増やさない！
       const lunchTarget = baseLunchTarget;
 
       const prioritySecs = split(customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT");
@@ -1233,15 +1273,12 @@ export default function App() {
         }
       }
       
-      // 昼当番の保存
       dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
-      // ★ 受付不足分のカバー：昼当番から受付ヘルプ(12:15〜13:00)へアサイン
       if (uketsukeShortage > 0 && !skipSections.includes("受付ヘルプ")) {
         let helpMems = split(dayCells["受付ヘルプ"]);
         let assignedCount = 0;
         
-        // 1. 昼当番のメンバーから優先して兼任させる
         const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
         for (const name of lunchCores) {
           if (assignedCount >= uketsukeShortage) break;
@@ -1251,7 +1288,6 @@ export default function App() {
           }
         }
         
-        // 2. 昼当番の人数より受付不足分の方が多い場合（まれ）は一般スタッフから
         if (assignedCount < uketsukeShortage) {
           const others = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
           for (const name of others) {
@@ -1461,7 +1497,7 @@ export default function App() {
                     </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>➔</span>
                     <div style={{ flex: 1, minWidth: "220px" }}>
-                      <MultiStaffPicker selected={rule.subs} onChange={(v: string) => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
+                      <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>を</span>
                     <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}>
@@ -1489,7 +1525,7 @@ export default function App() {
                       <button onClick={() => removeRule("pushOuts", idx)} className="rule-del">✖</button>
                     </div>
                     <div className="rule-row">
-                      <MultiSectionPicker selected={rule.targetSections} onChange={(v: string) => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
+                      <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
                       <span className="rule-label" style={{color:"#0284c7"}}>に移動</span>
                     </div>
                   </div>
@@ -1533,7 +1569,7 @@ export default function App() {
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} className="rule-del">✖</button>
                     </div>
-                    <MultiSectionPicker selected={rule.sections} onChange={(v: string) => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
+                    <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
                   </div>
                 ))}
                 <button className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}} onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
@@ -1605,10 +1641,82 @@ export default function App() {
                   const membersStr = monthlyAssign[key] || "";
                   const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
                   return (
-                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={(v: string) => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
                   )
                 })}
               </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, background: "#f8fafc" }}>
+        <details>
+          <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+            <span>📊</span> 今週のスタッフ稼働メーター（自動集計）を開く
+          </summary>
+          <div style={{ marginTop: 16, borderTop: "2px dashed #cbd5e1", paddingTop: 16 }}>
+            <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>※表示中の1週間（月〜日）で、誰が何回「業務（待機・当番除く）」に割り当てられているかを自動集計します。手動調整の目安にしてください。</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+              {weeklyStats.map(([name, stat]) => (
+                <div key={name} style={{ background: stat.total > 0 ? "#fff" : "#f1f5f9", border: `1px solid ${stat.total > 0 ? "#bfdbfe" : "#e2e8f0"}`, padding: "8px 12px", borderRadius: 8, minWidth: 150, boxShadow: stat.total > 0 ? "0 1px 2px rgba(0,0,0,0.05)" : "none" }}>
+                  <div style={{ fontWeight: 800, color: stat.total > 0 ? "#1e293b" : "#94a3b8", marginBottom: 6, fontSize: 13 }}>{name}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 4 }}>
+                    <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>総稼働: <strong style={{color:"#2563eb", fontSize:14}}>{stat.total}</strong> 枠</span>
+                    <div style={{ display: "flex", gap: 6, fontSize: 10, fontWeight: 800 }}>
+                      {stat.portable > 0 && <span style={{ color: "#ef4444", background: "#fee2e2", padding: "2px 4px", borderRadius: 4 }}>ポ:{stat.portable}</span>}
+                      {stat.ct > 0 && <span style={{ color: "#0ea5e9", background: "#e0f2fe", padding: "2px 4px", borderRadius: 4 }}>C:{stat.ct}</span>}
+                      {stat.mri > 0 && <span style={{ color: "#10b981", background: "#d1fae5", padding: "2px 4px", borderRadius: 4 }}>M:{stat.mri}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {/* ★ 新設: AIの思考回路パネル（ルールの解説 ＆ アサイン優先度ランキング） */}
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, background: "#faf5ff", border: "1px solid #ddd6fe" }}>
+        <details>
+          <summary style={{ fontWeight: 800, color: "#8b5cf6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+            <span>🤖</span> AIの思考回路（自動割当のルールと、本日の優先度ランキング）を開く
+          </summary>
+          <div style={{ marginTop: 16, borderTop: "2px dashed #c4b5fd", paddingTop: 16 }}>
+            <h4 style={{ margin: "0 0 10px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>📌 AIが部屋を埋める順番（基本ルール）</h4>
+            <div style={{ fontSize: 13, color: "#4c1d95", lineHeight: 1.6, background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #ddd6fe", marginBottom: 16 }}>
+              <ol style={{ margin: 0, paddingLeft: 20 }}>
+                <li><strong>専従・絶対優先</strong>：設定された「専従ルール」「代打ルール」「月間担当の絶対枠（治療・RI）」を最優先で配置します。</li>
+                <li><strong>CT・MRI</strong>：「月間担当」の中から、稼働数が少ない人を優先して配置します。</li>
+                <li><strong>一般撮影（1号室・ポータブル等）</strong>：残りのスタッフから、稼働数が少ない人を優先して配置します。（※ポータブルは前日入った人を避けます）</li>
+                <li><strong>待機・残り</strong>：ここまでで部屋に当たらなかった人を配置します。</li>
+                <li><strong>昼当番</strong>：ここまでに決まった「優先部屋（CTなど）」のメンバーから抽出して配置します。</li>
+                <li><strong>受付ヘルプ</strong>：受付が不足している場合、昼当番のメンバーから(12:15〜13:00)で配置します。</li>
+              </ol>
+            </div>
+
+            <h4 style={{ margin: "0 0 10px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>👑 本日（{cur.label}）のアサイン優先度ランキング</h4>
+            <p style={{ fontSize: 12, color: "#7c3aed", marginBottom: 12, fontWeight: 600 }}>※月曜日から昨日までの「稼働実績」が少ない人ほどランキング上位になり、優先的に部屋へアサインされます。AIは常にこのリストの上から順番にスタッフを探します。</p>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
+              {aiRanking.map((staff, idx) => {
+                const isUnavailable = staff.block === 'ALL';
+                const isHalf = staff.block === 'AM' || staff.block === 'PM';
+                return (
+                  <div key={staff.name} style={{ display: "flex", alignItems: "center", gap: 8, background: isUnavailable ? "#f1f5f9" : "#fff", padding: "6px 12px", borderRadius: 8, border: `1px solid ${isUnavailable ? "#e2e8f0" : "#c4b5fd"}`, opacity: isUnavailable ? 0.6 : 1 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: isUnavailable ? "#94a3b8" : "#8b5cf6", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>
+                      {isUnavailable ? "休" : idx + 1}
+                    </div>
+                    <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: isUnavailable ? "#64748b" : "#4c1d95" }}>{staff.name}</div>
+                    {!isUnavailable && (
+                      <div style={{ fontSize: 11, color: "#6d28d9", fontWeight: 800, background: "#ede9fe", padding: "2px 6px", borderRadius: 4 }}>
+                        {staff.count}回
+                        {isHalf && ` (${staff.block === 'AM' ? "午後" : "午前"}のみ)`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </details>
