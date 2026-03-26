@@ -563,7 +563,7 @@ export default function App() {
 
   const weeklyStats = useMemo(() => {
     const stats: Record<string, { total: number, portable: number, ct: number, mri: number }> = {};
-    activeGeneralStaff.forEach(s => { stats[s] = { total: number: 0, portable: 0, ct: 0, mri: 0 }; });
+    activeGeneralStaff.forEach(s => { stats[s] = { total: 0, portable: 0, ct: 0, mri: 0 }; });
     
     days.forEach(d => {
       if (d.isPublicHoliday) return;
