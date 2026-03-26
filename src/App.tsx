@@ -833,12 +833,13 @@ export default function App() {
       if (aBlock && !bBlock) return 1; 
       if (!aBlock && bBlock) return -1;
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
-      return 0; // 同率の場合はシャッフル時のランダム順を維持
+      return 0;
     });
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
-    const effectiveReceptionStaff = activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
-    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s));
+    
+    // ★ 一般スタッフを受付の代理にしないよう、受付名簿のみを対象とする
+    const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
 
     // --- ヘルパー関数 ---
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
@@ -1026,7 +1027,7 @@ export default function App() {
         const targets = split(sub.target);
         if (targets.length === 0 || skipSections.includes(sub.section)) return; 
         
-        // ★ AND条件：対象スタッフ全員が休みの時のみ発動
+        // AND条件：対象スタッフ全員が休みの時のみ発動
         const trigger = targets.every(t => !availAll.includes(t) || isUsed(t));
         
         if (trigger) {
@@ -1049,7 +1050,7 @@ export default function App() {
         }
       });
 
-      // ★ 修正: 受付の優先度を上げて、CTなどの前に配置する
+      // ★ 修正: 受付の一般補充を廃止し、受付専用スタッフのみで埋める
       if (!skipSections.includes("受付")) {
         const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
         let currentUketsuke = split(dayCells["受付"]);
@@ -1064,8 +1065,8 @@ export default function App() {
 
         const neededUketsuke = uTarget - currentUketsuke.length;
         if (neededUketsuke > 0) {
-          // 受付スタッフが足りない場合は一般スタッフから強制補充
-          const pickedUketsuke = pick(availGeneral, availGeneral, neededUketsuke, "受付", currentUketsuke);
+          // 受付スタッフ（出勤）のみから補充する（一般スタッフは入れない）
+          const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
           currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
         }
         dayCells["受付"] = join(currentUketsuke);
@@ -1297,15 +1298,10 @@ export default function App() {
         
         dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
-        // ★ 修正：受付スタッフが1人でも休んだら必ず受付ヘルプを発動する
+        // ★ 修正：受付の定員が満たされていない場合（誰か休んでいる場合）に受付ヘルプを発動する
         const currentUketsuke = split(dayCells["受付"]).map(getCoreName);
-        let isReceptionistAbsent = false;
-        if (activeReceptionStaff.length > 0) {
-          // 受付名簿にいる人が、本日出勤可能（availAll）に含まれていない場合は「休み」と判定
-          isReceptionistAbsent = activeReceptionStaff.some(name => blockMap.get(name) === 'ALL' || !availAll.includes(name));
-        }
-        
-        const needsUketsukeHelp = isReceptionistAbsent || currentUketsuke.length === 0;
+        const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
+        const needsUketsukeHelp = currentUketsuke.length < uTarget;
 
         if (needsUketsukeHelp && !skipSections.includes("受付ヘルプ")) {
           let helpMems = split(dayCells["受付ヘルプ"]);
