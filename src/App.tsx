@@ -95,6 +95,7 @@ function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
 function getCoreName(fullName: string) { return fullName.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim(); }
 
+// 偏りを防ぐ Fisher-Yates シャッフル
 function shuffleArray<T>(array: T[]): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -717,7 +718,7 @@ export default function App() {
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
-    // 1. 前処理（前日の入り反映・祝日スキップ）
+    // 1. 前処理
     if (prevDay && prevDay.cells["入り"]) {
       const iriMembers = split(prevDay.cells["入り"]).map(getCoreName);
       const currentAke = split(dayCells["明け"]);
@@ -726,7 +727,7 @@ export default function App() {
 
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
 
-    // 2. BlockMap構築（休務・不在の把握）
+    // 2. BlockMap構築
     const blockMap = new Map<string, string>();
     const buildBlockMap = () => {
       allStaff.forEach(s => blockMap.set(s, 'NONE'));
@@ -751,7 +752,7 @@ export default function App() {
       return false;
     }));
 
-    // 3. 緊急ルールの評価（定員変更など）
+    // 3. 緊急ルールの評価
     let skipSections: string[] = [];
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
@@ -770,7 +771,7 @@ export default function App() {
     };
     evaluateEmergencies();
 
-    // 4. 過去実績の集計 ＆ 候補者のシャッフル・ソート
+    // 4. 実績集計とスタッフのシャッフル
     const assignCounts: Record<string, number> = {};
     const maxAssigns: Record<string, number> = {};
     
@@ -955,7 +956,7 @@ export default function App() {
     // 5. 部屋埋め（メイン割り当て）
     // ==========================================
     const assignRooms = () => {
-      // 1. 強制ルール 
+      // 1. 強制ルール (サポート専任スタッフも固定対象になり得るため availAll を使用)
       (customRules.fixed || []).forEach((rule: any) => {
         if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
         if (skipSections.includes(rule.section)) return;
@@ -977,7 +978,7 @@ export default function App() {
         const candidates = split(monthlyAssign[ra.role] || "");
         const isRec = ["受付"].includes(ra.role);
         const targetAvail = isRec ? availReception : availGeneral;
-        const staff = candidates.find(s => targetAvail.includes(s) && !isUsed(s));
+        const staff = candidates.find(s => targetAvail.includes(s) && !isUsed(s) && !isForbidden(s, ra.section));
         if (staff && !split(dayCells[ra.section]).map(getCoreName).includes(staff)) { 
           const b = blockMap.get(staff);
           let tag = ""; let f = 1;
@@ -1032,7 +1033,7 @@ export default function App() {
         const trigger = targets.every(t => !availAll.includes(t) || isUsed(t));
         
         if (trigger) {
-          const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !isUsed(s));
+          const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !isUsed(s) && !isForbidden(s, sub.section));
           if (fallbackStaff.length > 0) {
             const currentSec = split(dayCells[sub.section]);
             for (const f of fallbackStaff) {
@@ -1065,7 +1066,6 @@ export default function App() {
 
         const neededUketsuke = uTarget - currentUketsuke.length;
         if (neededUketsuke > 0) {
-          // 一般スタッフからの補充は廃止
           const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
           currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
         }
@@ -1146,7 +1146,7 @@ export default function App() {
         fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
       }
       
-      // サポート専任スタッフの配置
+      // ★ サポート専任スタッフの配置
       const assignSupportStaff = () => {
         const supportTargets = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
         const unassignedSupport = availSupport.filter(s => !isUsed(s));
@@ -1155,9 +1155,9 @@ export default function App() {
           const b = blockMap.get(staff);
           if (b === 'ALL') return;
 
+          let assigned = false;
           for (const room of supportTargets) {
-            if (skipSections.includes(room)) continue;
-            if (isForbidden(staff, room)) continue;
+            if (skipSections.includes(room) || isForbidden(staff, room)) continue;
             
             let current = split(dayCells[room]);
             const currentCores = current.map(getCoreName);
@@ -1170,8 +1170,19 @@ export default function App() {
               
               dayCells[room] = join([...current, `${staff}${tag}`]);
               addU(staff, f);
+              assigned = true;
               break; 
             }
+          }
+          
+          if (!assigned && !skipSections.includes("待機") && !isForbidden(staff, "待機")) {
+             let current = split(dayCells["待機"]);
+             let tag = ""; let f = 1;
+             if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+             else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+             else { blockMap.set(staff, 'ALL'); }
+             dayCells["待機"] = join([...current, `${staff}${tag}`]);
+             addU(staff, f);
           }
         });
       };
@@ -1219,7 +1230,7 @@ export default function App() {
           }
           
           if (!picked) {
-            const forceCandidates = availGeneral.filter(name => !currentCore.includes(name) && blockMap.get(name) !== 'AM');
+            const forceCandidates = availGeneral.filter(name => !currentCore.includes(name) && blockMap.get(name) !== 'AM' && !isForbidden(name, rule.section));
             if (forceCandidates.length > 0) picked = forceCandidates[0];
           }
           
@@ -1261,10 +1272,17 @@ export default function App() {
         }
       }
 
+      // ★ 修正: 兼務ルールで遅番(17時等)が別の部屋に伝染しないようにする
       currentKenmu.forEach((km: any) => {
         const p1 = split(dayCells[km.s1]);
         if (p1.length > 0 && !skipSections.includes(km.s2)) { 
-          dayCells[km.s2] = join(p1); 
+          const allowed = p1.filter(m => {
+             if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
+             return !isForbidden(getCoreName(m), km.s2);
+          });
+          if (allowed.length > 0) {
+             dayCells[km.s2] = join(allowed); 
+          }
         }
       });
 
@@ -1284,7 +1302,7 @@ export default function App() {
           if (currentLunch.length >= lunchTarget) break;
           split(dayCells[sec]).forEach(name => {
             const core = getCoreName(name);
-            if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget) {
+            if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget && !isForbidden(core, "昼当番")) {
               currentLunch.push(core);
             }
           });
@@ -1299,7 +1317,7 @@ export default function App() {
               for (const name of secMembers) {
                 if (picked >= Number(cond.out) || currentLunch.length >= lunchTarget) break;
                 const core = getCoreName(name);
-                if (!currentLunch.map(getCoreName).includes(core)) {
+                if (!currentLunch.map(getCoreName).includes(core) && !isForbidden(core, "昼当番")) {
                   currentLunch.push(core);
                   picked++;
                 }
@@ -1315,13 +1333,13 @@ export default function App() {
             split(dayCells[sec]).forEach(name => lastResortMembers.push(getCoreName(name)));
           });
 
-          const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
+          const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name) && !isForbidden(name, "昼当番"));
           for (const name of fallbackCandidates) { 
             if (currentLunch.length < lunchTarget) currentLunch.push(name); 
           }
           
           if (currentLunch.length < lunchTarget) {
-             const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name));
+             const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name) && !isForbidden(name, "昼当番"));
              for (const name of finalFallback) {
                if (currentLunch.length < lunchTarget) currentLunch.push(name); 
              }
@@ -1330,7 +1348,6 @@ export default function App() {
         
         dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
-        // ★ 修正：受付の現在の人数が定員に満たない場合、必ず受付ヘルプを発動する
         const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
         const currentUketsukeCount = split(dayCells["受付"]).length;
         const needsUketsukeHelp = currentUketsukeCount < uTarget;
@@ -1338,21 +1355,20 @@ export default function App() {
         if (needsUketsukeHelp && !skipSections.includes("受付ヘルプ")) {
           let helpMems = split(dayCells["受付ヘルプ"]);
           
-          // 1. 昼ヘルプ (12:15〜13:00) を絶対に入れる
           let lunchHelpCandidate = null;
           const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
           
-          let c1 = availGeneral.filter(n => !lunchCores.includes(n) && !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+          let c1 = availGeneral.filter(n => !lunchCores.includes(n) && !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL' && !isForbidden(n, "受付ヘルプ"));
           if (c1.length > 0) {
             c1.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
             lunchHelpCandidate = c1[0];
           } else {
-            let c2 = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+            let c2 = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL' && !isForbidden(n, "受付ヘルプ"));
             if (c2.length > 0) {
               c2.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
               lunchHelpCandidate = c2[0];
             } else {
-              let c3 = availAll.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+              let c3 = availAll.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL' && !isForbidden(n, "受付ヘルプ"));
               if (c3.length > 0) {
                 c3.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
                 lunchHelpCandidate = c3[0];
@@ -1364,20 +1380,19 @@ export default function App() {
             helpMems.push(`${lunchHelpCandidate}(12:15〜13:00)`);
           }
 
-          // 2. 16時以降ヘルプ (16:00〜) : 基本は「検像」、いなければ他の人から必ず入れる
           let picked16 = null;
           const kenzoCores = split(dayCells["検像"]).map(getCoreName);
-          const validKenzo = kenzoCores.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n));
+          const validKenzo = kenzoCores.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && !isForbidden(n, "受付ヘルプ"));
           
           if (validKenzo.length > 0) {
             picked16 = validKenzo[0];
           } else {
-            let others = availGeneral.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== lunchHelpCandidate);
+            let others = availGeneral.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== lunchHelpCandidate && !isForbidden(n, "受付ヘルプ"));
             if (others.length > 0) {
               others.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
               picked16 = others[0];
             } else {
-              let others2 = availAll.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== lunchHelpCandidate);
+              let others2 = availAll.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== lunchHelpCandidate && !isForbidden(n, "受付ヘルプ"));
               if (others2.length > 0) {
                 others2.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
                 picked16 = others2[0];
@@ -1490,11 +1505,11 @@ export default function App() {
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>サポート専任スタッフ（2人目として入る人）</label>
-                  <textarea value={customRules.supportStaffList || ""} onChange={e => setCustomRules({...customRules, supportStaffList: e.target.value})} placeholder="例: 部長" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 50, fontSize: 14, lineHeight: 1.5 }} />
+                  <textarea value={customRules.supportStaffList || ""} onChange={e => setCustomRules({...customRules, supportStaffList: e.target.value})} placeholder="例: 部長" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 40, fontSize: 14, lineHeight: 1.5 }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>追加の休診日</label>
-                  <textarea value={customRules.customHolidays || ""} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} placeholder="例: 2026-12-29, 2026-12-30" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 50, fontSize: 14, lineHeight: 1.5 }} />
+                  <textarea value={customRules.customHolidays || ""} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} placeholder="例: 2026-12-29, 2026-12-30" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 40, fontSize: 14, lineHeight: 1.5 }} />
                 </div>
               </div>
             </div>
