@@ -427,7 +427,6 @@ export default function App() {
     return activeGeneralStaff;
   };
 
-  // ★ 修正：手動のプルダウンでも、すでに休んでいる人は選択肢に出さない
   const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
     const baseStaff = getStaffForSection(section);
     if (REST_SECTIONS.includes(section)) return baseStaff;
@@ -763,6 +762,13 @@ export default function App() {
       return false;
     }));
 
+    // ★追加: NG部屋の数を数えるヘルパー関数
+    const getForbiddenCount = (staffName: string) => {
+      const rules = customRules.forbidden || [];
+      const rule = rules.find((r: any) => r.staff === staffName);
+      return rule ? split(rule.sections).length : 0;
+    };
+
     let skipSections: string[] = [];
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
@@ -775,8 +781,6 @@ export default function App() {
           if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
           if (em.type === "kenmu") { 
             currentKenmu.push(em); 
-            // ★ 修正：兼務される側の部屋にはメインの処理で人を入れないようスキップさせる
-            if (em.s2) skipSections.push(em.s2);
           }
           if (em.type === "clear" && em.section) { skipSections.push(em.section); }
           if (em.type === "change_capacity" && em.section) { dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); }
@@ -844,29 +848,50 @@ export default function App() {
     const supportStaffList = parseAndSortStaff(customRules.supportStaffList || "");
     const supportTargetRooms = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
     
+    // ★ 修正：NG部屋が多い（制約が厳しい）人を最優先に前へ持ってくる
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return -1; // 半休の人は優先して枠に埋める
+      if (aBlock && !bBlock) return -1; // 半休優先
       if (!aBlock && bBlock) return 1;
+
+      // NGが多い人を優先（降順）
+      const aForbidCount = getForbiddenCount(a);
+      const bForbidCount = getForbiddenCount(b);
+      if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount;
+
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
       return 0; 
     });
     
     const availSupport = availAll.filter(s => supportStaffList.includes(s));
-    // サポート要員は一般の部屋埋めリストから除外
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s) && !supportStaffList.includes(s));
     const effectiveReceptionStaff = activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
     const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s) && !supportStaffList.includes(s));
 
+    // --- ヘルパー関数 ---
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
 
       const primary = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
-        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RI || "").includes(name) : false;
+        
+        // ★修正: 月間設定のメイン担当者であれば、前日と同じでも連続OKとする
+        let isMonthlyMain = false;
+        if (section) {
+          if (section === "治療") isMonthlyMain = split(monthlyAssign.治療 || "").includes(name);
+          else if (section === "RI") isMonthlyMain = split(monthlyAssign.RI || "").includes(name);
+          else if (section === "CT") isMonthlyMain = split(monthlyAssign.CT || "").includes(name);
+          else if (section === "MRI") isMonthlyMain = split(monthlyAssign.MRI || "").includes(name);
+          else if (section === "MMG") isMonthlyMain = split(monthlyAssign.MMG || "").includes(name);
+          else if (section === "透析後胸部") isMonthlyMain = split(monthlyAssign.透析後胸部 || "").includes(name);
+          else if (section === "受付") isMonthlyMain = split(monthlyAssign.受付 || "").includes(name);
+          else if (monthlyAssign[section]) isMonthlyMain = split(monthlyAssign[section] || "").includes(name);
+        }
+        
         const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || isMonthlyMain;
+        
         if (!allowRepeatFromPrev && prevDay && section && !isFixed) {
           if (split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
         }
@@ -877,8 +902,20 @@ export default function App() {
 
       const fallback = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
-        const isMonthlyMain = section === "RI" ? split(monthlyAssign.RI || "").includes(name) : false;
+        
+        let isMonthlyMain = false;
+        if (section) {
+          if (section === "治療") isMonthlyMain = split(monthlyAssign.治療 || "").includes(name);
+          else if (section === "RI") isMonthlyMain = split(monthlyAssign.RI || "").includes(name);
+          else if (section === "CT") isMonthlyMain = split(monthlyAssign.CT || "").includes(name);
+          else if (section === "MRI") isMonthlyMain = split(monthlyAssign.MRI || "").includes(name);
+          else if (section === "MMG") isMonthlyMain = split(monthlyAssign.MMG || "").includes(name);
+          else if (section === "透析後胸部") isMonthlyMain = split(monthlyAssign.透析後胸部 || "").includes(name);
+          else if (section === "受付") isMonthlyMain = split(monthlyAssign.受付 || "").includes(name);
+          else if (monthlyAssign[section]) isMonthlyMain = split(monthlyAssign[section] || "").includes(name);
+        }
         const isFixed = (customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || isMonthlyMain;
+        
         if (!allowRepeatFromPrev && prevDay && section && !isFixed) {
           if (split(prevDay.cells[section] || "").map(getCoreName).includes(name)) return false;
         }
@@ -944,7 +981,7 @@ export default function App() {
     };
 
     const assignRooms = () => {
-      // 1. 強制ルール (サポート専任スタッフも固定対象になり得るため availAll を使用)
+      // 1. 強制ルール
       (customRules.fixed || []).forEach((rule: any) => {
         if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
         if (skipSections.includes(rule.section)) return;
@@ -1177,6 +1214,9 @@ export default function App() {
     };
     assignRooms();
 
+    // ==========================================
+    // 6. 後処理（遅番、兼務、待機、昼当番など）
+    // ==========================================
     const processPostTasks = () => {
       let helpMembers: string[] = [];
       const tempAvailCountForHelp = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
@@ -1188,6 +1228,7 @@ export default function App() {
       (customRules.lateShifts || []).forEach((rule: any) => {
         if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
         if (skipSections.includes(rule.section)) return;
+        
         if (!ROOM_SECTIONS.includes(rule.section)) return;
         
         fill(availGeneral, rule.section, helpMembers, 1);
@@ -1256,10 +1297,9 @@ export default function App() {
         }
       }
 
-      // ★ 修正: 兼務ルール発動（時間タグはコピーせず名前だけをコピーする）
       currentKenmu.forEach((km: any) => {
         const p1 = split(dayCells[km.s1]);
-        if (p1.length > 0) { // ★修正：skipSectionsから外したため、コピーを無条件で実行
+        if (p1.length > 0) { 
           const allowed = p1.filter(m => {
              if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
              return !isForbidden(getCoreName(m), km.s2);
