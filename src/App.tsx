@@ -82,10 +82,11 @@ for (let h = 8; h <= 19; h++) {
   }
 }
 
+// ★ グループの構成をご要望通りに変更しました
 const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
-  { title: "モダリティ・受付", color: "#3b82f6", sections: ["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"] },
-  { title: "一般撮影・透視・その他", color: "#10b981", sections: ["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"] },
+  { title: "モダリティ", color: "#3b82f6", sections: ["CT","MRI","RI","治療"] },
+  { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部","検像","受付","受付ヘルプ"] },
   { title: "待機・当番", color: "#f59e0b", sections: ["待機","昼当番"] }
 ];
 
@@ -451,47 +452,24 @@ export default function App() {
     setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...prevDay.cells } }));
   };
 
-  const handleClearRestDay = () => {
-    if (window.confirm(`${cur.label} の「休務・夜勤・不在」をクリアしますか？`)) {
+  // ★ 汎用クリア機能の実装
+  const handleClearGroupDay = (title: string, sections: string[]) => {
+    if (window.confirm(`${cur.label} の「${title}」をクリアしますか？`)) {
       setAllDaysWithHistory((prev: any) => {
         const nextCells = { ...(prev[cur.id] || cur.cells) };
-        REST_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
+        sections.forEach(sec => { nextCells[sec] = ""; });
         return { ...prev, [cur.id]: nextCells };
       });
     }
   };
 
-  const handleClearRestWeek = () => {
-    if (window.confirm(`表示中の「休務・夜勤・不在」を1週間分すべてクリアしますか？`)) {
+  const handleClearGroupWeek = (title: string, sections: string[]) => {
+    if (window.confirm(`表示中の「${title}」を1週間分すべてクリアしますか？`)) {
       setAllDaysWithHistory((prev: any) => {
         const nextState = { ...prev };
         days.forEach(d => {
           const nextCells = { ...(prev[d.id] || d.cells) };
-          REST_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
-          nextState[d.id] = nextCells;
-        });
-        return nextState;
-      });
-    }
-  };
-
-  const handleClearWorkDay = () => {
-    if (window.confirm(`${cur.label} の「業務配置（モダリティ・一般・当番など）」をクリアしますか？`)) {
-      setAllDaysWithHistory((prev: any) => {
-        const nextCells = { ...(prev[cur.id] || cur.cells) };
-        ASSIGNABLE_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
-        return { ...prev, [cur.id]: nextCells };
-      });
-    }
-  };
-
-  const handleClearWorkWeek = () => {
-    if (window.confirm(`表示中の「業務配置（モダリティ・一般・当番など）」を1週間分すべてクリアしますか？`)) {
-      setAllDaysWithHistory((prev: any) => {
-        const nextState = { ...prev };
-        days.forEach(d => {
-          const nextCells = { ...(prev[d.id] || d.cells) };
-          ASSIGNABLE_SECTIONS.forEach(sec => { nextCells[sec] = ""; });
+          sections.forEach(sec => { nextCells[sec] = ""; });
           nextState[d.id] = nextCells;
         });
         return nextState;
@@ -604,7 +582,6 @@ export default function App() {
     const cells = cur.cells;
     const emptyRooms: string[] = [];
 
-    // 出勤可能人数の簡易計算（警告表示用）
     let tempAvailCountW = activeGeneralStaff.length;
     ["明け","入り","土日休日代休","不在"].forEach(sec => {
       split(cells[sec]).forEach(m => {
@@ -727,7 +704,6 @@ export default function App() {
     
     const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
 
-    // ★ 動的に定員を変更するためのオブジェクトを生成
     let dynamicCapacity = { ...(customRules.capacity || {}) };
 
     (customRules.emergencies || []).forEach((em: any) => {
@@ -735,7 +711,6 @@ export default function App() {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
         if (em.type === "kenmu") { currentKenmu.push(em); }
         if (em.type === "clear" && em.section) { skipSections.push(em.section); }
-        // ★ 定員変更ルールの適用
         if (em.type === "change_capacity" && em.section) { dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); }
       }
     });
@@ -1809,18 +1784,10 @@ export default function App() {
                     <span style={{ display: "inline-block", width: 4, height: 16, background: group.color, borderRadius: 2 }}></span>
                     {group.title}
                   </h4>
-                  {group.title === "休務・夜勤" && (
-                    <div style={{display: "flex", gap: 8}}>
-                      <button onClick={handleClearRestDay} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
-                      <button onClick={handleClearRestWeek} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
-                    </div>
-                  )}
-                  {group.title === "モダリティ・受付" && (
-                    <div style={{display: "flex", gap: 8}}>
-                      <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務1日クリア</button>
-                      <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務週間クリア</button>
-                    </div>
-                  )}
+                  <div style={{display: "flex", gap: 8}}>
+                    <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
+                    <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
+                  </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                   {group.sections.map((s: string) => (
