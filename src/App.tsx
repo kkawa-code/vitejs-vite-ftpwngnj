@@ -61,7 +61,7 @@ const MONTHLY_CATEGORIES = [
 const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
 const DEFAULT_RULES = { 
-  staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1 }, 
+  staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, 受付: 2 }, 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
@@ -95,7 +95,7 @@ function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
 function getCoreName(fullName: string) { return fullName.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim(); }
 
-// ★ 偏りを防ぐための Fisher-Yates シャッフル関数
+// 偏りを防ぐ Fisher-Yates シャッフル
 function shuffleArray<T>(array: T[]): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -715,13 +715,10 @@ export default function App() {
     return w;
   }, [cur, days, customRules, activeGeneralStaff]);
 
-  // ★ 巨大だった autoAssign を機能ごとに分割してリファクタリング
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
-    // ==========================================
     // 1. 前処理（前日の入り反映・祝日スキップ）
-    // ==========================================
     if (prevDay && prevDay.cells["入り"]) {
       const iriMembers = split(prevDay.cells["入り"]).map(getCoreName);
       const currentAke = split(dayCells["明け"]);
@@ -730,9 +727,7 @@ export default function App() {
 
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
 
-    // ==========================================
     // 2. BlockMap構築（休務・不在の把握）
-    // ==========================================
     const blockMap = new Map<string, string>();
     const buildBlockMap = () => {
       allStaff.forEach(s => blockMap.set(s, 'NONE'));
@@ -757,9 +752,7 @@ export default function App() {
       return false;
     }));
 
-    // ==========================================
     // 3. 緊急ルールの評価（定員変更など）
-    // ==========================================
     let skipSections: string[] = [];
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
@@ -778,9 +771,7 @@ export default function App() {
     };
     evaluateEmergencies();
 
-    // ==========================================
     // 4. 過去実績の集計 ＆ 候補者のシャッフル・ソート
-    // ==========================================
     const assignCounts: Record<string, number> = {};
     const maxAssigns: Record<string, number> = {};
     
@@ -835,7 +826,6 @@ export default function App() {
     allStaff.forEach(s => counts[s] = 0);
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
-    // ★ 修正：Math.random() を使わず、Fisher-Yatesシャッフルした配列をソートすることで偏りを排除
     const shuffledStaff = shuffleArray(allStaff);
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
@@ -1036,6 +1026,7 @@ export default function App() {
         const targets = split(sub.target);
         if (targets.length === 0 || skipSections.includes(sub.section)) return; 
         
+        // ★ AND条件：対象スタッフ全員が休みの時のみ発動
         const trigger = targets.every(t => !availAll.includes(t) || isUsed(t));
         
         if (trigger) {
@@ -1057,6 +1048,28 @@ export default function App() {
           }
         }
       });
+
+      // ★ 修正: 受付の優先度を上げて、CTなどの前に配置する
+      if (!skipSections.includes("受付")) {
+        const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
+        let currentUketsuke = split(dayCells["受付"]);
+        const uketsukeMonthly = split(monthlyAssign.受付 || "");
+        
+        // 月間設定の人を配置
+        for (const name of uketsukeMonthly) {
+          if (availAll.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { 
+            currentUketsuke.push(name); addU(name, 1); 
+          }
+        }
+
+        const neededUketsuke = uTarget - currentUketsuke.length;
+        if (neededUketsuke > 0) {
+          // 受付スタッフが足りない場合は一般スタッフから強制補充
+          const pickedUketsuke = pick(availGeneral, availGeneral, neededUketsuke, "受付", currentUketsuke);
+          currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
+        }
+        dayCells["受付"] = join(currentUketsuke);
+      }
 
       // 2. 主要モダリティ
       if (!skipSections.includes("治療")) {
@@ -1108,22 +1121,6 @@ export default function App() {
           fill(availGeneral, room, preferredList, targetCount);
         }
       });
-
-      // 4. 受付
-      if (!skipSections.includes("受付")) {
-        const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
-        let currentUketsuke = split(dayCells["受付"]);
-        const uketsukeMonthly = split(monthlyAssign.受付 || "");
-        for (const name of uketsukeMonthly) {
-          if (availReception.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { currentUketsuke.push(name); addU(name, 1); }
-        }
-        const neededUketsuke = uTarget - currentUketsuke.length;
-        if (neededUketsuke > 0) {
-          const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
-          currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
-        }
-        dayCells["受付"] = join(currentUketsuke);
-      }
 
       // 5. 一般の部屋（未指定）
       if (!skipSections.includes("検像") && !extraPriorityRooms.includes("検像")) {
@@ -1300,9 +1297,17 @@ export default function App() {
         
         dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
-        // 受付不在時の受付ヘルプ自動配置ルール
-        let isUketsukeEmpty = split(dayCells["受付"]).length === 0;
-        if (isUketsukeEmpty && !skipSections.includes("受付ヘルプ")) {
+        // ★ 修正：受付スタッフが1人でも休んだら必ず受付ヘルプを発動する
+        const currentUketsuke = split(dayCells["受付"]).map(getCoreName);
+        let isReceptionistAbsent = false;
+        if (activeReceptionStaff.length > 0) {
+          // 受付名簿にいる人が、本日出勤可能（availAll）に含まれていない場合は「休み」と判定
+          isReceptionistAbsent = activeReceptionStaff.some(name => blockMap.get(name) === 'ALL' || !availAll.includes(name));
+        }
+        
+        const needsUketsukeHelp = isReceptionistAbsent || currentUketsuke.length === 0;
+
+        if (needsUketsukeHelp && !skipSections.includes("受付ヘルプ")) {
           let helpMems = split(dayCells["受付ヘルプ"]);
           
           // 1. 昼ヘルプ (12:15〜13:00) : 昼当番以外の人から1名
@@ -1736,11 +1741,11 @@ export default function App() {
             <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", marginBottom: 16 }}>
               <ol style={{ margin: 0, paddingLeft: 20 }}>
                 <li><strong>【強制ルール】</strong> 専従、代打、玉突き・同室回避</li>
+                <li><strong>【受付】</strong> （優先的に確保）</li>
                 <li><strong>【主力モダリティ】</strong> 治療 → RI → CT → MRI</li>
                 <li><strong>【指定優先部屋】</strong> 「絶対優先人数」で追加した部屋（<span style={{fontWeight:800, color:"#be185d"}}>追加した順番で処理</span>：現在は {priorityRoomsList.length > 0 ? priorityRoomsList.join(' → ') : "指定なし"}）</li>
-                <li><strong>【受付】</strong> 受付</li>
                 <li><strong>【一般撮影】</strong> 指定優先部屋以外の残りの部屋（1号室、ポータブル、検像など）</li>
-                <li><strong>【後処理】</strong> 遅番、兼務、待機、昼当番</li>
+                <li><strong>【後処理】</strong> 遅番、兼務、待機、昼当番、受付ヘルプ</li>
               </ol>
             </div>
           </div>
