@@ -82,11 +82,12 @@ for (let h = 8; h <= 19; h++) {
   }
 }
 
+// ★ 昼当番を一般撮影・その他グループへ移動し、待機グループの名前をスッキリさせました
 const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
   { title: "モダリティ", color: "#3b82f6", sections: ["CT","MRI","RI","治療"] },
-  { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","検像","受付","受付ヘルプ"] },
-  { title: "待機・当番", color: "#f59e0b", sections: ["待機","透析後胸部","昼当番"] }
+  { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","検像","受付","受付ヘルプ","昼当番"] },
+  { title: "待機", color: "#f59e0b", sections: ["待機","透析後胸部"] }
 ];
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -257,7 +258,6 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   
   const handleAdd = (name: string) => { 
     if (name) {
-      // ★ 待機枠の場合は追加時に自動で (17:00〜19:00) を付与する
       const newName = isTaiki ? `${name}(17:00〜19:00)` : name;
       onChange(join([...members, newName])); 
     }
@@ -494,7 +494,6 @@ export default function App() {
     }
   };
 
-  // ★ 追加：モダリティと一般撮影をまとめてクリアする機能
   const handleClearWorkDay = () => {
     if (window.confirm(`${cur.label} の「モダリティ」と「一般撮影・透視・その他」をクリアしますか？`)) {
       const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections];
@@ -1224,6 +1223,8 @@ export default function App() {
       }
     });
 
+    // ★待機の自動割当（あまった人を詰める処理）は完全削除しました。手動で入力してください。
+
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
       
@@ -1813,7 +1814,7 @@ export default function App() {
                       <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務週間クリア</button>
                     </div>
                   )}
-                  {group.title === "待機・当番" && (
+                  {group.title === "待機" && (
                     <div style={{display: "flex", gap: 8}}>
                       <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
                       <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
