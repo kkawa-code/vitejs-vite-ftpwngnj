@@ -61,7 +61,7 @@ const MONTHLY_CATEGORIES = [
 const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
 const DEFAULT_RULES = { 
-  staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1 }, 
+  staffList: DEFAULT_STAFF, receptionStaffList: "", customHolidays: "", capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1 }, 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
@@ -604,9 +604,24 @@ export default function App() {
     const cells = cur.cells;
     const emptyRooms: string[] = [];
 
+    // 出勤可能人数の簡易計算（警告表示用）
+    let tempAvailCountW = activeGeneralStaff.length;
+    ["明け","入り","土日休日代休","不在"].forEach(sec => {
+      split(cells[sec]).forEach(m => {
+        if(activeGeneralStaff.includes(getCoreName(m))) tempAvailCountW--; 
+      });
+    });
+    
+    const dynamicCapacityW = { ...(customRules.capacity || {}) };
+    (customRules.emergencies || []).forEach((em: any) => {
+      if (tempAvailCountW <= Number(em.threshold) && em.type === "change_capacity" && em.section) {
+        dynamicCapacityW[em.section] = Number(em.newCapacity ?? 3);
+      }
+    });
+
     ROOM_SECTIONS.forEach(room => {
       const count = split(cells[room]).length;
-      const target = customRules.capacity?.[room];
+      const target = dynamicCapacityW[room];
 
       if (target !== undefined && target > 0) {
         if (count === 0) {
@@ -669,7 +684,7 @@ export default function App() {
     }
 
     return w;
-  }, [cur, days, customRules]);
+  }, [cur, days, customRules, activeGeneralStaff]);
 
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
@@ -712,11 +727,16 @@ export default function App() {
     
     const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
 
+    // ★ 動的に定員を変更するためのオブジェクトを生成
+    let dynamicCapacity = { ...(customRules.capacity || {}) };
+
     (customRules.emergencies || []).forEach((em: any) => {
       if (tempAvailCount <= Number(em.threshold)) {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
         if (em.type === "kenmu") { currentKenmu.push(em); }
         if (em.type === "clear" && em.section) { skipSections.push(em.section); }
+        // ★ 定員変更ルールの適用
+        if (em.type === "change_capacity" && em.section) { dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); }
       }
     });
 
@@ -974,7 +994,7 @@ export default function App() {
               const current = split(dayCells[room]);
               if (hasNGPair(s2, current.map(getCoreName), false)) continue;
               
-              const actualCap = room === "CT" || room === "MRI" || room === "治療" ? 3 : (customRules.capacity?.[room] ?? 1);
+              const actualCap = room === "CT" || room === "MRI" || room === "治療" ? (dynamicCapacity[room] ?? 3) : (dynamicCapacity[room] ?? 1);
               if (current.length < actualCap) {
                 const b = blockMap.get(s2);
                 let tag = ""; let f = 1;
@@ -1016,7 +1036,7 @@ export default function App() {
 
     // 【2. 主要モダリティ】
     if (!skipSections.includes("治療")) {
-      const treatTarget = customRules.capacity?.治療 ?? 3;
+      const treatTarget = dynamicCapacity.治療 !== undefined ? dynamicCapacity.治療 : 3;
       const treatMain = split(monthlyAssign.治療 || "").filter(s => availGeneral.includes(s));
       const treatPrioritySub = split(monthlyAssign.治療サブ優先 || "").filter(s => availGeneral.includes(s));
       const treatSub = split(monthlyAssign.治療サブ || "").filter(s => availGeneral.includes(s));
@@ -1026,7 +1046,7 @@ export default function App() {
     }
 
     if (!skipSections.includes("RI")) {
-      const riTarget = customRules.capacity?.RI ?? 1;
+      const riTarget = dynamicCapacity.RI !== undefined ? dynamicCapacity.RI : 1;
       const riMain = split(monthlyAssign.RI || "").filter(s => availGeneral.includes(s));
       const riSub = split(monthlyAssign.RIサブ || "").filter(s => availGeneral.includes(s));
       const preferred = [...riMain, ...riSub];
@@ -1035,14 +1055,14 @@ export default function App() {
     }
 
     if (!skipSections.includes("CT")) {
-      const ctTarget = customRules.capacity?.CT ?? 3;
+      const ctTarget = dynamicCapacity.CT !== undefined ? dynamicCapacity.CT : 4;
       fill(availGeneral, "CT", split(monthlyAssign.CT || ""), ctTarget);
       const ctMembersAfter = split(dayCells["CT"]).map(getCoreName);
       if (ctMembersAfter.length >= 4) { maxAssigns[ctMembersAfter[ctMembersAfter.length - 1]] = 2; }
     }
 
     if (!skipSections.includes("MRI")) {
-      const mriTarget = customRules.capacity?.MRI ?? 3;
+      const mriTarget = dynamicCapacity.MRI !== undefined ? dynamicCapacity.MRI : 3;
       const mriPref = split(monthlyAssign.MRI || "").filter(s => availGeneral.includes(s));
       fill(mriPref, "MRI", mriPref, mriTarget);
       const mriCurrent = split(dayCells["MRI"]);
@@ -1055,7 +1075,7 @@ export default function App() {
     const extraPriorityRooms = Object.keys(customRules.capacity || {}).filter(r => !["治療", "RI", "CT", "MRI", "受付"].includes(r));
     extraPriorityRooms.forEach(room => {
       if (skipSections.includes(room)) return;
-      const targetCount = customRules.capacity[room];
+      const targetCount = dynamicCapacity[room] !== undefined ? dynamicCapacity[room] : 1;
       const preferredList = split(monthlyAssign[room] || "").filter(s => availGeneral.includes(s));
       
       if (room === "MMG" || room === "透析後胸部") {
@@ -1070,7 +1090,7 @@ export default function App() {
     // 【4. 受付】
     let uketsukeShortage = 0;
     if (!skipSections.includes("受付")) {
-      const uTarget = customRules.capacity?.受付 ?? 2;
+      const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
       let currentUketsuke = split(dayCells["受付"]);
       const uketsukeMonthly = split(monthlyAssign.受付 || "");
       for (const name of uketsukeMonthly) {
@@ -1382,7 +1402,7 @@ export default function App() {
               
               <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👥 絶対優先の人数設定（自動割当用）</h4>
-                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>ここで設定した部屋と人数は、AIが最優先でアサインします。（CT, MRI, 治療, RI 以外も自由に追加可能）</p>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>ここで設定した部屋と人数は、システムが最優先でアサインします。（CTの基本人数などを設定します）</p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   {Object.entries(customRules.capacity || {}).map(([room, count]) => (
                     <div key={room} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
@@ -1587,8 +1607,11 @@ export default function App() {
                     <input type="number" value={rule.threshold} onChange={e => updateRule("emergencies", idx, "threshold", e.target.value)} className="rule-num" style={{borderColor:"#fde047"}} />
                     <span className="rule-label" style={{color:"#854d0e"}}>人以下➔</span>
                     
-                    <select value={rule.type === "kenmu" ? "kenmu" : rule.type === "clear" ? "clear" : "role_assign"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"120px", borderColor:"#fde047"}}>
-                      <option value="role_assign">担当配置</option><option value="kenmu">兼務</option><option value="clear">配置なし</option>
+                    <select value={["kenmu", "clear", "role_assign", "change_capacity"].includes(rule.type) ? rule.type : "role_assign"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"120px", borderColor:"#fde047"}}>
+                      <option value="role_assign">担当配置</option>
+                      <option value="kenmu">兼務</option>
+                      <option value="change_capacity">定員変更</option>
+                      <option value="clear">配置なし</option>
                     </select>
 
                     {rule.type === "role_assign" ? (
@@ -1605,6 +1628,13 @@ export default function App() {
                         <select value={rule.s2} onChange={e => updateRule("emergencies", idx, "s2", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所2</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                         <span className="rule-label" style={{color:"#854d0e"}}>] も兼務</span>
                       </>
+                    ) : rule.type === "change_capacity" ? (
+                      <>
+                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <span className="rule-label" style={{color:"#854d0e"}}>の定員を</span>
+                        <input type="number" value={rule.newCapacity ?? 3} onChange={e => updateRule("emergencies", idx, "newCapacity", e.target.value)} className="rule-num" style={{borderColor:"#fde047"}} />
+                        <span className="rule-label" style={{color:"#854d0e"}}>人にする</span>
+                      </>
                     ) : (
                       <>
                         <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
@@ -1614,7 +1644,7 @@ export default function App() {
                     <button onClick={() => removeRule("emergencies", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "clear", role: "", section: "", s1: "", s2: "" })}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "CT", s1: "", s2: "", newCapacity: 3 })}>＋ 追加</button>
               </div>
 
               <div style={{ background: "#fdf2f8", padding: 16, borderRadius: 12, border: "1px solid #fbcfe8", gridColumn: "1 / -1" }}>
@@ -1675,15 +1705,15 @@ export default function App() {
         </details>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, background: "#faf5ff", border: "1px solid #ddd6fe" }}>
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
         <details>
-          <summary style={{ fontWeight: 800, color: "#8b5cf6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
-            <span>🤖</span> AIの思考回路（部屋が埋まる優先度）を開く
+          <summary style={{ fontWeight: 800, color: "#475569", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+            <span>📋</span> 自動割当のルール（部屋が埋まる優先度）を開く
           </summary>
-          <div style={{ marginTop: 16, borderTop: "2px dashed #c4b5fd", paddingTop: 16 }}>
-            <h4 style={{ margin: "0 0 10px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>📌 部屋が埋まる順番（処理の優先度ランキング）</h4>
-            <p style={{ fontSize: 12, color: "#7c3aed", marginBottom: 12, fontWeight: 600 }}>※上にある部屋・ルールから順番に、スタッフが割り当てられていきます。「絶対優先人数」で追加した部屋は、追加した順番に優先して処理されます。</p>
-            <div style={{ fontSize: 13, color: "#4c1d95", lineHeight: 1.6, background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #ddd6fe", marginBottom: 16 }}>
+          <div style={{ marginTop: 16, borderTop: "2px dashed #cbd5e1", paddingTop: 16 }}>
+            <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>📌 部屋が埋まる順番（処理の優先順位）</h4>
+            <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>※上にある部屋・ルールから順番に、スタッフが割り当てられていきます。「絶対優先人数」で追加した部屋は、追加した順番に優先して処理されます。</p>
+            <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", marginBottom: 16 }}>
               <ol style={{ margin: 0, paddingLeft: 20 }}>
                 <li><strong>【強制ルール】</strong> 専従、代打、玉突き・同室回避</li>
                 <li><strong>【主力モダリティ】</strong> 治療 → RI → CT → MRI</li>
