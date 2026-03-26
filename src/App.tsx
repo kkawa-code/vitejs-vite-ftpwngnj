@@ -838,8 +838,8 @@ export default function App() {
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
     
-    // ★ 一般スタッフを受付の代理にしないよう、受付名簿のみを対象とする
-    const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
+    const effectiveReceptionStaff = activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
+    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s));
 
     // --- ヘルパー関数 ---
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
@@ -1027,7 +1027,6 @@ export default function App() {
         const targets = split(sub.target);
         if (targets.length === 0 || skipSections.includes(sub.section)) return; 
         
-        // AND条件：対象スタッフ全員が休みの時のみ発動
         const trigger = targets.every(t => !availAll.includes(t) || isUsed(t));
         
         if (trigger) {
@@ -1050,13 +1049,12 @@ export default function App() {
         }
       });
 
-      // ★ 修正: 受付の一般補充を廃止し、受付専用スタッフのみで埋める
+      // ★ 修正: 一般スタッフを受付の代理にしないよう、受付の定員分は受付専用スタッフのみで埋める
       if (!skipSections.includes("受付")) {
         const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
         let currentUketsuke = split(dayCells["受付"]);
         const uketsukeMonthly = split(monthlyAssign.受付 || "");
         
-        // 月間設定の人を配置
         for (const name of uketsukeMonthly) {
           if (availAll.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { 
             currentUketsuke.push(name); addU(name, 1); 
@@ -1065,7 +1063,6 @@ export default function App() {
 
         const neededUketsuke = uTarget - currentUketsuke.length;
         if (neededUketsuke > 0) {
-          // 受付スタッフ（出勤）のみから補充する（一般スタッフは入れない）
           const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
           currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
         }
@@ -1298,34 +1295,62 @@ export default function App() {
         
         dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
-        // ★ 修正：受付の定員が満たされていない場合（誰か休んでいる場合）に受付ヘルプを発動する
-        const currentUketsuke = split(dayCells["受付"]).map(getCoreName);
+        // ★ 修正：受付の現在の人数が定員に満たない場合、必ず受付ヘルプを発動する
         const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
-        const needsUketsukeHelp = currentUketsuke.length < uTarget;
+        const currentUketsukeCount = split(dayCells["受付"]).length;
+        const needsUketsukeHelp = currentUketsukeCount < uTarget;
 
         if (needsUketsukeHelp && !skipSections.includes("受付ヘルプ")) {
           let helpMems = split(dayCells["受付ヘルプ"]);
           
-          // 1. 昼ヘルプ (12:15〜13:00) : 昼当番以外の人から1名
+          // 1. 昼ヘルプ (12:15〜13:00) を絶対に入れる
+          let lunchHelpCandidate = null;
           const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
-          const availForLunchHelp = availGeneral.filter(n => !lunchCores.includes(n) && !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
-          if (availForLunchHelp.length > 0) {
-            availForLunchHelp.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
-            helpMems.push(`${availForLunchHelp[0]}(12:15〜13:00)`);
+          
+          // 優先1: 昼当番以外で出勤している一般スタッフ
+          let c1 = availGeneral.filter(n => !lunchCores.includes(n) && !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+          if (c1.length > 0) {
+            c1.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+            lunchHelpCandidate = c1[0];
+          } else {
+            // 優先2: 昼当番を含めてもいいから一般スタッフ
+            let c2 = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+            if (c2.length > 0) {
+              c2.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+              lunchHelpCandidate = c2[0];
+            } else {
+              // 優先3: 仕方がないので全スタッフの誰か
+              let c3 = availAll.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+              if (c3.length > 0) {
+                c3.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+                lunchHelpCandidate = c3[0];
+              }
+            }
           }
 
-          // 2. 16時以降ヘルプ (16:00〜) : 基本は「検像」、いなければ他の人から1名
-          const kenzoCores = split(dayCells["検像"]).map(getCoreName);
+          if (lunchHelpCandidate) {
+            helpMems.push(`${lunchHelpCandidate}(12:15〜13:00)`);
+          }
+
+          // 2. 16時以降ヘルプ (16:00〜) : 基本は「検像」、いなければ他の人から必ず入れる
           let picked16 = null;
+          const kenzoCores = split(dayCells["検像"]).map(getCoreName);
           const validKenzo = kenzoCores.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n));
           
           if (validKenzo.length > 0) {
             picked16 = validKenzo[0];
           } else {
-            const others = availGeneral.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== (availForLunchHelp[0] || ""));
-            if(others.length > 0) {
+            let others = availGeneral.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== lunchHelpCandidate);
+            if (others.length > 0) {
               others.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
               picked16 = others[0];
+            } else {
+              // さらに妥協
+              let others2 = availAll.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== lunchHelpCandidate);
+              if (others2.length > 0) {
+                others2.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+                picked16 = others2[0];
+              }
             }
           }
           
