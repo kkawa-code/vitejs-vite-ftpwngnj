@@ -1526,7 +1526,16 @@ export default function App() {
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
                   <div style={{ flex: 1, minWidth: "200px" }}>
                     <label style={{ fontSize: 12, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>対象スタッフ名（複数可）</label>
-                    <input type="text" value={customRules.supportStaffList || ""} onChange={e => setCustomRules({...customRules, supportStaffList: e.target.value})} placeholder="例: 浅野、部長" style={{ width: "100%", padding: "8px 12px", border: "1px solid #86efac", borderRadius: 8, fontSize: 13, outline: "none" }} />
+                    {/* ▼ ここをMultiStaffPickerに変更 ▼ */}
+                    <div style={{ background: "#fff", padding: "6px", borderRadius: 8, border: "1px solid #86efac", minHeight: "34px", display: "flex", alignItems: "center" }}>
+                      <MultiStaffPicker 
+                        selected={customRules.supportStaffList || ""} 
+                        onChange={v => setCustomRules({...customRules, supportStaffList: v})} 
+                        options={allStaff} 
+                        placeholder="＋スタッフを選択" 
+                      />
+                    </div>
+                    {/* ▲ ここまで ▲ */}
                   </div>
                   <div style={{ flex: 2, minWidth: "250px" }}>
                     <label style={{ fontSize: 12, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>優先する対象部屋</label>
