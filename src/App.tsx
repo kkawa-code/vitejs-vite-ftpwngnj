@@ -82,12 +82,11 @@ for (let h = 8; h <= 19; h++) {
   }
 }
 
-// ★ グループの構成をご要望通りに変更しました
 const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
   { title: "モダリティ", color: "#3b82f6", sections: ["CT","MRI","RI","治療"] },
-  { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部","検像","受付","受付ヘルプ"] },
-  { title: "待機・当番", color: "#f59e0b", sections: ["待機","昼当番"] }
+  { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","検像","受付","受付ヘルプ"] },
+  { title: "待機・当番", color: "#f59e0b", sections: ["待機","透析後胸部","昼当番"] }
 ];
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -452,7 +451,6 @@ export default function App() {
     setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...prevDay.cells } }));
   };
 
-  // ★ 汎用クリア機能の実装
   const handleClearGroupDay = (title: string, sections: string[]) => {
     if (window.confirm(`${cur.label} の「${title}」をクリアしますか？`)) {
       setAllDaysWithHistory((prev: any) => {
