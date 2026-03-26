@@ -412,14 +412,15 @@ export default function App() {
     return Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff]));
   }, [activeGeneralStaff, activeReceptionStaff]);
 
+  // ★ 修正：受付名簿が空なら一般スタッフから選べるようにフォールバック
   const getStaffForSection = (section: string) => {
-    if (section === "受付") return activeReceptionStaff;
+    if (section === "受付") return activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
     if (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section)) return allStaff;
     return activeGeneralStaff;
   };
 
   const getStaffForCategory = (category: string) => {
-    if (category === "受付") return activeReceptionStaff;
+    if (category === "受付") return activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
     if (category === "受付ヘルプ") return allStaff;
     return activeGeneralStaff;
   };
@@ -811,6 +812,7 @@ export default function App() {
     allStaff.forEach(s => counts[s] = 0);
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
+    // 終日出勤できる人を最優先し、AM休・PM休の人は後回しにする
     const availAll = allStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
@@ -821,7 +823,10 @@ export default function App() {
     });
     
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s));
-    const availReception = availAll.filter(s => activeReceptionStaff.includes(s));
+    
+    // ★ 修正：受付名簿が空なら一般スタッフから選べるようにフォールバック
+    const effectiveReceptionStaff = activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
+    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s));
 
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
@@ -1028,12 +1033,13 @@ export default function App() {
       }
     });
 
+    // ★ 修正：代打ルールの対象スタッフ複数人判定（全員休みの時だけ発動）
     (customRules.substitutes || []).forEach((sub: any) => {
       const targets = split(sub.target);
       if (targets.length === 0 || skipSections.includes(sub.section)) return; 
       
-      // 対象スタッフの誰か一人でも休務・夜勤（ブロック）されている、または別件で1日使われている場合
-      const trigger = targets.some(t => !availAll.includes(t) || isUsed(t));
+      // 対象スタッフの「全員」が休務・夜勤等で使えない場合のみ true になる
+      const trigger = targets.every(t => !availAll.includes(t) || isUsed(t));
       
       if (trigger) {
         const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !isUsed(s));
@@ -1286,7 +1292,7 @@ export default function App() {
       
       dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
-      // ★ 受付不在時の受付ヘルプ自動配置ルール
+      // ★ 修正：受付不在時の受付ヘルプ自動配置ルール
       let isUketsukeEmpty = split(dayCells["受付"]).length === 0;
       if (isUketsukeEmpty && !skipSections.includes("受付ヘルプ")) {
         let helpMems = split(dayCells["受付ヘルプ"]);
@@ -1813,24 +1819,10 @@ export default function App() {
                     <span style={{ display: "inline-block", width: 4, height: 16, background: group.color, borderRadius: 2 }}></span>
                     {group.title}
                   </h4>
-                  {group.title === "休務・夜勤" && (
-                    <div style={{display: "flex", gap: 8}}>
-                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
-                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
-                    </div>
-                  )}
-                  {group.title === "モダリティ" && (
-                    <div style={{display: "flex", gap: 8}}>
-                      <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務1日クリア</button>
-                      <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務週間クリア</button>
-                    </div>
-                  )}
-                  {group.title === "待機" && (
-                    <div style={{display: "flex", gap: 8}}>
-                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
-                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
-                    </div>
-                  )}
+                  <div style={{display: "flex", gap: 8}}>
+                    <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
+                    <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
+                  </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                   {group.sections.map((s: string) => (
