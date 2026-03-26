@@ -253,7 +253,15 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
 
 const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [] }: { section: string, value: string, activeStaff: string[], onChange: (v: string) => void, noTime?: boolean, customOptions?: string[] }) => {
   const members = split(value);
-  const handleAdd = (name: string) => { if (name) onChange(join([...members, name])); };
+  const isTaiki = section === "待機";
+  
+  const handleAdd = (name: string) => { 
+    if (name) {
+      // ★ 待機枠の場合は追加時に自動で (17:00〜19:00) を付与する
+      const newName = isTaiki ? `${name}(17:00〜19:00)` : name;
+      onChange(join([...members, newName])); 
+    }
+  };
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
   
   const handleTimeChange = (idx: number, newTime: string) => {
@@ -263,8 +271,6 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
     next[idx] = core + newTime;
     onChange(join(next));
   };
-
-  const isTaiki = section === "待機";
 
   return (
     <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
@@ -481,6 +487,33 @@ export default function App() {
         days.forEach(d => {
           const nextCells = { ...(prev[d.id] || d.cells) };
           sections.forEach(sec => { nextCells[sec] = ""; });
+          nextState[d.id] = nextCells;
+        });
+        return nextState;
+      });
+    }
+  };
+
+  // ★ 追加：モダリティと一般撮影をまとめてクリアする機能
+  const handleClearWorkDay = () => {
+    if (window.confirm(`${cur.label} の「モダリティ」と「一般撮影・透視・その他」をクリアしますか？`)) {
+      const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections];
+      setAllDaysWithHistory((prev: any) => {
+        const nextCells = { ...(prev[cur.id] || cur.cells) };
+        workSections.forEach(sec => { nextCells[sec] = ""; });
+        return { ...prev, [cur.id]: nextCells };
+      });
+    }
+  };
+
+  const handleClearWorkWeek = () => {
+    if (window.confirm(`表示中の「モダリティ」と「一般撮影・透視・その他」を1週間分すべてクリアしますか？`)) {
+      const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections];
+      setAllDaysWithHistory((prev: any) => {
+        const nextState = { ...prev };
+        days.forEach(d => {
+          const nextCells = { ...(prev[d.id] || d.cells) };
+          workSections.forEach(sec => { nextCells[sec] = ""; });
           nextState[d.id] = nextCells;
         });
         return nextState;
@@ -780,12 +813,11 @@ export default function App() {
     allStaff.forEach(s => counts[s] = 0);
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
-    // ★ 修正：終日出勤できる人を最優先し、AM休・PM休の人は後回しにする
     const availAll = allStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return 1;  // aが半休なら後回し
-      if (!aBlock && bBlock) return -1; // bが半休ならaを優先
+      if (aBlock && !bBlock) return 1; 
+      if (!aBlock && bBlock) return -1;
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
       return Math.random() - 0.5;
     });
@@ -1191,8 +1223,6 @@ export default function App() {
         dayCells[km.s2] = join(p1); 
       }
     });
-
-    // ★待機の自動割当（あまった人を詰める処理）は完全削除しました。手動で入力してください。
 
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
@@ -1771,10 +1801,24 @@ export default function App() {
                     <span style={{ display: "inline-block", width: 4, height: 16, background: group.color, borderRadius: 2 }}></span>
                     {group.title}
                   </h4>
-                  <div style={{display: "flex", gap: 8}}>
-                    <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
-                    <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
-                  </div>
+                  {group.title === "休務・夜勤" && (
+                    <div style={{display: "flex", gap: 8}}>
+                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
+                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
+                    </div>
+                  )}
+                  {group.title === "モダリティ" && (
+                    <div style={{display: "flex", gap: 8}}>
+                      <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務1日クリア</button>
+                      <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務週間クリア</button>
+                    </div>
+                  )}
+                  {group.title === "待機・当番" && (
+                    <div style={{display: "flex", gap: 8}}>
+                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
+                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                   {group.sections.map((s: string) => (
@@ -1783,6 +1827,14 @@ export default function App() {
                 </div>
               </div>
             ))}
+
+            {/* ★ 下部のアクションボタン追加 */}
+            <div className="no-print" style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", marginTop: 32, paddingTop: 20, borderTop: "2px dashed #cbd5e1", flexWrap: "wrap" }}>
+              <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
+              <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
+              <button className="btn-hover" onClick={handleUndo} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), cursor: history.length === 0 ? "not-allowed" : "pointer"}} disabled={history.length === 0}>↩️ 戻る</button>
+            </div>
+
           </div>
         )}
       </div>
