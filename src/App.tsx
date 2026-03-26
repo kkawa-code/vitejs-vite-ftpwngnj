@@ -594,50 +594,6 @@ export default function App() {
     return Object.entries(stats).sort((a, b) => b[1].total - a[1].total);
   }, [days, activeGeneralStaff]);
 
-  const aiRanking = useMemo(() => {
-    if (!cur || cur.isPublicHoliday) return [];
-    
-    const curIndex = days.findIndex(d => d.id === cur.id);
-    const pastDays = days.slice(0, curIndex);
-    
-    const counts: Record<string, number> = {};
-    activeGeneralStaff.forEach(s => counts[s] = 0);
-    
-    pastDays.forEach(pd => {
-      Object.entries(pd.cells).forEach(([sec, val]) => {
-        if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return;
-        split(val as string).forEach(m => {
-          const c = getCoreName(m);
-          if (counts[c] !== undefined) counts[c]++;
-        });
-      });
-    });
-
-    const blockMap = new Map<string, string>();
-    activeGeneralStaff.forEach(s => blockMap.set(s, 'NONE'));
-    ["明け","入り","土日休日代休"].forEach(sec => split(cur.cells[sec]).forEach(m => blockMap.set(getCoreName(m), 'ALL')));
-    split(cur.cells["不在"]).forEach(m => {
-      const core = getCoreName(m);
-      if (m.includes("(AM)")) blockMap.set(core, 'AM');
-      else if (m.includes("(PM)")) blockMap.set(core, 'PM');
-      else blockMap.set(core, 'ALL');
-    });
-
-    const activeMembers = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
-      const aBlock = blockMap.get(a) !== 'NONE';
-      const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return 1; 
-      if (!aBlock && bBlock) return -1;
-      return counts[a] - counts[b]; 
-    });
-
-    return activeMembers.map(name => ({
-      name,
-      count: counts[name],
-      block: blockMap.get(name)
-    }));
-  }, [cur, days, activeGeneralStaff]);
-
   const priorityRoomsList = useMemo(() => {
     return Object.keys(customRules.capacity || {}).filter(r => !["治療", "RI", "CT", "MRI", "受付"].includes(r));
   }, [customRules.capacity]);
@@ -1140,7 +1096,7 @@ export default function App() {
       if (split(dayCells["CT"]).length >= 4) { helpMembers.push(getCoreName(split(dayCells["CT"])[split(dayCells["CT"]).length - 1])); }
     }
 
-    ["1号室", "2号室", "3号室", "5号室", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => {
+    ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA"].forEach(sec => {
       if (!extraPriorityRooms.includes(sec)) {
         fill(availGeneral, sec, helpMembers, 1);
       }
@@ -1722,7 +1678,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, background: "#faf5ff", border: "1px solid #ddd6fe" }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#8b5cf6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
-            <span>🤖</span> AIの思考回路（自動割当のルールと、本日の優先度ランキング）を開く
+            <span>🤖</span> AIの思考回路（部屋が埋まる優先度）を開く
           </summary>
           <div style={{ marginTop: 16, borderTop: "2px dashed #c4b5fd", paddingTop: 16 }}>
             <h4 style={{ margin: "0 0 10px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>📌 部屋が埋まる順番（処理の優先度ランキング）</h4>
@@ -1736,30 +1692,6 @@ export default function App() {
                 <li><strong>【一般撮影】</strong> 指定優先部屋以外の残りの部屋（1号室、ポータブル、検像など）</li>
                 <li><strong>【後処理】</strong> 遅番、兼務、待機、昼当番</li>
               </ol>
-            </div>
-
-            <h4 style={{ margin: "0 0 10px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>👑 本日（{cur.label}）のアサイン優先度ランキング</h4>
-            <p style={{ fontSize: 12, color: "#7c3aed", marginBottom: 12, fontWeight: 600 }}>※月曜日から昨日までの「稼働実績」が少ない人ほどランキング上位になり、優先的に部屋へアサインされます。AIは常にこのリストの上から順番にスタッフを探します。</p>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
-              {aiRanking.map((staff, idx) => {
-                const isUnavailable = staff.block === 'ALL';
-                const isHalf = staff.block === 'AM' || staff.block === 'PM';
-                return (
-                  <div key={staff.name} style={{ display: "flex", alignItems: "center", gap: 8, background: isUnavailable ? "#f1f5f9" : "#fff", padding: "6px 12px", borderRadius: 8, border: `1px solid ${isUnavailable ? "#e2e8f0" : "#c4b5fd"}`, opacity: isUnavailable ? 0.6 : 1 }}>
-                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: isUnavailable ? "#94a3b8" : "#8b5cf6", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>
-                      {isUnavailable ? "休" : idx + 1}
-                    </div>
-                    <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: isUnavailable ? "#64748b" : "#4c1d95" }}>{staff.name}</div>
-                    {!isUnavailable && (
-                      <div style={{ fontSize: 11, color: "#6d28d9", fontWeight: 800, background: "#ede9fe", padding: "2px 6px", borderRadius: 4 }}>
-                        {staff.count}回
-                        {isHalf && ` (${staff.block === 'AM' ? "午後" : "午前"}のみ)`}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
             </div>
           </div>
         </details>
