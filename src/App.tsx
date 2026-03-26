@@ -715,10 +715,13 @@ export default function App() {
     return w;
   }, [cur, days, customRules, activeGeneralStaff]);
 
+  // ★ 巨大だった autoAssign を機能ごとに分割してリファクタリング
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
-    // 1. 前処理
+    // ==========================================
+    // 1. 前処理（前日の入り反映・祝日スキップ）
+    // ==========================================
     if (prevDay && prevDay.cells["入り"]) {
       const iriMembers = split(prevDay.cells["入り"]).map(getCoreName);
       const currentAke = split(dayCells["明け"]);
@@ -727,7 +730,9 @@ export default function App() {
 
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
 
-    // 2. BlockMap構築
+    // ==========================================
+    // 2. BlockMap構築（休務・不在の把握）
+    // ==========================================
     const blockMap = new Map<string, string>();
     const buildBlockMap = () => {
       allStaff.forEach(s => blockMap.set(s, 'NONE'));
@@ -752,7 +757,9 @@ export default function App() {
       return false;
     }));
 
-    // 3. 緊急ルールの評価
+    // ==========================================
+    // 3. 緊急ルールの評価（定員変更など）
+    // ==========================================
     let skipSections: string[] = [];
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
@@ -771,7 +778,9 @@ export default function App() {
     };
     evaluateEmergencies();
 
-    // 4. 実績集計とスタッフのシャッフル
+    // ==========================================
+    // 4. 過去実績の集計 ＆ 候補者のシャッフル・ソート
+    // ==========================================
     const assignCounts: Record<string, number> = {};
     const maxAssigns: Record<string, number> = {};
     
@@ -826,23 +835,24 @@ export default function App() {
     allStaff.forEach(s => counts[s] = 0);
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
+    // ★ 修正：半休（AMのみ等）の人を優先的にアサインし、CT等に吸収させて1人部屋の空白を防ぐ
     const shuffledStaff = shuffleArray(allStaff);
-    
-    const supportStaffList = parseAndSortStaff(customRules.supportStaffList || "");
-    
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return 1; 
-      if (!aBlock && bBlock) return -1;
+      if (aBlock && !bBlock) return -1; // 半休の人は前に
+      if (!aBlock && bBlock) return 1;
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
-      return 0; 
+      return 0; // 同率の場合はシャッフル時のランダム順を維持
     });
+    
+    // ★ サポート専任スタッフの抽出
+    const supportStaffList = parseAndSortStaff(customRules.supportStaffList || "");
     
     const availSupport = availAll.filter(s => supportStaffList.includes(s));
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s) && !supportStaffList.includes(s));
     const effectiveReceptionStaff = activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
-    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s));
+    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s) && !supportStaffList.includes(s));
 
     // --- ヘルパー関数 ---
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
@@ -886,39 +896,19 @@ export default function App() {
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
-      let amCount = 0; let pmCount = 0;
       
-      current.forEach(m => {
-        let isAM = true; let isPM = true;
-        if (m.includes("(AM)")) isPM = false;
-        if (m.includes("(PM)")) isAM = false;
-        if (m.match(/\(〜\d{1,2}:\d{2}\)/)) isPM = false; 
-        if (m.match(/\(\d{1,2}:\d{2}〜\)/)) isAM = false; 
-        if (isAM) amCount += 1;
-        if (isPM) pmCount += 1;
-      });
-
       let safeCounter = 0;
-      while ((amCount < targetCount || pmCount < targetCount) && safeCounter < 20) {
+      // ★ 修正：人数ベースでカウントする（半休でも1枠として扱い、玉突きを防ぐ）
+      while (current.length < targetCount && safeCounter < 20) {
         safeCounter++;
-        const neededAM = amCount < targetCount;
-        const neededPM = pmCount < targetCount;
 
         const validPreferred = preferredList.filter(name => {
           if (isUsed(name) || isForbidden(name, section) || current.map(getCoreName).includes(name)) return false;
-          const b = blockMap.get(name);
-          if (b === 'ALL') return false;
-          if (neededAM && !neededPM && b === 'AM') return false; 
-          if (neededPM && !neededAM && b === 'PM') return false; 
-          return true;
+          return blockMap.get(name) !== 'ALL';
         });
         const validAvail = availList.filter(name => {
           if (isUsed(name) || isForbidden(name, section) || current.map(getCoreName).includes(name)) return false;
-          const b = blockMap.get(name);
-          if (b === 'ALL') return false;
-          if (neededAM && !neededPM && b === 'AM') return false;
-          if (neededPM && !neededAM && b === 'PM') return false;
-          return true;
+          return blockMap.get(name) !== 'ALL';
         });
 
         if (validPreferred.length === 0 && validAvail.length === 0) break;
@@ -927,17 +917,15 @@ export default function App() {
         if (pickedCoreList.length === 0) break;
 
         const core = pickedCoreList[0];
-        assignCounts[core] -= 1;
+        assignCounts[core] -= 1; // revert pick's addU
 
         const block = blockMap.get(core);
         let tag = ""; let f = 1;
-        if (block === 'AM') { tag = "(PM)"; pmCount += 1; f = 0.5; blockMap.set(core, 'ALL'); } 
-        else if (block === 'PM') { tag = "(AM)"; amCount += 1; f = 0.5; blockMap.set(core, 'ALL'); } 
-        else {
-          if (neededAM && !neededPM) { tag = "(AM)"; amCount += 1; f = 0.5; blockMap.set(core, 'AM'); } 
-          else if (neededPM && !neededAM) { tag = "(PM)"; pmCount += 1; f = 0.5; blockMap.set(core, 'PM'); } 
-          else { tag = ""; amCount += 1; pmCount += 1; f = 1; blockMap.set(core, 'ALL'); }
-        }
+        if (block === 'AM') { tag = "(PM)"; f = 0.5; } 
+        else if (block === 'PM') { tag = "(AM)"; f = 0.5; } 
+        else { tag = ""; f = 1; }
+        
+        blockMap.set(core, 'ALL'); // アサインされたら絶対にブロック（他の部屋との玉突きを防ぐ）
         current.push(`${core}${tag}`);
         addU(core, f);
       }
@@ -956,7 +944,7 @@ export default function App() {
     // 5. 部屋埋め（メイン割り当て）
     // ==========================================
     const assignRooms = () => {
-      // 1. 強制ルール (サポート専任スタッフも固定対象になり得るため availAll を使用)
+      // 1. 強制ルール (サポート専任スタッフも固定対象になり得るため、ここでは availAll を使用)
       (customRules.fixed || []).forEach((rule: any) => {
         if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
         if (skipSections.includes(rule.section)) return;
@@ -1146,7 +1134,7 @@ export default function App() {
         fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
       }
       
-      // ★ サポート専任スタッフの配置
+      // ★ サポート専任スタッフの配置（2人目要員として）
       const assignSupportStaff = () => {
         const supportTargets = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
         const unassignedSupport = availSupport.filter(s => !isUsed(s));
@@ -1162,7 +1150,8 @@ export default function App() {
             let current = split(dayCells[room]);
             const currentCores = current.map(getCoreName);
             
-            if (current.length >= 1 && !currentCores.includes(staff) && !hasNGPair(staff, currentCores, false)) {
+            // 対象部屋にすでに1人だけ入っている場合、2人目として合流する
+            if (current.length === 1 && !currentCores.includes(staff) && !hasNGPair(staff, currentCores, false)) {
               let tag = ""; let f = 1;
               if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
               else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
@@ -1175,6 +1164,7 @@ export default function App() {
             }
           }
           
+          // 2人目として入れる部屋がなかった場合は待機に回る
           if (!assigned && !skipSections.includes("待機") && !isForbidden(staff, "待機")) {
              let current = split(dayCells["待機"]);
              let tag = ""; let f = 1;
@@ -1204,6 +1194,8 @@ export default function App() {
       (customRules.lateShifts || []).forEach((rule: any) => {
         if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
         if (skipSections.includes(rule.section)) return;
+        
+        // ★修正: 対象の部屋以外には絶対に遅番時間を付けない
         if (!ROOM_SECTIONS.includes(rule.section)) return;
         
         fill(availGeneral, rule.section, helpMembers, 1);
@@ -1255,7 +1247,7 @@ export default function App() {
               }
             }
           } else if (allStaff.includes(item)) {
-            if (availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item)) {
+            if (availGeneral.includes(item) && !isUsed(item) && !currentUketsukeHelp.map(getCoreName).includes(item) && !isForbidden(item, "受付ヘルプ")) {
               const b = blockMap.get(item);
               let tag = ""; let f = 1;
               if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(item, 'ALL'); }
@@ -1504,7 +1496,7 @@ export default function App() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>サポート専任スタッフ（2人目として入る人）</label>
+                  <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>サポート専任スタッフ（2人目要員）</label>
                   <textarea value={customRules.supportStaffList || ""} onChange={e => setCustomRules({...customRules, supportStaffList: e.target.value})} placeholder="例: 部長" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 40, fontSize: 14, lineHeight: 1.5 }} />
                 </div>
                 <div>
