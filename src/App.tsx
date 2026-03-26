@@ -427,10 +427,9 @@ export default function App() {
     return activeGeneralStaff;
   };
 
-  // ★ 修正：手動入力のプルダウンから、すでに「休務・不在」に入っている人を除外する
   const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
     const baseStaff = getStaffForSection(section);
-    if (REST_SECTIONS.includes(section)) return baseStaff; // 休務枠自体は全員選べる
+    if (REST_SECTIONS.includes(section)) return baseStaff;
     
     const absentStaff = [
       ...split(currentDayCells["明け"]).map(getCoreName),
@@ -778,7 +777,7 @@ export default function App() {
           if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
           if (em.type === "kenmu") { 
             currentKenmu.push(em); 
-            // ★ 修正：兼務される側(s2)の部屋は、メイン処理で人を割り当てないようにスキップする
+            // ★兼務先はメインの部屋割り当てから除外（ロック）する
             if (em.s2) skipSections.push(em.s2);
           }
           if (em.type === "clear" && em.section) { skipSections.push(em.section); }
@@ -845,18 +844,21 @@ export default function App() {
 
     const shuffledStaff = shuffleArray(allStaff);
     
+    // サポート専任スタッフの抽出
     const supportStaffList = parseAndSortStaff(customRules.supportStaffList || "");
+    const supportTargetRooms = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
     
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return -1; // ★修正：半休の人は後回しにせず先に埋める
+      if (aBlock && !bBlock) return -1; // 半休の人は優先して枠に埋める
       if (!aBlock && bBlock) return 1;
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
       return 0; 
     });
     
     const availSupport = availAll.filter(s => supportStaffList.includes(s));
+    // ★サポート要員は一般の部屋埋めリストから除外
     const availGeneral = availAll.filter(s => activeGeneralStaff.includes(s) && !supportStaffList.includes(s));
     const effectiveReceptionStaff = activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
     const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s) && !supportStaffList.includes(s));
@@ -950,7 +952,7 @@ export default function App() {
     // 5. 部屋埋め（メイン割り当て）
     // ==========================================
     const assignRooms = () => {
-      // 1. 強制ルール
+      // 1. 強制ルール 
       (customRules.fixed || []).forEach((rule: any) => {
         if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
         if (skipSections.includes(rule.section)) return;
@@ -1139,48 +1141,6 @@ export default function App() {
         const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
         fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
       }
-      
-      // ★ サポート専任スタッフの配置
-      const assignSupportStaff = () => {
-        const supportTargets = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
-        const unassignedSupport = availSupport.filter(s => !isUsed(s));
-        
-        unassignedSupport.forEach(staff => {
-          const b = blockMap.get(staff);
-          if (b === 'ALL') return;
-
-          let assigned = false;
-          for (const room of supportTargets) {
-            if (skipSections.includes(room) || isForbidden(staff, room)) continue;
-            
-            let current = split(dayCells[room]);
-            const currentCores = current.map(getCoreName);
-            
-            if (current.length >= 1 && !currentCores.includes(staff) && !hasNGPair(staff, currentCores, false)) {
-              let tag = ""; let f = 1;
-              if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-              else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-              else { blockMap.set(staff, 'ALL'); }
-              
-              dayCells[room] = join([...current, `${staff}${tag}`]);
-              addU(staff, f);
-              assigned = true;
-              break; 
-            }
-          }
-          
-          if (!assigned && !skipSections.includes("待機") && !isForbidden(staff, "待機")) {
-             let current = split(dayCells["待機"]);
-             let tag = ""; let f = 1;
-             if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-             else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-             else { blockMap.set(staff, 'ALL'); }
-             dayCells["待機"] = join([...current, `${staff}${tag}`]);
-             addU(staff, f);
-          }
-        });
-      };
-      assignSupportStaff();
     };
     assignRooms();
 
@@ -1199,7 +1159,6 @@ export default function App() {
         if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
         if (skipSections.includes(rule.section)) return;
         
-        // ★修正: 対象の部屋以外には絶対に遅番時間を付けない
         if (!ROOM_SECTIONS.includes(rule.section)) return;
         
         fill(availGeneral, rule.section, helpMembers, 1);
@@ -1268,19 +1227,61 @@ export default function App() {
         }
       }
 
-      // ★ 修正: 兼務ルールで遅番(17時等)が別の部屋に伝染しないようにする
+      // ★ 修正: 兼務ルールで遅番時間が伝染しないよう制御
       currentKenmu.forEach((km: any) => {
         const p1 = split(dayCells[km.s1]);
         if (p1.length > 0 && !skipSections.includes(km.s2)) { 
           const allowed = p1.filter(m => {
              if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
              return !isForbidden(getCoreName(m), km.s2);
-          });
+          }).map(getCoreName); // ★兼務時は時間タグを剥がして名前だけコピーする
           if (allowed.length > 0) {
              dayCells[km.s2] = join(allowed); 
           }
         }
       });
+
+      // ★ サポート専任スタッフの2人目配置
+      const assignSupportStaff = () => {
+        const unassignedSupport = availSupport.filter(s => !isUsed(s));
+        
+        unassignedSupport.forEach(staff => {
+          const b = blockMap.get(staff);
+          if (b === 'ALL') return;
+
+          let assigned = false;
+          for (const room of supportTargetRooms) {
+            if (skipSections.includes(room) || isForbidden(staff, room)) continue;
+            
+            let current = split(dayCells[room]);
+            const currentCores = current.map(getCoreName);
+            
+            // 対象部屋にすでに1人だけ入っている場合、2人目として合流する
+            if (current.length === 1 && !currentCores.includes(staff) && !hasNGPair(staff, currentCores, false)) {
+              let tag = ""; let f = 1;
+              if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+              else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+              else { blockMap.set(staff, 'ALL'); }
+              
+              dayCells[room] = join([...current, `${staff}${tag}`]);
+              addU(staff, f);
+              assigned = true;
+              break; 
+            }
+          }
+          
+          if (!assigned && !skipSections.includes("待機") && !isForbidden(staff, "待機")) {
+             let current = split(dayCells["待機"]);
+             let tag = ""; let f = 1;
+             if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+             else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+             else { blockMap.set(staff, 'ALL'); }
+             dayCells["待機"] = join([...current, `${staff}${tag}`]);
+             addU(staff, f);
+          }
+        });
+      };
+      assignSupportStaff();
 
       if (!skipSections.includes("昼当番")) {
         let currentLunch = split(dayCells["昼当番"]);
@@ -1940,7 +1941,6 @@ export default function App() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                   {group.sections.map((s: string) => {
-                    // ★ 修正：昼当番や休務枠には時間を表示しない
                     const noTimeSections = ["明け","入り","土日休日代休","不在","昼当番"];
                     const isNoTime = noTimeSections.includes(s);
                     
