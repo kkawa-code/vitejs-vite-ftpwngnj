@@ -762,7 +762,6 @@ export default function App() {
       return false;
     }));
 
-    // ★追加: NG部屋の数を数えるヘルパー関数
     const getForbiddenCount = (staffName: string) => {
       const rules = customRules.forbidden || [];
       const rule = rules.find((r: any) => r.staff === staffName);
@@ -848,14 +847,12 @@ export default function App() {
     const supportStaffList = parseAndSortStaff(customRules.supportStaffList || "");
     const supportTargetRooms = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
     
-    // ★ 修正：NG部屋が多い（制約が厳しい）人を最優先に前へ持ってくる
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return -1; // 半休優先
+      if (aBlock && !bBlock) return -1; 
       if (!aBlock && bBlock) return 1;
 
-      // NGが多い人を優先（降順）
       const aForbidCount = getForbiddenCount(a);
       const bForbidCount = getForbiddenCount(b);
       if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount;
@@ -877,7 +874,6 @@ export default function App() {
       const primary = uniqueList.filter(name => {
         if (!availList.includes(name) || isUsed(name) || (section && isForbidden(name, section))) return false;
         
-        // ★修正: 月間設定のメイン担当者であれば、前日と同じでも連続OKとする
         let isMonthlyMain = false;
         if (section) {
           if (section === "治療") isMonthlyMain = split(monthlyAssign.治療 || "").includes(name);
@@ -1170,47 +1166,6 @@ export default function App() {
         const tosekiMonthly = split(monthlyAssign.透析後胸部 || "").filter(s => availGeneral.includes(s));
         fill(tosekiMonthly, "透析後胸部", tosekiMonthly, tosekiMonthly.length > 0 ? tosekiMonthly.length : 0);
       }
-      
-      // ★ サポート専任スタッフの配置
-      const assignSupportStaff = () => {
-        const unassignedSupport = availSupport.filter(s => !isUsed(s));
-        
-        unassignedSupport.forEach(staff => {
-          const b = blockMap.get(staff);
-          if (b === 'ALL') return;
-
-          let assigned = false;
-          for (const room of supportTargetRooms) {
-            if (skipSections.includes(room) || isForbidden(staff, room)) continue;
-            
-            let current = split(dayCells[room]);
-            const currentCores = current.map(getCoreName);
-            
-            if (current.length >= 1 && !currentCores.includes(staff) && !hasNGPair(staff, currentCores, false)) {
-              let tag = ""; let f = 1;
-              if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-              else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-              else { blockMap.set(staff, 'ALL'); }
-              
-              dayCells[room] = join([...current, `${staff}${tag}`]);
-              addU(staff, f);
-              assigned = true;
-              break; 
-            }
-          }
-          
-          if (!assigned && !skipSections.includes("待機") && !isForbidden(staff, "待機")) {
-             let current = split(dayCells["待機"]);
-             let tag = ""; let f = 1;
-             if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-             else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
-             else { blockMap.set(staff, 'ALL'); }
-             dayCells["待機"] = join([...current, `${staff}${tag}`]);
-             addU(staff, f);
-          }
-        });
-      };
-      assignSupportStaff();
     };
     assignRooms();
 
@@ -1297,6 +1252,7 @@ export default function App() {
         }
       }
 
+      // ★ 修正: 兼務ルール発動（時間タグはコピーせず名前だけをコピーする。バグ修正）
       currentKenmu.forEach((km: any) => {
         const p1 = split(dayCells[km.s1]);
         if (p1.length > 0) { 
@@ -1309,6 +1265,48 @@ export default function App() {
           }
         }
       });
+      
+      // ★ サポート専任スタッフの2人目配置
+      const assignSupportStaff = () => {
+        const unassignedSupport = availSupport.filter(s => !isUsed(s));
+        
+        unassignedSupport.forEach(staff => {
+          const b = blockMap.get(staff);
+          if (b === 'ALL') return;
+
+          let assigned = false;
+          for (const room of supportTargetRooms) {
+            if (skipSections.includes(room) || isForbidden(staff, room)) continue;
+            
+            let current = split(dayCells[room]);
+            const currentCores = current.map(getCoreName);
+            
+            // 対象部屋にすでに1人だけ入っている場合、2人目として合流する
+            if (current.length === 1 && !currentCores.includes(staff) && !hasNGPair(staff, currentCores, false)) {
+              let tag = ""; let f = 1;
+              if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+              else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+              else { blockMap.set(staff, 'ALL'); }
+              
+              dayCells[room] = join([...current, `${staff}${tag}`]);
+              addU(staff, f);
+              assigned = true;
+              break; 
+            }
+          }
+          
+          if (!assigned && !skipSections.includes("待機") && !isForbidden(staff, "待機")) {
+             let current = split(dayCells["待機"]);
+             let tag = ""; let f = 1;
+             if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+             else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(staff, 'ALL'); }
+             else { blockMap.set(staff, 'ALL'); }
+             dayCells["待機"] = join([...current, `${staff}${tag}`]);
+             addU(staff, f);
+          }
+        });
+      };
+      assignSupportStaff();
 
       if (!skipSections.includes("昼当番")) {
         let currentLunch = split(dayCells["昼当番"]);
@@ -1526,9 +1524,11 @@ export default function App() {
                 <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>受付スタッフ名簿</label>
                 <textarea value={customRules.receptionStaffList || ""} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} placeholder="例: 伊藤(いとう), 鈴木(すずき)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
               </div>
-              <div>
-                <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>追加の休診日</label>
-                <textarea value={customRules.customHolidays || ""} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} placeholder="例: 2026-12-29, 2026-12-30" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>追加の休診日</label>
+                  <textarea value={customRules.customHolidays || ""} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} placeholder="例: 2026-12-29, 2026-12-30" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+                </div>
               </div>
             </div>
 
@@ -1563,7 +1563,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ★ 新規: サポート専任ルールのUI変更 */}
+              {/* ★ サポート専任ルールのUI変更 */}
               <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
                 <p style={{ fontSize: 12, color: "#166534", marginBottom: 12, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
@@ -1752,6 +1752,7 @@ export default function App() {
                   <input type="number" value={customRules.helpThreshold ?? 17} onChange={e => setCustomRules({...customRules, helpThreshold: Number(e.target.value)})} style={{ width: "60px", padding: "4px", borderRadius: 6, border: "1px solid #fde047", textAlign: "center", fontWeight: 800, color: "#a16207" }} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#a16207" }}>人以下</span>
                 </div>
+                <p style={{ fontSize: 12, color: "#a16207", marginBottom: 12, fontWeight: 600 }}>※「兼務」を連鎖させる場合（AがBを兼務し、BがCを兼務など）は、ルールの順番に注意するか、「AがBを兼務」「AがCを兼務」と直接指定すると確実です。</p>
                 {(customRules.emergencies || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row" style={{background:"#fff", padding:"8px 12px", border:"1px dashed #fde047", borderRadius:8}}>
                     <span className="rule-label" style={{color:"#854d0e"}}>出勤</span>
