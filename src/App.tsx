@@ -82,7 +82,6 @@ for (let h = 8; h <= 19; h++) {
   }
 }
 
-// ★ 昼当番を一般撮影・その他グループへ移動し、待機グループの名前をスッキリさせました
 const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
   { title: "モダリティ", color: "#3b82f6", sections: ["CT","MRI","RI","治療"] },
@@ -1030,8 +1029,12 @@ export default function App() {
     });
 
     (customRules.substitutes || []).forEach((sub: any) => {
-      if (!sub.target || skipSections.includes(sub.section)) return; 
-      const trigger = !availAll.includes(sub.target) || isUsed(sub.target);
+      const targets = split(sub.target);
+      if (targets.length === 0 || skipSections.includes(sub.section)) return; 
+      
+      // 対象スタッフの誰か一人でも休務・夜勤（ブロック）されている、または別件で1日使われている場合
+      const trigger = targets.some(t => !availAll.includes(t) || isUsed(t));
+      
       if (trigger) {
         const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !isUsed(s));
         if (fallbackStaff.length > 0) {
@@ -1106,7 +1109,6 @@ export default function App() {
     });
 
     // 【4. 受付】
-    let uketsukeShortage = 0;
     if (!skipSections.includes("受付")) {
       const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
       let currentUketsuke = split(dayCells["受付"]);
@@ -1120,7 +1122,6 @@ export default function App() {
         currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
       }
       dayCells["受付"] = join(currentUketsuke);
-      uketsukeShortage = Math.max(0, uTarget - currentUketsuke.length);
     }
 
     // 【5. 一般の部屋（未指定）】
@@ -1223,8 +1224,6 @@ export default function App() {
       }
     });
 
-    // ★待機の自動割当（あまった人を詰める処理）は完全削除しました。手動で入力してください。
-
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
       
@@ -1287,27 +1286,38 @@ export default function App() {
       
       dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
-      if (uketsukeShortage > 0 && !skipSections.includes("受付ヘルプ")) {
+      // ★ 受付不在時の受付ヘルプ自動配置ルール
+      let isUketsukeEmpty = split(dayCells["受付"]).length === 0;
+      if (isUketsukeEmpty && !skipSections.includes("受付ヘルプ")) {
         let helpMems = split(dayCells["受付ヘルプ"]);
-        let assignedCount = 0;
         
+        // 1. 昼ヘルプ (12:15〜13:00) : 昼当番以外の人から1名
         const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
-        for (const name of lunchCores) {
-          if (assignedCount >= uketsukeShortage) break;
-          if (!helpMems.map(getCoreName).includes(name)) {
-            helpMems.push(`${name}(12:15〜13:00)`);
-            assignedCount++;
+        const availForLunchHelp = availGeneral.filter(n => !lunchCores.includes(n) && !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
+        if (availForLunchHelp.length > 0) {
+          availForLunchHelp.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+          helpMems.push(`${availForLunchHelp[0]}(12:15〜13:00)`);
+        }
+
+        // 2. 16時以降ヘルプ (16:00〜) : 基本は「検像」、いなければ他の人から1名
+        const kenzoCores = split(dayCells["検像"]).map(getCoreName);
+        let picked16 = null;
+        const validKenzo = kenzoCores.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n));
+        
+        if (validKenzo.length > 0) {
+          picked16 = validKenzo[0];
+        } else {
+          const others = availGeneral.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== (availForLunchHelp[0] || ""));
+          if(others.length > 0) {
+            others.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
+            picked16 = others[0];
           }
         }
         
-        if (assignedCount < uketsukeShortage) {
-          const others = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
-          for (const name of others) {
-            if (assignedCount >= uketsukeShortage) break;
-            helpMems.push(`${name}(12:15〜13:00)`);
-            assignedCount++;
-          }
+        if (picked16) {
+          helpMems.push(`${picked16}(16:00〜)`);
         }
+
         dayCells["受付ヘルプ"] = join(helpMems);
       }
     }
@@ -1503,16 +1513,17 @@ export default function App() {
                 <p style={{ fontSize: 12, color: "#9a3412", marginBottom: 12, fontWeight: 600 }}>特定のスタッフが休みの時に、指定した代打スタッフを優先してアサインするルールです。</p>
                 {(customRules.substitutes || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
-                    <select value={rule.target} onChange={e => updateRule("substitutes", idx, "target", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}>
-                      <option value="" disabled>対象スタッフ</option>
-                      {activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>➔</span>
-                    <div style={{ flex: 1, minWidth: "220px" }}>
+                    
+                    <div style={{ flex: 1, minWidth: "150px" }}>
+                      <MultiStaffPicker selected={rule.target} onChange={v => updateRule("substitutes", idx, "target", v)} options={activeGeneralStaff} placeholder="対象スタッフ(休)" />
+                    </div>
+                    
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>が休みの時➔</span>
+                    <div style={{ flex: 1, minWidth: "180px" }}>
                       <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>を</span>
-                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c"}}>
+                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c", flex: "0 0 120px"}}>
                       <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>に優先</span>
