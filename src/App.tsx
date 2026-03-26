@@ -95,7 +95,6 @@ function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
 function getCoreName(fullName: string) { return fullName.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim(); }
 
-// 偏りを防ぐ Fisher-Yates シャッフル
 function shuffleArray<T>(array: T[]): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -1049,26 +1048,6 @@ export default function App() {
         }
       });
 
-      // ★ 修正: 一般スタッフを受付の代理にしないよう、受付の定員分は受付専用スタッフのみで埋める
-      if (!skipSections.includes("受付")) {
-        const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
-        let currentUketsuke = split(dayCells["受付"]);
-        const uketsukeMonthly = split(monthlyAssign.受付 || "");
-        
-        for (const name of uketsukeMonthly) {
-          if (availAll.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { 
-            currentUketsuke.push(name); addU(name, 1); 
-          }
-        }
-
-        const neededUketsuke = uTarget - currentUketsuke.length;
-        if (neededUketsuke > 0) {
-          const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
-          currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
-        }
-        dayCells["受付"] = join(currentUketsuke);
-      }
-
       // 2. 主要モダリティ
       if (!skipSections.includes("治療")) {
         const treatTarget = dynamicCapacity.治療 !== undefined ? dynamicCapacity.治療 : 3;
@@ -1119,6 +1098,26 @@ export default function App() {
           fill(availGeneral, room, preferredList, targetCount);
         }
       });
+
+      // 4. 受付 (一般スタッフからの補充を禁止)
+      if (!skipSections.includes("受付")) {
+        const uTarget = dynamicCapacity.受付 !== undefined ? dynamicCapacity.受付 : 2;
+        let currentUketsuke = split(dayCells["受付"]);
+        const uketsukeMonthly = split(monthlyAssign.受付 || "");
+        
+        for (const name of uketsukeMonthly) {
+          if (availAll.includes(name) && !isUsed(name) && !currentUketsuke.map(getCoreName).includes(name)) { 
+            currentUketsuke.push(name); addU(name, 1); 
+          }
+        }
+
+        const neededUketsuke = uTarget - currentUketsuke.length;
+        if (neededUketsuke > 0) {
+          const pickedUketsuke = pick(availReception, availReception, neededUketsuke, "受付", currentUketsuke);
+          currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
+        }
+        dayCells["受付"] = join(currentUketsuke);
+      }
 
       // 5. 一般の部屋（未指定）
       if (!skipSections.includes("検像") && !extraPriorityRooms.includes("検像")) {
@@ -1307,19 +1306,16 @@ export default function App() {
           let lunchHelpCandidate = null;
           const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
           
-          // 優先1: 昼当番以外で出勤している一般スタッフ
           let c1 = availGeneral.filter(n => !lunchCores.includes(n) && !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
           if (c1.length > 0) {
             c1.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
             lunchHelpCandidate = c1[0];
           } else {
-            // 優先2: 昼当番を含めてもいいから一般スタッフ
             let c2 = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
             if (c2.length > 0) {
               c2.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
               lunchHelpCandidate = c2[0];
             } else {
-              // 優先3: 仕方がないので全スタッフの誰か
               let c3 = availAll.filter(n => !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL');
               if (c3.length > 0) {
                 c3.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
@@ -1345,7 +1341,6 @@ export default function App() {
               others.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
               picked16 = others[0];
             } else {
-              // さらに妥協
               let others2 = availAll.filter(n => blockMap.get(n) !== 'AM' && !helpMems.map(getCoreName).includes(n) && n !== lunchHelpCandidate);
               if (others2.length > 0) {
                 others2.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0));
@@ -1418,6 +1413,25 @@ export default function App() {
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
+      </div>
+
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, padding: "12px 20px" }}>
+        <details>
+          <summary style={{ fontWeight: 800, color: "#be185d", fontSize: 15, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
+            <span>📱</span> スマホ・PC間のデータ連携（テキストのコピー＆復元）を開く
+          </summary>
+          <div style={{ marginTop: 12, paddingTop: 16, borderTop: "2px dashed #fbcfe8" }}>
+            <p style={{ fontSize: 12, color: "#9d174d", marginBottom: 12, fontWeight: 600 }}>
+              Android等でファイルが保存・選択できない場合、以下のボタンでデータをコピーし、LINE等でスマホに送ってください。<br/>
+              スマホ側でその文字を下の枠に貼り付けて「復元」を押せばデータを移行できます。
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, justifyContent: "center" }}>📋 データをコピー</button>
+              <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="スマホでコピーした文字をここに貼り付け" style={{ flex: 2, padding: "10px 12px", borderRadius: 8, border: "1px solid #f9a8d4", outline: "none", minWidth: 200, fontSize: 12 }} />
+              <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1, justifyContent: "center" }}>✨ テキストから復元</button>
+            </div>
+          </div>
+        </details>
       </div>
 
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
@@ -1691,19 +1705,6 @@ export default function App() {
                   </div>
                 ))}
                 <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "CT", s1: "", s2: "", newCapacity: 3 })}>＋ 追加</button>
-              </div>
-
-              <div style={{ background: "#fdf2f8", padding: 16, borderRadius: 12, border: "1px solid #fbcfe8", gridColumn: "1 / -1" }}>
-                <h4 style={{ margin: "0 0 12px 0", color: "#9d174d", fontSize: 14, fontWeight: 800 }}>📱 スマホ・PC間データ移行（コピペ用）</h4>
-                <p style={{ fontSize: 12, color: "#be185d", marginBottom: 12, fontWeight: 600 }}>
-                  Android等でファイルが選択できない場合、以下のボタンでデータをコピーし、LINE等でスマホに送ってください。<br/>
-                  スマホ側でその文字を下の枠に貼り付けて「復元」を押せばデータを移行できます。
-                </p>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, justifyContent: "center" }}>📋 データをコピー</button>
-                  <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="スマホでコピーした文字をここに貼り付け" style={{ flex: 2, padding: "10px 12px", borderRadius: 8, border: "1px solid #f9a8d4", outline: "none", minWidth: 200, fontSize: 12 }} />
-                  <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1, justifyContent: "center" }}>✨ テキストから復元</button>
-                </div>
               </div>
 
             </div>
