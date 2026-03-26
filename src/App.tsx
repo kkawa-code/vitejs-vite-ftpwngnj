@@ -38,11 +38,11 @@ type RenderGroup = { title: string; color: string; sections: string[] };
 const SECTIONS = [
   "明け","入り","土日休日代休","不在","待機","CT","MRI","RI",
   "1号室","2号室","3号室","5号室","透視（6号）","透視（11号）",
-  "MMG","骨塩","パノラマCT","ポータブル","DSA","透析後胸部","治療","検像","昼当番","残り・待機","受付","受付ヘルプ"
+  "MMG","骨塩","パノラマCT","ポータブル","DSA","透析後胸部","治療","検像","昼当番","受付","受付ヘルプ"
 ];
 
 const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在"].includes(s));
-const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番","残り・待機"].includes(s));
+const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番"].includes(s));
 const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const ROLE_PLACEHOLDERS = ["CT枠", "MRI枠", "RI枠", "治療枠", "MMG枠", "透視枠", "受付枠"];
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "透析後胸部", "検像"];
@@ -72,7 +72,7 @@ const KEY_ALL_DAYS = "shifto_alldays_v100";
 const KEY_MONTHLY = "shifto_monthly_v100"; 
 const KEY_RULES = "shifto_rules_v100";
 
-const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)"];
+const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
 for (let h = 8; h <= 19; h++) {
   for (let m = 0; m < 60; m += 15) {
     if (h === 8 && m === 0) continue; 
@@ -86,7 +86,7 @@ const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
   { title: "モダリティ・受付", color: "#3b82f6", sections: ["CT","MRI","RI","MMG","治療","受付","受付ヘルプ","検像"] },
   { title: "一般撮影・透視・その他", color: "#10b981", sections: ["1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","透析後胸部"] },
-  { title: "待機・当番", color: "#f59e0b", sections: ["待機","残り・待機","昼当番"] }
+  { title: "待機・当番", color: "#f59e0b", sections: ["待機","昼当番"] }
 ];
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -396,7 +396,7 @@ export default function App() {
 
   const getStaffForSection = (section: string) => {
     if (section === "受付") return activeReceptionStaff;
-    if (REST_SECTIONS.includes(section) || ["待機", "残り・待機", "昼当番", "受付ヘルプ"].includes(section)) return allStaff;
+    if (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section)) return allStaff;
     return activeGeneralStaff;
   };
 
@@ -578,7 +578,7 @@ export default function App() {
     
     days.forEach(d => {
       if (d.isPublicHoliday) return;
-      const taskRooms = ASSIGNABLE_SECTIONS.filter(s => !["待機", "残り・待機", "昼当番", "受付", "受付ヘルプ"].includes(s));
+      const taskRooms = ASSIGNABLE_SECTIONS.filter(s => !["待機", "昼当番", "受付", "受付ヘルプ"].includes(s));
       taskRooms.forEach(sec => {
         const members = split(d.cells[sec]).map(getCoreName);
         members.forEach(m => {
@@ -638,7 +638,6 @@ export default function App() {
     }));
   }, [cur, days, activeGeneralStaff]);
 
-  // ★ 優先部屋のリストアップ
   const priorityRoomsList = useMemo(() => {
     return Object.keys(customRules.capacity || {}).filter(r => !["治療", "RI", "CT", "MRI", "受付"].includes(r));
   }, [customRules.capacity]);
@@ -1230,8 +1229,8 @@ export default function App() {
       }
     });
 
-    if (!skipSections.includes("残り・待機")) {
-      let currentReserve = split(dayCells["残り・待機"]);
+    if (!skipSections.includes("待機")) {
+      let currentReserve = split(dayCells["待機"]);
       const unassigned = availAll.filter(name => !isUsed(name));
       unassigned.forEach(name => {
         const b = blockMap.get(name);
@@ -1243,7 +1242,7 @@ export default function App() {
         addU(name, f);
       });
       if (currentReserve.length === 0) {
-        const fallback = pick(availGeneral, availGeneral, 1, "残り・待機", currentReserve, true);
+        const fallback = pick(availGeneral, availGeneral, 1, "待機", currentReserve, true);
         fallback.forEach(name => {
             const b = blockMap.get(name);
             let tag = ""; let f = 1;
@@ -1254,10 +1253,8 @@ export default function App() {
             addU(name, f);
         });
       }
-      dayCells["残り・待機"] = join(currentReserve);
+      dayCells["待機"] = join(currentReserve);
     }
-    
-    fill(availGeneral, "待機", [], 1);
 
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
@@ -1722,7 +1719,6 @@ export default function App() {
         </details>
       </div>
 
-      {/* ★ 新設: AIの思考回路パネル（ルールの解説 ＆ アサイン優先度ランキング） */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, background: "#faf5ff", border: "1px solid #ddd6fe" }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#8b5cf6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
@@ -1738,7 +1734,7 @@ export default function App() {
                 <li><strong>【指定優先部屋】</strong> 「絶対優先人数」で追加した部屋（<span style={{fontWeight:800, color:"#be185d"}}>追加した順番で処理</span>：現在は {priorityRoomsList.length > 0 ? priorityRoomsList.join(' → ') : "指定なし"}）</li>
                 <li><strong>【受付】</strong> 受付</li>
                 <li><strong>【一般撮影】</strong> 指定優先部屋以外の残りの部屋（1号室、ポータブル、検像など）</li>
-                <li><strong>【後処理】</strong> 遅番、兼務、残り・待機、昼当番</li>
+                <li><strong>【後処理】</strong> 遅番、兼務、待機、昼当番</li>
               </ol>
             </div>
 
