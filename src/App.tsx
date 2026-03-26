@@ -264,6 +264,8 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
     onChange(join(next));
   };
 
+  const isTaiki = section === "待機";
+
   return (
     <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
       <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
@@ -283,12 +285,23 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
                   style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 11, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 18px 0 2px" }}
                 >
                   <option value="">終日</option>
-                  <option value="(AM)">AM</option>
-                  <option value="(PM)">PM</option>
-                  {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (
-                    <option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>
+                  {!isTaiki && <option value="(AM)">AM</option>}
+                  {!isTaiki && <option value="(PM)">PM</option>}
+                  
+                  {isTaiki ? (
+                    <>
+                      <option value="(17:00〜19:00)">17:00〜19:00</option>
+                      <option value="(17:00〜22:00)">17:00〜22:00</option>
+                      <option value="(17:00〜)">17:00〜</option>
+                    </>
+                  ) : (
+                    <>
+                      {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (
+                        <option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>
+                      )}
+                      {TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
+                    </>
                   )}
-                  {TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                 </select>
               )}
               <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 4 }}>✖</span>
@@ -550,7 +563,7 @@ export default function App() {
 
   const weeklyStats = useMemo(() => {
     const stats: Record<string, { total: number, portable: number, ct: number, mri: number }> = {};
-    activeGeneralStaff.forEach(s => { stats[s] = { total: 0, portable: 0, ct: 0, mri: 0 }; });
+    activeGeneralStaff.forEach(s => { stats[s] = { total: number: 0, portable: 0, ct: 0, mri: 0 }; });
     
     days.forEach(d => {
       if (d.isPublicHoliday) return;
@@ -767,11 +780,12 @@ export default function App() {
     allStaff.forEach(s => counts[s] = 0);
     pastDays.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; split(val as string).forEach(m => { const c = getCoreName(m); if (counts[c] !== undefined) counts[c]++; }); }); });
 
+    // ★ 修正：終日出勤できる人を最優先し、AM休・PM休の人は後回しにする
     const availAll = allStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return -1;
-      if (!aBlock && bBlock) return 1;
+      if (aBlock && !bBlock) return 1;  // aが半休なら後回し
+      if (!aBlock && bBlock) return -1; // bが半休ならaを優先
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
       return Math.random() - 0.5;
     });
@@ -1178,32 +1192,7 @@ export default function App() {
       }
     });
 
-    if (!skipSections.includes("待機")) {
-      let currentReserve = split(dayCells["待機"]);
-      const unassigned = availAll.filter(name => !isUsed(name));
-      unassigned.forEach(name => {
-        const b = blockMap.get(name);
-        let tag = ""; let f = 1;
-        if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(name, 'ALL'); }
-        else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(name, 'ALL'); }
-        else { blockMap.set(name, 'ALL'); }
-        currentReserve.push(`${name}${tag}`);
-        addU(name, f);
-      });
-      if (currentReserve.length === 0) {
-        const fallback = pick(availGeneral, availGeneral, 1, "待機", currentReserve, true);
-        fallback.forEach(name => {
-            const b = blockMap.get(name);
-            let tag = ""; let f = 1;
-            if (b === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(name, 'ALL'); }
-            else if (b === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(name, 'ALL'); }
-            else { blockMap.set(name, 'ALL'); }
-            currentReserve.push(`${name}${tag}`);
-            addU(name, f);
-        });
-      }
-      dayCells["待機"] = join(currentReserve);
-    }
+    // ★待機の自動割当（あまった人を詰める処理）は完全削除しました。手動で入力してください。
 
     if (!skipSections.includes("昼当番")) {
       let currentLunch = split(dayCells["昼当番"]);
