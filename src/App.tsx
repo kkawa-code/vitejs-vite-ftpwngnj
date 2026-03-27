@@ -1,22 +1,20 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 
-// 🌟 プロ仕様のモダンSaaS向けグローバルCSS
 const globalStyle = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  body { margin: 0; background: #f8fafc; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1em; padding-right: 2.5rem; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
-  details > summary:hover { color: #2563eb; }
+  details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
   
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   
-  /* 追従ヘッダーの美しいすりガラス効果 */
-  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(248, 250, 252, 0.85); backdrop-filter: blur(8px); padding: 12px 0; margin: 0 -12px; padding: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-bottom: 1px solid #e2e8f0; }
+  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(244, 247, 249, 0.95); backdrop-filter: blur(4px); padding: 12px 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
@@ -25,20 +23,20 @@ const globalStyle = `
   .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; filter: brightness(1.05); }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
   
+  .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
+  .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   
-  /* ルール設定用の統一されたクリーンなUI */
-  .rule-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02); }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
-  .rule-sel { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 13px; color: #334155; background-color: #f8fafc; flex: 1 1 120px; min-width: 110px; transition: all 0.2s; }
-  .rule-sel:hover { border-color: #94a3b8; }
-  .rule-num { width: 60px; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; font-size: 14px; background-color: #f8fafc; }
-  .rule-del { border: none; background: #fee2e2; color: #ef4444; border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: 0.2s; }
-  .rule-del:hover { background: #fecaca; }
-  .rule-add { background: #f8fafc; color: #4f46e5; border: 1px dashed #cbd5e1; padding: 10px 16px; font-size: 13px; width: 100%; display: flex; justify-content: center; font-weight: 700; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
-  .rule-add:hover { background: #e0e7ff; border-color: #818cf8; color: #3730a3; }
-  .rule-label { font-size: 13px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+  .rule-sel { padding: 6px 24px 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 110px; min-width: 100px; transition: border-color 0.2s; }
+  .rule-num { width: 50px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 16px; flex-shrink: 0; padding: 0 4px; transition: 0.2s; }
+  .rule-del:hover { background: #fee2e2; border-radius: 4px; }
+  .rule-add { background: #fff; color: #4f46e5; border: 1px dashed #a5b4fc; padding: 6px 12px; font-size: 12px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
+  .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
+  .rule-label { font-size: 12px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
@@ -96,9 +94,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v104"; 
-const KEY_MONTHLY = "shifto_monthly_v104"; 
-const KEY_RULES = "shifto_rules_v104";
+const KEY_ALL_DAYS = "shifto_alldays_v105"; 
+const KEY_MONTHLY = "shifto_monthly_v105"; 
+const KEY_RULES = "shifto_rules_v105";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -144,7 +142,6 @@ function parseAndSortStaff(staffString: string) {
   return Array.from(new Set(parsed.map(p => p.cleanName)));
 }
 
-// 🌟 TypeScriptエラー修正済：トップレベルの純粋関数として定義
 function getMonthlyStaffForSection(sec: string, monthlyAssign: Record<string, string>): string[] {
   let staff: string[] = [];
   if (sec === "治療") staff = [...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)];
@@ -162,9 +159,8 @@ const isMonthlyMainStaff = (section: string, name: string, monthlyAssign: Record
 function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { 
   return { background: bg, color: color, border: "none", borderRadius: "8px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
 }
-// 箱の中の箱感を減らしたクリーンなパネル
 function panelStyle(): React.CSSProperties { 
-  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)" }; 
+  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)" }; 
 }
 function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
@@ -180,7 +176,7 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, alignItems: "center" }}>
       {current.map((sec, i) => (
         <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 16, padding: "4px 10px", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, border: "1px solid #bae6fd" }}>
           {sec} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
@@ -332,8 +328,8 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   };
 
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
-      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 12, letterSpacing: "0.02em" }}>{section}</label>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
+      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = getCoreName(m);
@@ -373,7 +369,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </div>
           )
         })}
-        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "6px 28px 6px 8px" }}>
+        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 28px 4px 8px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">
             {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
@@ -752,6 +748,22 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
       }
     });
 
+    (customRules.kenmuPairs || []).forEach((pair: any) => {
+      if (!pair.s1 || !pair.s2) return;
+      if (split(dayCells[pair.s2]).length > 0) return;
+      const source = split(dayCells[pair.s1]);
+      if (source.length === 0) return;
+      const allowed = source
+        .filter(m => {
+          if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
+          return !isForbidden(getCoreName(m), pair.s2);
+        })
+        .map(getCoreName);
+      if (allowed.length > 0) {
+        dayCells[pair.s2] = join(allowed);
+      }
+    });
+
     currentKenmu.forEach((km: any) => {
       const p1 = split(dayCells[km.s1]);
       if (p1.length > 0) {
@@ -858,8 +870,10 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         const currentCore = current.map(getCoreName);
         const candidates = availGeneral.filter(name => {
           if (currentCore.includes(name)) return false;
+          // ★ バグ修正箇所: 午後休みの人（b === 'PM'）だけを候補から外す！
+          // （'ALL'=フルタイム、'AM'=午後勤務、'NONE'=フリー は遅番可能）
           const b = blockMap.get(name);
-          if (b === 'ALL' || b === 'PM') return false; 
+          if (b === 'PM') return false; 
           if (isForbidden(name, rule.section)) return false;
           if (hasNGPair(name, currentCore, false)) return false;
           return true;
@@ -874,7 +888,7 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
           const forceCandidates = availGeneral.filter(name => {
             if (currentCore.includes(name)) return false;
             const b = blockMap.get(name);
-            if (b === 'ALL' || b === 'PM') return false; 
+            if (b === 'PM') return false; 
             if (isForbidden(name, rule.section)) return false;
             return true;
           });
@@ -939,7 +953,6 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
       }
       const lunchTarget = baseLunchTarget;
 
-      // 🌟 追加: RI担当者は無条件で昼当番に最優先アサイン
       const riMembers = split(dayCells["RI"]).map(getCoreName);
       riMembers.forEach(name => {
         if (!currentLunch.includes(name) && currentLunch.length < lunchTarget && !isForbidden(name, "昼当番")) {
@@ -1060,7 +1073,6 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
 
   return { ...day, cells: dayCells };
 };
-// ============== 純粋関数切り出しここまで ==============
 
 
 export default function App() {
@@ -1144,14 +1156,8 @@ export default function App() {
     return Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff]));
   }, [activeGeneralStaff, activeReceptionStaff]);
 
-  const getStaffForSection = (section: string) => {
-    if (section === "受付") return activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
-    if (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section)) return allStaff;
-    return activeGeneralStaff;
-  };
-
   const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
-    const baseStaff = getStaffForSection(section);
+    const baseStaff = section === "受付" ? (activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff) : (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section) ? allStaff : activeGeneralStaff);
     if (REST_SECTIONS.includes(section)) return baseStaff;
     
     const absentStaff = [
@@ -1490,31 +1496,32 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
+    <div style={{ padding: "20px 12px", maxWidth: 1400, margin: "0 auto", background: "#f4f7f9" }}>
       <style>{globalStyle}</style>
       
-      {/* 🌟 ヘッダー */}
-      <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "16px 24px", background: "#fff", borderLeft: "4px solid #4f46e5" }}>
+      <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
-          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>現場のルールに基づき、自動で最適な人員配置を行います。</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
+          <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
+          
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
           <input type="file" ref={fileInputRef} accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
+          
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, padding: "16px 24px", borderLeft: "4px solid #db2777" }}>
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, padding: "12px 20px" }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#be185d", fontSize: 15, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
             <span>📱</span> スマホ・PC間のデータ連携（テキストのコピー＆復元）を開く
           </summary>
-          <div style={{ marginTop: 12, paddingTop: 16, borderTop: "1px dashed #e2e8f0" }}>
-            <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>
+          <div style={{ marginTop: 12, paddingTop: 16, borderTop: "2px dashed #fbcfe8" }}>
+            <p style={{ fontSize: 12, color: "#9d174d", marginBottom: 12, fontWeight: 600 }}>
               Android等でファイルが保存・選択できない場合、以下のボタンでデータをコピーし、LINE等でスマホに送ってください。<br/>
               スマホ側でその文字を下の枠に貼り付けて「復元」を押せばデータを移行できます。
             </p>
@@ -1527,147 +1534,157 @@ export default function App() {
         </details>
       </div>
 
-      {/* 🌟 設定エリアの3分割 */}
-      <div className="no-print" style={{ display: "grid", gap: 16, marginBottom: 24 }}>
-        
-        {/* ① 基本設定 */}
-        <div style={{ ...panelStyle(), padding: "16px 24px", borderLeft: "4px solid #0d9488" }}>
-          <details>
-            <summary style={{ fontWeight: 800, color: "#0f766e", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
-              <span>⚙️</span> ① 基本設定（名簿・優先順位・人数）
-            </summary>
-            <div style={{ paddingTop: 20, borderTop: "1px dashed #e2e8f0", marginTop: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 24 }}>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: "#334155", display: "block", marginBottom: 8 }}>在籍スタッフ名簿（一般）</label>
-                  <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やまだ), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 8, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
-                  <div style={{ fontSize: 11, color: "#0d9488", marginTop: 6, fontWeight: 600 }}>※カッコでふりがなを入れると50音順にソートされます！</div>
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: "#334155", display: "block", marginBottom: 8 }}>受付スタッフ名簿</label>
-                  <textarea value={customRules.receptionStaffList || ""} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} placeholder="例: 伊藤(いとう), 鈴木(すずき)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 8, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 800, color: "#334155", display: "block", marginBottom: 8 }}>追加の休診日</label>
-                  <textarea value={customRules.customHolidays || ""} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} placeholder="例: 2026-12-29, 2026-12-30" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 8, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
-                </div>
+      {/* 🌟 1つのアコーディオンにまとめた元のレイアウト */}
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
+        <details>
+          <summary style={{ fontWeight: 800, color: "#0f766e", padding: "4px", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
+            <span>⚙️</span> スタッフ名簿 ＆ 特殊ルールの設定を開く
+          </summary>
+          <div style={{ paddingTop: 20, borderTop: "2px dashed #e2e8f0", marginTop: 16 }}>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>在籍スタッフ名簿（一般）</label>
+                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やまだ), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+                <div style={{ fontSize: 11, color: "#10b981", marginTop: 6, fontWeight: 600 }}>※カッコでふりがなを入れると50音順にソートされます！</div>
               </div>
-
-              <div style={{ display: "grid", gap: 16 }}>
-                <div className="rule-card">
-                  <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👥 絶対優先の人数設定（自動割当用）</h4>
-                  <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>ここで設定した部屋と人数は、システムが最優先でアサインします。（CTの基本人数などを設定します）</p>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                    {Object.entries(customRules.capacity || {}).map(([room, count]) => (
-                      <div key={room} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f8fafc", padding: "6px 12px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: "#475569" }}>{room}:</span>
-                        <input type="number" min="0" value={count as number} onChange={e => setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: Number(e.target.value)}})} style={{ width: 44, border: "none", outline: "none", fontSize: 15, fontWeight: 800, textAlign: "center", color: "#334155", background: "transparent" }} />
-                        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>人</span>
-                        <span onClick={() => {
-                          const newCap = {...customRules.capacity};
-                          delete newCap[room];
-                          setCustomRules({...customRules, capacity: newCap});
-                        }} className="rule-del" style={{background: "transparent", width: "auto", height: "auto"}}>✖</span>
-                      </div>
-                    ))}
-                    <select onChange={e => {
-                      const room = e.target.value;
-                      if (room && !customRules.capacity?.[room]) {
-                        setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: 1}});
-                      }
-                      e.target.value = "";
-                    }} className="rule-sel" style={{ flexShrink: 0 }}>
-                      <option value="">＋ 部屋を追加</option>
-                      {ROOM_SECTIONS.filter(r => !Object.keys(customRules.capacity || {}).includes(r)).map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="rule-card">
-                  <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👑 部屋の割り当て優先順位（上から順に埋めます）</h4>
-                  <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>人が足りない場合、優先順位が低い（下にある）部屋から空室になり、自動的に兼務扱いになります。</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {priorityRoomsList.map((room: string, idx: number, arr: string[]) => (
-                      <div key={room} style={{ display: "flex", alignItems: "center", background: "#f8fafc", padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: "#64748b", marginRight: 8, minWidth: 20 }}>{idx + 1}.</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "#334155", marginRight: 8 }}>{room}</span>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <button onClick={() => {
-                            setCustomRules((prev: any) => {
-                              const newArr = [...priorityRoomsList];
-                              [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]];
-                              return { ...prev, priorityRooms: newArr };
-                            });
-                          }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#e2e8f0", cursor: idx === 0 ? "default" : "pointer", fontSize: 10, padding: "2px 6px", borderRadius: 4, color: "#64748b", lineHeight: 1 }}>▲</button>
-                          <button onClick={() => {
-                            setCustomRules((prev: any) => {
-                              const newArr = [...priorityRoomsList];
-                              [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]];
-                              return { ...prev, priorityRooms: newArr };
-                            });
-                          }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#e2e8f0", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 10, padding: "2px 6px", borderRadius: 4, color: "#64748b", lineHeight: 1 }}>▼</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rule-card">
-                  <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🕒 終日専任（半休・AM/PM不可）の部屋</h4>
-                  <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>検査数が少ない部屋や、半休の人をわざわざアサインする意味がない部屋を指定します。ここには「1日通しで入れる人」しか配置されません。</p>
-                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
-                    <div style={{ flex: 1, minWidth: "250px" }}>
-                      <MultiSectionPicker selected={customRules.fullDayOnlyRooms || "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
-                    </div>
-                  </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>受付スタッフ名簿</label>
+                <textarea value={customRules.receptionStaffList || ""} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} placeholder="例: 伊藤(いとう), 鈴木(すずき)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>追加の休診日</label>
+                  <textarea value={customRules.customHolidays || ""} onChange={e => setCustomRules({...customRules, customHolidays: e.target.value})} placeholder="例: 2026-12-29, 2026-12-30" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
                 </div>
               </div>
             </div>
-          </details>
-        </div>
 
-        {/* ② 日々の業務ルール */}
-        <div style={{ ...panelStyle(), padding: "16px 24px", borderLeft: "4px solid #3b82f6" }}>
-          <details>
-            <summary style={{ fontWeight: 800, color: "#1d4ed8", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
-              <span>🍱</span> ② 日々の業務ルール（昼当番・遅番・サポート・常時兼務）
-            </summary>
-            <div style={{ paddingTop: 20, borderTop: "1px dashed #e2e8f0", marginTop: 16, display: "grid", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24, marginBottom: 20 }}>
               
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 8px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🔗 常時兼務ペア</h4>
-                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>👥 絶対優先の人数設定（自動割当用）</h4>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>ここで設定した部屋と人数は、システムが最優先でアサインします。（CTの基本人数などを設定します）</p>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  {Object.entries(customRules.capacity || {}).map(([room, count]) => (
+                    <div key={room} style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#475569" }}>{room}:</span>
+                      <input type="number" min="0" value={count as number} onChange={e => setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: Number(e.target.value)}})} style={{ width: 44, border: "none", outline: "none", fontSize: 15, fontWeight: 800, textAlign: "center", color: "#334155", background: "transparent" }} />
+                      <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>人</span>
+                      <span onClick={() => {
+                        const newCap = {...customRules.capacity};
+                        delete newCap[room];
+                        setCustomRules({...customRules, capacity: newCap});
+                      }} className="rule-del">✖</span>
+                    </div>
+                  ))}
+                  <select onChange={e => {
+                    const room = e.target.value;
+                    if (room && !customRules.capacity?.[room]) {
+                      setCustomRules({...customRules, capacity: {...(customRules.capacity||{}), [room]: 1}});
+                    }
+                    e.target.value = "";
+                  }} className="rule-sel" style={{ flexShrink: 0 }}>
+                    <option value="">＋ 部屋を追加</option>
+                    {ROOM_SECTIONS.filter(r => !Object.keys(customRules.capacity || {}).includes(r)).map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ background: "#fffbeb", padding: 16, borderRadius: 12, border: "1px solid #fde68a", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 10px 0", color: "#b45309", fontSize: 14, fontWeight: 800 }}>👑 部屋の割り当て優先順位（上から順に埋めます）</h4>
+                <p style={{ fontSize: 12, color: "#d97706", marginBottom: 12, fontWeight: 600 }}>人が足りない場合、優先順位が低い（下にある）部屋から空室になり、自動的に兼務扱いになります。</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {priorityRoomsList.map((room: string, idx: number, arr: string[]) => (
+                    <div key={room} style={{ display: "flex", alignItems: "center", background: "#fff", padding: "4px 8px", borderRadius: 8, border: "1px solid #fcd34d", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#92400e", marginRight: 8, minWidth: 20 }}>{idx + 1}.</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#b45309", marginRight: 8 }}>{room}</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <button onClick={() => {
+                          setCustomRules((prev: any) => {
+                            const newArr = [...priorityRoomsList];
+                            [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]];
+                            return { ...prev, priorityRooms: newArr };
+                          });
+                        }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#fef3c7", cursor: idx === 0 ? "default" : "pointer", fontSize: 10, padding: "2px 6px", borderRadius: 4, color: "#92400e", lineHeight: 1 }}>▲</button>
+                        <button onClick={() => {
+                          setCustomRules((prev: any) => {
+                            const newArr = [...priorityRoomsList];
+                            [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]];
+                            return { ...prev, priorityRooms: newArr };
+                          });
+                        }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#fef3c7", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 10, padding: "2px 6px", borderRadius: 4, color: "#92400e", lineHeight: 1 }}>▼</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🕒 終日専任（半休・AM/PM不可）の部屋</h4>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>検査数が少ない部屋や、半休の人をわざわざアサインする意味がない部屋を指定します。ここには「1日通しで入れる人」しか配置されません。</p>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, minWidth: "250px" }}>
+                    <MultiSectionPicker selected={customRules.fullDayOnlyRooms || "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: "#ecfdf5", padding: 16, borderRadius: 12, border: "1px solid #a7f3d0", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 8px 0", color: "#065f46", fontSize: 14, fontWeight: 800 }}>🔗 常時兼務ペア</h4>
+                <p style={{ fontSize: 12, color: "#047857", marginBottom: 12, fontWeight: 600 }}>
                   人が足りない時に自動で兼務にする部屋のペアです。余裕がある時は独立した担当者が入ります。
                 </p>
                 {(customRules.kenmuPairs || []).map((rule: any, idx: number) => (
-                  <div key={idx} className="rule-row" style={{ background: "#f8fafc", padding: "8px 12px", border: "1px solid #e2e8f0", borderRadius: 8 }}>
-                    <select value={rule.s1} onChange={e => updateRule("kenmuPairs", idx, "s1", e.target.value)} className="rule-sel">
+                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "8px 12px", border: "1px solid #a7f3d0", borderRadius: 8 }}>
+                    <select value={rule.s1} onChange={e => updateRule("kenmuPairs", idx, "s1", e.target.value)} className="rule-sel" style={{ borderColor: "#6ee7b7" }}>
                       <option value="">部屋を選択</option>
                       {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                    <span className="rule-label">←→</span>
-                    <select value={rule.s2} onChange={e => updateRule("kenmuPairs", idx, "s2", e.target.value)} className="rule-sel">
+                    <span className="rule-label" style={{ color: "#065f46" }}>←→</span>
+                    <select value={rule.s2} onChange={e => updateRule("kenmuPairs", idx, "s2", e.target.value)} className="rule-sel" style={{ borderColor: "#6ee7b7" }}>
                       <option value="">部屋を選択</option>
                       {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <button onClick={() => removeRule("kenmuPairs", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("kenmuPairs", { s1: "", s2: "" })}>
+                <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("kenmuPairs", { s1: "", s2: "" })}>
                   ＋ ペアを追加
                 </button>
               </div>
 
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🍱 昼当番の自動選出ルール</h4>
-                <p style={{ fontSize: 12, color: "#3b82f6", marginBottom: 16, fontWeight: 600 }}>※RI担当者は、NG設定されていない限り最優先で昼当番にアサインされます。</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, background: "#f8fafc", padding: "8px 16px", borderRadius: 8, border: "1px solid #e2e8f0", width: "fit-content" }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#475569" }}>基本の人数:</span>
-                  <input type="number" min="0" value={customRules.lunchBaseCount ?? 3} onChange={e => setCustomRules({...customRules, lunchBaseCount: Number(e.target.value)})} style={{ width: 50, padding: "4px", borderRadius: 6, border: "1px solid #cbd5e1", textAlign: "center", fontWeight: 800, color: "#334155", fontSize: 14 }} />
+              <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 10px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
+                <p style={{ fontSize: 12, color: "#166534", marginBottom: 12, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, minWidth: "200px" }}>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>対象スタッフ名（複数可）</label>
+                    <div style={{ background: "#fff", padding: "6px", borderRadius: 8, border: "1px solid #86efac", minHeight: "34px", display: "flex", alignItems: "center" }}>
+                      <MultiStaffPicker 
+                        selected={customRules.supportStaffList || ""} 
+                        onChange={v => setCustomRules({...customRules, supportStaffList: v})} 
+                        options={allStaff} 
+                        placeholder="＋スタッフを選択" 
+                      />
+                    </div>
+                  </div>
+                  <div style={{ flex: 2, minWidth: "250px" }}>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>優先する対象部屋</label>
+                    <MultiSectionPicker selected={customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT"} onChange={v => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: "#eef2ff", padding: 16, borderRadius: 12, border: "1px solid #c7d2fe", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#4338ca", fontSize: 14, fontWeight: 800 }}>🍱 昼当番の自動選出ルール</h4>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, background: "#fff", padding: "8px 16px", borderRadius: 10, border: "1px solid #c7d2fe", width: "fit-content" }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#3730a3" }}>基本の人数:</span>
+                  <input type="number" min="0" value={customRules.lunchBaseCount ?? 3} onChange={e => setCustomRules({...customRules, lunchBaseCount: Number(e.target.value)})} style={{ width: 50, padding: "4px", borderRadius: 6, border: "1px solid #a5b4fc", textAlign: "center", fontWeight: 800, color: "#4f46e5", fontSize: 14 }} />
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-                  <div style={{ flex: 1, minWidth: "260px", background: "#f8fafc", padding: 16, borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                    <h5 style={{ margin: "0 0 12px 0", fontSize: 13, color: "#334155", fontWeight: 800 }}>📅 曜日で人数を変える</h5>
+                  <div style={{ flex: 1, minWidth: "260px", background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                    <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>📅 曜日で人数を変える</h5>
                     {(customRules.lunchSpecialDays || []).map((rule: any, idx: number) => (
                       <div key={idx} className="rule-row">
                         <select value={rule.day} onChange={e => updateRule("lunchSpecialDays", idx, "day", e.target.value)} className="rule-sel">
@@ -1680,8 +1697,8 @@ export default function App() {
                     ))}
                     <button className="rule-add" onClick={() => addRule("lunchSpecialDays", { day: "火", count: 4 })}>＋ 曜日ルールを追加</button>
                   </div>
-                  <div style={{ flex: 1, minWidth: "260px", background: "#f8fafc", padding: 16, borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                    <h5 style={{ margin: "0 0 12px 0", fontSize: 13, color: "#334155", fontWeight: 800 }}>⚖️ 条件付き選出（特定部屋が多い時）</h5>
+                  <div style={{ flex: 1, minWidth: "260px", background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                    <h5 style={{ margin: "0 0 10px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚖️ 条件付き選出（特定部屋が多い時）</h5>
                     {(customRules.lunchConditional || []).map((rule: any, idx: number) => (
                       <div key={idx} className="rule-row">
                         <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} className="rule-sel">
@@ -1698,146 +1715,118 @@ export default function App() {
                 </div>
                 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
-                  <div style={{ flex: 1, background: "#f8fafc", padding: 16, borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                    <h5 style={{ margin: "0 0 8px 0", fontSize: 13, color: "#334155", fontWeight: 800 }}>🎯 優先的に選出する部屋</h5>
+                  <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                    <h5 style={{ margin: "0 0 6px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>🎯 優先的に選出する部屋</h5>
                     <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={v => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} />
                   </div>
-                  <div style={{ flex: 1, background: "#f8fafc", padding: 16, borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                    <h5 style={{ margin: "0 0 8px 0", fontSize: 13, color: "#334155", fontWeight: 800 }}>⚠️ 緊急時のみ選出する部屋（なるべく除外）</h5>
+                  <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                    <h5 style={{ margin: "0 0 6px 0", fontSize: 13, color: "#4f46e5", fontWeight: 800 }}>⚠️ 緊急時のみ選出する部屋（なるべく除外）</h5>
                     <MultiSectionPicker selected={customRules.lunchLastResortSections ?? "治療"} onChange={v => setCustomRules({...customRules, lunchLastResortSections: v})} options={ROOM_SECTIONS} />
                   </div>
                 </div>
               </div>
 
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🌆 遅番・引き継ぎルール</h4>
-                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>「17時以降も稼働する部屋」を指定できます。日勤者には自動で終了時間が付き、遅番が1名追加されます。</p>
+              <div style={{ background: "#f5f3ff", padding: 16, borderRadius: 12, border: "1px solid #ddd6fe", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#6d28d9", fontSize: 14, fontWeight: 800 }}>🌆 遅番・引き継ぎルール</h4>
+                <p style={{ fontSize: 12, color: "#7c3aed", marginBottom: 12, fontWeight: 600 }}>「17時以降も稼働する部屋」を指定できます。日勤者には自動で終了時間が付き、遅番が1名追加されます。</p>
                 {(customRules.lateShifts || []).map((rule: any, idx: number) => (
-                  <div key={idx} className="rule-row" style={{background: "#f8fafc", padding: "8px 12px", border: "1px solid #e2e8f0", borderRadius: 8}}>
-                    <select value={rule.section} onChange={e => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel">
+                  <div key={idx} className="rule-row" style={{background:"#fff", padding:"8px 12px", border:"1px solid #ddd6fe", borderRadius:8}}>
+                    <select value={rule.section} onChange={e => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe"}}>
                       <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                    <span className="rule-label">に</span>
-                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{flex: "0 0 110px"}}>
+                    <span className="rule-label" style={{color:"#6d28d9"}}>に</span>
+                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 110px"}}>
                       <option value="">遅番の時間</option>
                       {TIME_OPTIONS.filter(t => t.includes("〜)")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                     </select>
-                    <span className="rule-label">の担当を追加する（日勤は</span>
-                    <select value={rule.dayEndTime} onChange={e => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{flex: "0 0 110px"}}>
+                    <span className="rule-label" style={{color:"#6d28d9"}}>の担当を追加する（日勤は</span>
+                    <select value={rule.dayEndTime} onChange={e => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 110px"}}>
                       <option value="">日勤の終了時間</option>
                       {TIME_OPTIONS.filter(t => t.includes("(〜")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                     </select>
-                    <span className="rule-label">とする）</span>
+                    <span className="rule-label" style={{color:"#6d28d9"}}>とする）</span>
                     <button onClick={() => removeRule("lateShifts", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("lateShifts", { section: "", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" })}>＋ 遅番ルールを追加</button>
+                <button className="rule-add" style={{color:"#6d28d9", borderColor:"#c4b5fd"}} onClick={() => addRule("lateShifts", { section: "", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" })}>＋ 遅番ルールを追加</button>
               </div>
 
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
-                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
-                  <div style={{ flex: 1, minWidth: "200px" }}>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 8 }}>対象スタッフ名（複数可）</label>
-                    <div style={{ background: "#f8fafc", padding: "8px", borderRadius: 8, border: "1px solid #e2e8f0", minHeight: "42px", display: "flex", alignItems: "center" }}>
-                      <MultiStaffPicker selected={customRules.supportStaffList || ""} onChange={v => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" />
-                    </div>
-                  </div>
-                  <div style={{ flex: 2, minWidth: "250px" }}>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "block", marginBottom: 8 }}>優先する対象部屋</label>
-                    <MultiSectionPicker selected={customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT"} onChange={v => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        {/* ③ イレギュラー対応ルール */}
-        <div style={{ ...panelStyle(), padding: "16px 24px", borderLeft: "4px solid #ef4444" }}>
-          <details>
-            <summary style={{ fontWeight: 800, color: "#b91c1c", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
-              <span>🚨</span> ③ イレギュラー対応（玉突き・代打・NG・緊急など）
-            </summary>
-            <div style={{ paddingTop: 20, borderTop: "1px dashed #e2e8f0", marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 16 }}>
-              
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🎱 玉突き・同室回避ルール</h4>
-                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>「AさんとBさんが同じ部屋になりそうな時、Bさんを別の部屋に押し出す」ルールです。</p>
+              <div style={{ background: "#e0f2fe", padding: 16, borderRadius: 12, border: "1px solid #bae6fd", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#0369a1", fontSize: 14, fontWeight: 800 }}>🎱 玉突き・同室回避ルール</h4>
+                <p style={{ fontSize: 12, color: "#0284c7", marginBottom: 12, fontWeight: 600 }}>「AさんとBさんが同じ部屋になりそうな時、Bさんを別の部屋に押し出す」ルールです。</p>
                 {(customRules.pushOuts || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
+                  <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #bae6fd", paddingBottom: 16 }}>
                     <div className="rule-row">
-                      <select value={rule.s1 || rule.triggerStaff} onChange={e => updateRule("pushOuts", idx, "s1", e.target.value)} className="rule-sel"><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                      <span className="rule-label">と</span>
-                      <select value={rule.s2 || rule.targetStaff} onChange={e => updateRule("pushOuts", idx, "s2", e.target.value)} className="rule-sel"><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                      <span className="rule-label">が同じ</span>
-                      <select value={rule.triggerSection} onChange={e => updateRule("pushOuts", idx, "triggerSection", e.target.value)} className="rule-sel"><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                      <span className="rule-label">になる時➔ 後者を</span>
+                      <select value={rule.s1 || rule.triggerStaff} onChange={e => updateRule("pushOuts", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#0284c7"}}>と</span>
+                      <select value={rule.s2 || rule.targetStaff} onChange={e => updateRule("pushOuts", idx, "s2", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">誰</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#0284c7"}}>が同じ</span>
+                      <select value={rule.triggerSection} onChange={e => updateRule("pushOuts", idx, "triggerSection", e.target.value)} className="rule-sel" style={{borderColor:"#93c5fd"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#0284c7"}}>になる時➔ 後者を</span>
                       <button onClick={() => removeRule("pushOuts", idx)} className="rule-del">✖</button>
                     </div>
                     <div className="rule-row">
                       <MultiSectionPicker selected={rule.targetSections} onChange={v => updateRule("pushOuts", idx, "targetSections", v)} options={ROOM_SECTIONS} />
-                      <span className="rule-label">に移動</span>
+                      <span className="rule-label" style={{color:"#0284c7"}}>に移動</span>
                     </div>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("pushOuts", { s1: "", s2: "", triggerSection: "", targetSections: "" })}>＋ 玉突きルールを追加</button>
+                <button className="rule-add" style={{color:"#0369a1", borderColor:"#7dd3fc"}} onClick={() => addRule("pushOuts", { s1: "", s2: "", triggerSection: "", targetSections: "" })}>＋ 玉突きルールを追加</button>
               </div>
 
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🔄 代打ルール</h4>
-                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>特定のスタッフが休みの時に、指定した代打スタッフを優先してアサインするルールです。</p>
+              <div style={{ background: "#fff7ed", padding: 16, borderRadius: 12, border: "1px solid #fed7aa" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#c2410c", fontSize: 14, fontWeight: 800 }}>🔄 代打ルール</h4>
+                <p style={{ fontSize: 12, color: "#9a3412", marginBottom: 12, fontWeight: 600 }}>特定のスタッフが休みの時に、指定した代打スタッフを優先してアサインするルールです。</p>
                 {(customRules.substitutes || []).map((rule: any, idx: number) => (
-                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16, alignItems: "center", background: "#f8fafc", padding: "12px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center", background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
                     <div style={{ flex: 1, minWidth: "150px" }}>
                       <MultiStaffPicker selected={rule.target} onChange={v => updateRule("substitutes", idx, "target", v)} options={activeGeneralStaff} placeholder="対象スタッフ(休)" />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#475569" }}>が全員休みの時➔</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>が全員休みの時➔</span>
                     <div style={{ flex: 1, minWidth: "180px" }}>
                       <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#475569" }}>を</span>
-                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{ flex: "0 0 120px" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>を</span>
+                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c", flex: "0 0 120px"}}>
                       <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#475569" }}>に優先</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#c2410c" }}>に優先</span>
                     <button onClick={() => removeRule("substitutes", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })}>＋ 代打ルールを追加</button>
+                <button className="rule-add" style={{color:"#c2410c", borderColor:"#fdba74"}} onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })}>＋ 代打ルールを追加</button>
               </div>
 
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🚫 NGペア</h4>
+              <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#b91c1c", fontSize: 14, fontWeight: 800 }}>🚫 NGペア</h4>
                 {(customRules.ngPairs || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row">
-                    <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span className="rule-label">と</span>
-                    <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} className="rule-sel" style={{ color:"#ef4444", flex:"0 0 auto", minWidth:"120px" }}>
+                    <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5", color:"#b91c1c", flex:"0 0 auto", minWidth:"120px"}}>
                       <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
                     </select>
                     <button onClick={() => removeRule("ngPairs", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}} onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })}>＋ 追加</button>
               </div>
 
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🔒 専従（必ずここに配置）</h4>
+              <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🔒 専従（必ずここに配置）</h4>
                 {(customRules.fixed || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row">
-                    <select value={rule.staff} onChange={e => updateRule("fixed", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.section} onChange={e => updateRule("fixed", idx, "section", e.target.value)} className="rule-sel"><option value="">選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.staff} onChange={e => updateRule("fixed", idx, "staff", e.target.value)} className="rule-sel" style={{borderColor:"#86efac"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={rule.section} onChange={e => updateRule("fixed", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#86efac"}}><option value="">選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <button onClick={() => removeRule("fixed", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("fixed", { staff: "", section: "" })}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("fixed", { staff: "", section: "" })}>＋ 追加</button>
               </div>
 
-              <div className="rule-card">
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🙅 担当不可（複数選択可）</h4>
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#475569", fontSize: 14, fontWeight: 800 }}>🙅 担当不可（複数選択可）</h4>
                 {(customRules.forbidden || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
                     <div className="rule-row">
@@ -1847,24 +1836,24 @@ export default function App() {
                     <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}} onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
               </div>
 
-              <div className="rule-card" style={{ borderLeft: "4px solid #f59e0b" }}>
-                <h4 style={{ margin: "0 0 12px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🚨 緊急ルール（人数不足時の対応）</h4>
-                <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, background: "#fffbeb", padding: "8px 16px", borderRadius: 8, border: "1px solid #fde68a" }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#d97706" }}>🚑 一般スタッフ発動ライン: 出勤</span>
-                  <input type="number" value={customRules.helpThreshold ?? 17} onChange={e => setCustomRules({...customRules, helpThreshold: Number(e.target.value)})} style={{ width: "60px", padding: "4px", borderRadius: 6, border: "1px solid #fcd34d", textAlign: "center", fontWeight: 800, color: "#d97706", background: "#fff" }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#d97706" }}>人以下</span>
+              <div style={{ background: "#fef08a", padding: 16, borderRadius: 12, border: "1px solid #fde047", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 12px 0", color: "#a16207", fontSize: 14, fontWeight: 800 }}>🚨 緊急ルール（人数不足時の対応）</h4>
+                <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8, background: "#fff", padding: "8px 16px", borderRadius: 10, border: "1px solid #fde047" }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#854d0e" }}>🚑 一般スタッフ発動ライン: 出勤</span>
+                  <input type="number" value={customRules.helpThreshold ?? 17} onChange={e => setCustomRules({...customRules, helpThreshold: Number(e.target.value)})} style={{ width: "60px", padding: "4px", borderRadius: 6, border: "1px solid #fde047", textAlign: "center", fontWeight: 800, color: "#a16207" }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#a16207" }}>人以下</span>
                 </div>
-                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>※「兼務」を連鎖させる場合（AがBを兼務し、BがCを兼務など）は、ルールの順番に注意するか、「AがBを兼務」「AがCを兼務」と直接指定すると確実です。</p>
+                <p style={{ fontSize: 12, color: "#a16207", marginBottom: 12, fontWeight: 600 }}>※「兼務」を連鎖させる場合（AがBを兼務し、BがCを兼務など）は、ルールの順番に注意するか、「AがBを兼務」「AがCを兼務」と直接指定すると確実です。</p>
                 {(customRules.emergencies || []).map((rule: any, idx: number) => (
-                  <div key={idx} className="rule-row" style={{background:"#f8fafc", padding:"8px 12px", border:"1px solid #e2e8f0", borderRadius:8}}>
-                    <span className="rule-label">出勤</span>
-                    <input type="number" value={rule.threshold} onChange={e => updateRule("emergencies", idx, "threshold", e.target.value)} className="rule-num" />
-                    <span className="rule-label">人以下➔</span>
+                  <div key={idx} className="rule-row" style={{background:"#fff", padding:"8px 12px", border:"1px dashed #fde047", borderRadius:8}}>
+                    <span className="rule-label" style={{color:"#854d0e"}}>出勤</span>
+                    <input type="number" value={rule.threshold} onChange={e => updateRule("emergencies", idx, "threshold", e.target.value)} className="rule-num" style={{borderColor:"#fde047"}} />
+                    <span className="rule-label" style={{color:"#854d0e"}}>人以下➔</span>
                     
-                    <select value={["kenmu", "clear", "role_assign", "change_capacity"].includes(rule.type) ? rule.type : "role_assign"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"120px"}}>
+                    <select value={["kenmu", "clear", "role_assign", "change_capacity"].includes(rule.type) ? rule.type : "role_assign"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"120px", borderColor:"#fde047"}}>
                       <option value="role_assign">担当配置</option>
                       <option value="kenmu">兼務</option>
                       <option value="change_capacity">定員変更</option>
@@ -1873,45 +1862,45 @@ export default function App() {
 
                     {rule.type === "role_assign" ? (
                       <>
-                        <select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel"><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
-                        <span className="rule-label">を</span>
-                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel"><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+                        <span className="rule-label" style={{color:"#854d0e"}}>を</span>
+                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       </>
                     ) : rule.type === "kenmu" ? (
                       <>
-                        <span className="rule-label">[</span>
-                        <select value={rule.s1} onChange={e => updateRule("emergencies", idx, "s1", e.target.value)} className="rule-sel"><option value="">場所1</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                        <span className="rule-label">] の担当が [</span>
+                        <span className="rule-label" style={{color:"#854d0e"}}>[</span>
+                        <select value={rule.s1} onChange={e => updateRule("emergencies", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所1</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <span className="rule-label" style={{color:"#854d0e"}}>] の担当が [</span>
                         <div style={{ flex: 1, minWidth: "150px" }}>
                           <MultiSectionPicker selected={rule.s2 || ""} onChange={v => updateRule("emergencies", idx, "s2", v)} options={ROOM_SECTIONS} />
                         </div>
-                        <span className="rule-label">] も兼務</span>
+                        <span className="rule-label" style={{color:"#854d0e"}}>] も兼務</span>
                       </>
                     ) : rule.type === "change_capacity" ? (
                       <>
-                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel"><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                        <span className="rule-label">の定員を</span>
-                        <input type="number" value={rule.newCapacity ?? 3} onChange={e => updateRule("emergencies", idx, "newCapacity", e.target.value)} className="rule-num" />
-                        <span className="rule-label">人にする</span>
+                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <span className="rule-label" style={{color:"#854d0e"}}>の定員を</span>
+                        <input type="number" value={rule.newCapacity ?? 3} onChange={e => updateRule("emergencies", idx, "newCapacity", e.target.value)} className="rule-num" style={{borderColor:"#fde047"}} />
+                        <span className="rule-label" style={{color:"#854d0e"}}>人にする</span>
                       </>
                     ) : (
                       <>
-                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel"><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                        <span className="rule-label">を空にする</span>
+                        <select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <span className="rule-label" style={{color:"#854d0e"}}>を空にする</span>
                       </>
                     )}
                     <button onClick={() => removeRule("emergencies", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "CT", s1: "", s2: "", newCapacity: 3 })}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "CT", s1: "", s2: "", newCapacity: 3 })}>＋ 追加</button>
               </div>
 
             </div>
           </details>
         </div>
 
-        {/* 月間担当者の設定（これは外に出しておく） */}
-        <div style={{ ...panelStyle(), padding: "20px 24px", borderLeft: "4px solid #8b5cf6" }}>
+        {/* 月間担当者の設定（アコーディオンの外に出しておく） */}
+        <div style={{ ...panelStyle(), padding: "20px 24px" }}>
           <h4 style={{ margin: "0 0 8px 0", color: "#334155", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
           <p style={{ fontSize: 13, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
@@ -1926,7 +1915,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, padding: "16px 24px" }}>
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
             <span>📊</span> 今週のスタッフ稼働メーター（自動集計）を開く
@@ -1954,7 +1943,7 @@ export default function App() {
         </details>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, padding: "16px 24px" }}>
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#475569", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
             <span>📋</span> 自動割当のルール（部屋が埋まる優先度）を開く
