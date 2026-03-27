@@ -32,7 +32,6 @@ const globalStyle = `
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 12px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   
-  /* 🌟 追加: モーダル表示時のアニメーション */
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
 
@@ -162,7 +161,6 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
-// 🌟 TypeScriptエラー修正済のMultiStaffPicker
 const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
@@ -301,7 +299,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
       <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
@@ -369,7 +367,6 @@ export default function App() {
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
-  // 🌟 追加: モーダル表示用のステート
   const [selectedStaffForStats, setSelectedStaffForStats] = useState<string | null>(null);
 
   const [targetMonday, setTargetMonday] = useState(() => {
@@ -754,6 +751,9 @@ export default function App() {
     return w;
   }, [cur, days, customRules, activeGeneralStaff]);
 
+  // ==========================================
+  // 👑 自動割当アルゴリズム（完全版・相組み最適化対応）
+  // ==========================================
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
@@ -773,8 +773,8 @@ export default function App() {
       });
       split(dayCells["不在"]).forEach(m => {
         const core = getCoreName(m);
-        if (m.includes("(AM)")) blockMap.set(core, 'AM');
-        else if (m.includes("(PM)")) blockMap.set(core, 'PM');
+        if (m.includes("(AM)")) blockMap.set(core, 'AM'); // AM不在＝PMのみ可
+        else if (m.includes("(PM)")) blockMap.set(core, 'PM'); // PM不在＝AMのみ可
         else blockMap.set(core, 'ALL');
       });
     };
@@ -857,16 +857,11 @@ export default function App() {
     
     const shuffledStaff = shuffleArray(allStaff);
     
+    // ★ グローバルソートから半休優先を排除。入れる部屋が少ない人を優先するだけにする。
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
-      const aBlock = blockMap.get(a) !== 'NONE';
-      const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return -1; 
-      if (!aBlock && bBlock) return 1;
-
       const aForbidCount = getForbiddenCount(a);
       const bForbidCount = getForbiddenCount(b);
       if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount;
-
       if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
       return 0; 
     });
@@ -938,6 +933,7 @@ export default function App() {
       return result;
     }
 
+    // 🌟 スマート・ペアリング対応の fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
@@ -970,7 +966,46 @@ export default function App() {
 
         if (validPreferred.length === 0 && validAvail.length === 0) break;
 
-        const pickedCoreList = pick(validAvail, [...validPreferred, ...validAvail], 1, section, current.map(getCoreName), false);
+        // 🌟 ペアリング判定（相性の良い半休同士がいるか）
+        const hasAmFree = validAvail.some(s => blockMap.get(s) === 'PM');
+        const hasPmFree = validAvail.some(s => blockMap.get(s) === 'AM');
+        
+        const sortCandidates = (candidates: string[]) => {
+           return [...candidates].sort((a, b) => {
+               const bA = blockMap.get(a);
+               const bB = blockMap.get(b);
+
+               let scoreA = 0; let scoreB = 0;
+
+               // フルタイムが必要な枠の場合
+               if (needTag === "") {
+                   if (bA === 'NONE') scoreA += 100; // フルタイムの人を優先
+                   if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 120; // 完璧なペアが作れるなら最強！
+               } else {
+                   // 半休が必要な枠の場合
+                   if (needTag === "(AM)" && bA === 'PM') scoreA += 100;
+                   if (needTag === "(PM)" && bA === 'AM') scoreA += 100;
+                   if (bA === 'NONE') scoreA += 50; // 仕方なくフルタイムを割る
+               }
+
+               if (needTag === "") {
+                   if (bB === 'NONE') scoreB += 100;
+                   if (hasAmFree && hasPmFree && (bB === 'AM' || bB === 'PM')) scoreB += 120;
+               } else {
+                   if (needTag === "(AM)" && bB === 'PM') scoreB += 100;
+                   if (needTag === "(PM)" && bB === 'AM') scoreB += 100;
+                   if (bB === 'NONE') scoreB += 50;
+               }
+
+               if (scoreA !== scoreB) return scoreB - scoreA;
+               return candidates.indexOf(a) - candidates.indexOf(b); // 同点なら元の優先順位（NGが多い人）を守る
+           });
+        };
+
+        const sortedPreferred = sortCandidates(validPreferred);
+        const sortedAvail = sortCandidates(validAvail);
+
+        const pickedCoreList = pick(sortedAvail, [...sortedPreferred, ...sortedAvail], 1, section, current.map(getCoreName), false);
         if (pickedCoreList.length === 0) break;
 
         const core = pickedCoreList[0];
@@ -985,6 +1020,7 @@ export default function App() {
             if (needTag) {
                 tag = needTag;
                 f = 0.5;
+                // ★ 修正箇所: (AM)に入ったらAMをブロックし、次はPMに回るようにする
                 blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM');
             } else {
                 tag = ""; 
@@ -1071,6 +1107,7 @@ export default function App() {
           
           let candidates = availGeneral;
           const strictRooms = ["治療", "RI", "MMG", "透析後胸部"];
+          // 🚨 月間設定必須の部屋（資格がない人を絶対に入れない）
           if (strictRooms.includes(room)) {
              candidates = preferredList; 
           }
