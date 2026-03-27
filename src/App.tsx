@@ -82,6 +82,7 @@ const DEFAULT_PRIORITY_ROOMS = [
 const DEFAULT_RULES = { 
   staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "1号室,2号室,5号室,パノラマCT", customHolidays: "", 
   capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1, 受付: 2 }, 
+  dailyCapacities: [], // 🌟 追加：特定日の人数変更ルール
   priorityRooms: DEFAULT_PRIORITY_ROOMS, 
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
@@ -431,13 +432,23 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
   let currentKenmu: any[] = [];
   let dynamicCapacity = { ...(customRules.capacity || {}) };
   
+  // 🌟 特定日の人数変更ルールを適用（最優先）
+  (customRules.dailyCapacities || []).forEach((rule: any) => {
+    if (rule.date === day.id && rule.section) {
+      dynamicCapacity[rule.section] = Number(rule.capacity);
+    }
+  });
+  
   const evaluateEmergencies = () => {
     const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
     (customRules.emergencies || []).forEach((em: any) => {
       if (tempAvailCount <= Number(em.threshold)) {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
         if (em.type === "clear" && em.section) { skipSections.push(em.section); }
-        if (em.type === "change_capacity" && em.section) { dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); }
+        // ※特定日の設定（dailyCapacities）がない場合のみ、緊急時の人数変更を適用する
+        if (em.type === "change_capacity" && em.section && !(customRules.dailyCapacities || []).some((r:any) => r.date === day.id && r.section === em.section)) { 
+           dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); 
+        }
         if (em.type === "kenmu") { 
           currentKenmu.push(em); 
           if (em.s2) {
@@ -1597,6 +1608,29 @@ export default function App() {
                     <option value="">＋ 部屋を追加</option>
                     {ROOM_SECTIONS.filter(r => !Object.keys(customRules.capacity || {}).includes(r)).map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
+                </div>
+
+                {/* 🌟ここに追加！ 特定日のオーバーライド */}
+                <div style={{ marginTop: 32, paddingTop: 24, borderTop: "2px dashed #cbd5e1" }}>
+                  <h5 style={{ margin: "0 0 16px 0", color: "#0ea5e9", fontSize: 24, fontWeight: 800 }}>📅 特定の日だけ人数を変更する</h5>
+                  <p style={{ fontSize: 20, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>※「この日だけCTを1人増やす」といったイレギュラーに対応します。基本人数より優先されます。</p>
+                  {(customRules.dailyCapacities || []).map((rule: any, idx: number) => (
+                    <div key={idx} className="rule-row" style={{ background: "#fff", padding: "16px 24px", border: "2px solid #bae6fd", borderRadius: 12 }}>
+                      <input type="date" value={rule.date} onChange={e => updateRule("dailyCapacities", idx, "date", e.target.value)} className="rule-sel" style={{ flex: "0 0 200px", borderColor: "#7dd3fc" }} />
+                      <span className="rule-label" style={{ color: "#0369a1" }}>の</span>
+                      <select value={rule.section} onChange={e => updateRule("dailyCapacities", idx, "section", e.target.value)} className="rule-sel" style={{ borderColor: "#7dd3fc" }}>
+                        <option value="">部屋を選択</option>
+                        {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <span className="rule-label" style={{ color: "#0369a1" }}>を</span>
+                      <input type="number" min="0" value={rule.capacity} onChange={e => updateRule("dailyCapacities", idx, "capacity", e.target.value)} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
+                      <span className="rule-label" style={{ color: "#0369a1" }}>人にする</span>
+                      <button onClick={() => removeRule("dailyCapacities", idx)} className="rule-del">✖</button>
+                    </div>
+                  ))}
+                  <button className="rule-add" style={{ color: "#0ea5e9", borderColor: "#7dd3fc" }} onClick={() => addRule("dailyCapacities", { date: targetMonday, section: "", capacity: 4 })}>
+                    ＋ 特定日の人数変更を追加
+                  </button>
                 </div>
               </div>
 
