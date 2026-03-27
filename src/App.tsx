@@ -18,10 +18,10 @@ const globalStyle = `
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
+  .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
-  .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; }
-  .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
+  .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
@@ -31,6 +31,11 @@ const globalStyle = `
   .rule-add { background: #fff; color: #4f46e5; border: 1px dashed #a5b4fc; padding: 6px 12px; font-size: 12px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 12px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  
+  /* 🌟 追加: モーダル表示時のアニメーション */
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
+
   @media print {
     body { background: #fff; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
@@ -157,6 +162,7 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
+// 🌟 TypeScriptエラー修正済のMultiStaffPicker
 const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
@@ -295,7 +301,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   };
 
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
+    <div style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
       <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
@@ -363,6 +369,8 @@ export default function App() {
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
+  // 🌟 追加: モーダル表示用のステート
+  const [selectedStaffForStats, setSelectedStaffForStats] = useState<string | null>(null);
 
   const [targetMonday, setTargetMonday] = useState(() => {
     const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff));
@@ -746,9 +754,6 @@ export default function App() {
     return w;
   }, [cur, days, customRules, activeGeneralStaff]);
 
-  // ==========================================
-  // 👑 自動割当アルゴリズム（完全版・半休バグ修正対応）
-  // ==========================================
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
@@ -768,7 +773,6 @@ export default function App() {
       });
       split(dayCells["不在"]).forEach(m => {
         const core = getCoreName(m);
-        // AM不在なら「AMをブロック」、PM不在なら「PMをブロック」
         if (m.includes("(AM)")) blockMap.set(core, 'AM');
         else if (m.includes("(PM)")) blockMap.set(core, 'PM');
         else blockMap.set(core, 'ALL');
@@ -934,12 +938,10 @@ export default function App() {
       return result;
     }
 
-    // 🌟 半休バグを修正した fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
       
-      // 現在のアサイン量を計算（半休は0.5、終日は1）
       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + (m.includes("(AM)") || m.includes("(PM)") || m.match(/\(〜/) || m.match(/〜\)/) ? 0.5 : 1), 0);
 
       let safeCounter = 0;
@@ -948,7 +950,6 @@ export default function App() {
         const remaining = targetCount - getCurrentAmount(current);
         
         let needTag = "";
-        // 残り枠に端数（0.5）がある場合、AMとPMのどっちが足りないかを判定
         if (remaining === 0.5 || remaining === 1.5 || remaining === 2.5) {
            const amCount = current.filter(m => m.includes("(AM)")).length;
            const pmCount = current.filter(m => m.includes("(PM)")).length;
@@ -959,9 +960,7 @@ export default function App() {
         const isValidBlock = (name: string) => {
            const b = blockMap.get(name);
            if (b === 'ALL') return false;
-           // AMが欲しい時に、AMがブロックされている人（b==='AM'）は除外
            if (needTag === "(AM)" && b === 'AM') return false; 
-           // PMが欲しい時に、PMがブロックされている人（b==='PM'）は除外
            if (needTag === "(PM)" && b === 'PM') return false; 
            return true;
         };
@@ -986,7 +985,6 @@ export default function App() {
             if (needTag) {
                 tag = needTag;
                 f = 0.5;
-                // ★ バグ修正箇所！ AMに入ったらAMをブロックする（次はPMに回す）
                 blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM');
             } else {
                 tag = ""; 
@@ -1005,7 +1003,7 @@ export default function App() {
       let staff: string[] = [];
       if (sec === "治療") staff = [...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)];
       else if (sec === "RI") staff = [...split(monthlyAssign.RI), ...split(monthlyAssign.RIサブ)];
-      else if (monthlyAssign[sec] !== undefined) staff = staff = split(monthlyAssign[sec]);
+      else if (monthlyAssign[sec] !== undefined) staff = split(monthlyAssign[sec]);
       return staff.map(getCoreName);
     };
 
@@ -1071,11 +1069,10 @@ export default function App() {
              preferredList = split(monthlyAssign[room]).filter(s => availGeneral.includes(s));
           }
           
-          // 🚨 月間設定必須の部屋（資格がない人を絶対に入れない）
           let candidates = availGeneral;
           const strictRooms = ["治療", "RI", "MMG", "透析後胸部"];
           if (strictRooms.includes(room)) {
-             candidates = preferredList; // 資格者のみに絞る
+             candidates = preferredList; 
           }
           
           fill(candidates, room, preferredList, targetCount);
@@ -1539,6 +1536,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* ★ サポート専任ルールのUI変更 */}
               <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
                 <p style={{ fontSize: 12, color: "#166534", marginBottom: 12, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
@@ -1809,7 +1807,7 @@ export default function App() {
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>※表示中の1週間（月〜日）で、誰が何回「業務（待機・当番除く）」に割り当てられているかを自動集計します。手動調整の目安にしてください。</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               {weeklyStats.map(([name, stat]) => (
-                <div key={name} style={{ background: stat.total > 0 ? "#fff" : "#f1f5f9", border: `1px solid ${stat.total > 0 ? "#bfdbfe" : "#e2e8f0"}`, padding: "8px 12px", borderRadius: 8, minWidth: 150, boxShadow: stat.total > 0 ? "0 1px 2px rgba(0,0,0,0.05)" : "none" }}>
+                <div key={name} className="card-hover btn-hover" onClick={() => setSelectedStaffForStats(name)} style={{ background: stat.total > 0 ? "#fff" : "#f1f5f9", border: `1px solid ${stat.total > 0 ? "#bfdbfe" : "#e2e8f0"}`, padding: "8px 12px", borderRadius: 8, minWidth: 150, boxShadow: stat.total > 0 ? "0 1px 2px rgba(0,0,0,0.05)" : "none" }}>
                   <div style={{ fontWeight: 800, color: stat.total > 0 ? "#1e293b" : "#94a3b8", marginBottom: 6, fontSize: 13 }}>{name}</div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 4 }}>
                     <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>総稼働: <strong style={{color:"#2563eb", fontSize:14}}>{stat.total}</strong> 枠</span>
@@ -1984,6 +1982,59 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* 🌟 追加: 稼働詳細を表示するモーダル */}
+      {selectedStaffForStats && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(2px)" }} onClick={() => setSelectedStaffForStats(null)}>
+          <div className="modal-animate" style={{ background: "#fff", padding: 24, borderRadius: 20, width: "90%", maxWidth: 400, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 12, borderBottom: "2px solid #f1f5f9" }}>
+              <h3 style={{ margin: 0, fontSize: 18, color: "#0f172a", fontWeight: 800 }}>👤 {selectedStaffForStats} さんの稼働詳細</h3>
+              <button onClick={() => setSelectedStaffForStats(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 32, height: 32, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>✖</button>
+            </div>
+            
+            {days.every(d => d.isPublicHoliday) ? (
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 14 }}>今週はすべて休診日です。</p>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
+                    <th style={{ padding: "8px 4px", textAlign: "left", color: "#475569" }}>日付</th>
+                    <th style={{ padding: "8px 4px", textAlign: "left", color: "#475569" }}>業務担当</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {days.map(d => {
+                    if (d.isPublicHoliday) return null;
+                    const assigns: string[] = [];
+                    Object.entries(d.cells).forEach(([sec, val]) => {
+                      if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
+                      const members = split(val as string);
+                      const myAssign = members.find(m => getCoreName(m) === selectedStaffForStats);
+                      if (myAssign) {
+                         const timeStr = myAssign.substring(selectedStaffForStats.length);
+                         assigns.push(`${sec}${timeStr}`);
+                      }
+                    });
+                    
+                    return (
+                      <tr key={d.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ padding: "12px 4px", fontWeight: 600, color: "#334155", verticalAlign: "top" }}>{d.label}</td>
+                        <td style={{ padding: "12px 4px", color: assigns.length > 0 ? "#0369a1" : "#94a3b8", fontWeight: 700 }}>
+                          {assigns.length > 0 ? assigns.join(" / ") : "なし（または休務）"}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+            <div style={{ marginTop: 24, textAlign: "center" }}>
+              <button className="btn-hover" onClick={() => setSelectedStaffForStats(null)} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "10px 24px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
