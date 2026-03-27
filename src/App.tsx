@@ -2,16 +2,16 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
+  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; overflow-x: hidden; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
-  details > summary { list-style: none; cursor: pointer; transition: color 0.2s; }
+  details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
-  .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
   .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
 
@@ -20,25 +20,26 @@ const globalStyle = `
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
   .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
-  .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; }
+  .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; width: 100%; }
   .rule-sel { padding: 6px 24px 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 110px; min-width: 100px; transition: border-color 0.2s; }
   .rule-num { width: 50px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 16px; flex-shrink: 0; padding: 0 4px; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 16px; flex-shrink: 0; padding: 0 4px; transition: 0.2s; }
+  .rule-del:hover { background: #fee2e2; border-radius: 4px; }
   .rule-add { background: #fff; color: #4f46e5; border: 1px dashed #a5b4fc; padding: 6px 12px; font-size: 12px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 12px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
   @media print {
-    body { background: #fff; } .no-print { display: none !important; }
+    body { background: #fff; overflow: visible; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
-    table { width: 100% !important; border-collapse: collapse !important; }
+    table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed; }
     tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #000 !important; padding: 6px !important; font-size: 10pt !important; color: #000 !important; position: static !important; }
+    th, td { border: 1px solid #000 !important; padding: 6px !important; font-size: 10pt !important; color: #000 !important; position: static !important; max-width: 150px; word-break: break-all; }
   }
 `;
 
@@ -81,14 +82,14 @@ const DEFAULT_RULES = {
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   kenmuPairs: [], 
-  lateShifts: [], // デフォルト遅番はなし
+  lateShifts: [], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v107"; 
-const KEY_MONTHLY = "shifto_monthly_v107"; 
-const KEY_RULES = "shifto_rules_v107";
+const KEY_ALL_DAYS = "shifto_alldays_v108"; 
+const KEY_MONTHLY = "shifto_monthly_v108"; 
+const KEY_RULES = "shifto_rules_v108";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -109,6 +110,7 @@ const RENDER_GROUPS: RenderGroup[] = [
   { title: "待機", color: "#f59e0b", sections: ["待機","透析後胸部"] }
 ];
 
+// ============== 🌟 ヘルパー関数群 ==============
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDayForDisplay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
@@ -146,15 +148,21 @@ const isMonthlyMainStaff = (section: string, name: string, monthlyAssign: Record
   return getMonthlyStaffForSection(section, monthlyAssign).includes(name);
 };
 
-function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { return { background: bg, color: color, border: "none", borderRadius: "10px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; }
-function panelStyle(): React.CSSProperties { return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)" }; }
-function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false): React.CSSProperties { 
-  let bg = isHeader ? "#f8fafc" : "#fff";
+// ============== 🌟 UIスタイリング関数 ==============
+function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { 
+  return { background: bg, color: color, border: "none", borderRadius: "10px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
+}
+function panelStyle(): React.CSSProperties { 
+  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)", width: "100%", boxSizing: "border-box" }; 
+}
+function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties { 
+  let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
   if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; 
-  else if (isSelected) bg = isHeader ? "#eff6ff" : "#f0f9ff"; 
-  return { border: "1px solid #e2e8f0", padding: "12px", background: bg, fontWeight: isHeader ? 800 : 500, textAlign: isHeader ? "center" : "left", fontSize: 13, minWidth: isHeader && !isSticky ? "100px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 5px -2px rgba(0,0,0,0.05)" : "none" }; 
+  else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); 
+  return { border: "1px solid #e2e8f0", padding: "12px", background: bg, fontWeight: isHeader ? 800 : 500, textAlign: isHeader ? "center" : "left", fontSize: 13, minWidth: isHeader && !isSticky ? "100px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 5px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
+// ============== 🌟 UIコンポーネント ==============
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
   const handleAdd = (sec: string) => { if (sec && !current.includes(sec)) onChange(join([...current, sec])); };
@@ -565,7 +573,9 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
          if (b === 'ALL') return false;
          if (needTag === "(AM)" && b === 'AM') return false; 
          if (needTag === "(PM)" && b === 'PM') return false; 
+         
          if (fullDayOnlyList.includes(section) && b !== 'NONE') return false;
+
          return true;
       };
 
@@ -854,6 +864,7 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         const getCandidate = (candidatesList: string[]) => {
           let cand = candidatesList.filter(name => {
             if (currentCore.includes(name)) return false;
+            // 🌟 修正: 午後不在の人（PMがブロックされている人）だけを遅番候補から外す！
             if (blockMap.get(name) === 'PM') return false; 
             if (isForbidden(name, rule.section)) return false;
             return true;
@@ -866,6 +877,7 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         };
 
         let picked = getCandidate(helpMembers) || getCandidate(availGeneral);
+        
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
           addU(picked, 0.5);
@@ -936,7 +948,7 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         if (currentLunch.length >= lunchTarget) break;
         split(dayCells[sec]).forEach(name => {
           const core = getCoreName(name);
-          if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget && !isForbidden(core, "昼当番")) {
+          if (!currentLunch.includes(core) && currentLunch.length < lunchTarget && !isForbidden(core, "昼当番")) {
             currentLunch.push(core);
           }
         });
@@ -951,7 +963,7 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
             for (const name of secMembers) {
               if (picked >= Number(cond.out) || currentLunch.length >= lunchTarget) break;
               const core = getCoreName(name);
-              if (!currentLunch.map(getCoreName).includes(core) && !isForbidden(core, "昼当番")) {
+              if (!currentLunch.includes(core) && !isForbidden(core, "昼当番")) {
                 currentLunch.push(core);
                 picked++;
               }
@@ -967,13 +979,13 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
           split(dayCells[sec]).forEach(name => lastResortMembers.push(getCoreName(name)));
         });
 
-        const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name) && !isForbidden(name, "昼当番"));
+        const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.includes(name) && !isForbidden(name, "昼当番"));
         for (const name of fallbackCandidates) { 
           if (currentLunch.length < lunchTarget) currentLunch.push(name); 
         }
         
         if (currentLunch.length < lunchTarget) {
-           const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name) && !isForbidden(name, "昼当番"));
+           const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.includes(name) && !isForbidden(name, "昼当番"));
            for (const name of finalFallback) {
              if (currentLunch.length < lunchTarget) currentLunch.push(name); 
            }
@@ -1462,10 +1474,12 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
-          {/* 🌟 復活: 一番上の保存ボタン */}
+          
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
+          
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
           <input type="file" ref={fileInputRef} accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
+          
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
@@ -1490,7 +1504,6 @@ export default function App() {
         </details>
       </div>
 
-      {/* 🌟 元の使いやすい「1つのアコーディオンにまとまったUI」 */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#0f766e", padding: "4px", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
@@ -1756,7 +1769,7 @@ export default function App() {
                 <button className="rule-add" style={{color:"#c2410c", borderColor:"#fdba74"}} onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })}>＋ 代打ルールを追加</button>
               </div>
 
-              <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
+              <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#b91c1c", fontSize: 14, fontWeight: 800 }}>🚫 NGペア</h4>
                 {(customRules.ngPairs || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row">
@@ -1772,7 +1785,7 @@ export default function App() {
                 <button className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}} onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })}>＋ 追加</button>
               </div>
 
-              <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
+              <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🔒 専従（必ずここに配置）</h4>
                 {(customRules.fixed || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row">
@@ -1784,7 +1797,7 @@ export default function App() {
                 <button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("fixed", { staff: "", section: "" })}>＋ 追加</button>
               </div>
 
-              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1" }}>
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#475569", fontSize: 14, fontWeight: 800 }}>🙅 担当不可（複数選択可）</h4>
                 {(customRules.forbidden || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
@@ -1855,23 +1868,22 @@ export default function App() {
               </div>
 
             </div>
-          </details>
-        </div>
 
-        {/* 月間担当者の設定 */}
-        <div style={{ ...panelStyle(), padding: "16px 20px" }}>
-          <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
-          <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-            {MONTHLY_CATEGORIES.map(({ key, label }) => {
-              const membersStr = monthlyAssign[key] || "";
-              const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
-              return (
-                <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
-              )
-            })}
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "2px dashed #cbd5e1" }}>
+              <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
+              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                {MONTHLY_CATEGORIES.map(({ key, label }) => {
+                  const membersStr = monthlyAssign[key] || "";
+                  const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
+                  return (
+                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                  )
+                })}
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
       </div>
 
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
@@ -1879,7 +1891,7 @@ export default function App() {
           <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
             <span>📊</span> 今週のスタッフ稼働メーター（自動集計）を開く
           </summary>
-          <div style={{ marginTop: 16, borderTop: "2px dashed #cbd5e1", paddingTop: 16 }}>
+          <div style={{ marginTop: 16, borderTop: "1px dashed #e2e8f0", paddingTop: 16 }}>
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>※表示中の1週間（月〜日）で、誰が何回「業務（待機・当番除く）」に割り当てられているかを自動集計します。クリックで詳細が見れます。</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               {weeklyStats.map(([name, stat]) => (
@@ -1907,7 +1919,7 @@ export default function App() {
           <summary style={{ fontWeight: 800, color: "#475569", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
             <span>📋</span> 自動割当のルール（部屋が埋まる優先度）を開く
           </summary>
-          <div style={{ marginTop: 16, borderTop: "2px dashed #cbd5e1", paddingTop: 16 }}>
+          <div style={{ marginTop: 16, borderTop: "1px dashed #e2e8f0", paddingTop: 16 }}>
             <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>📌 部屋が埋まる順番（処理の優先順位）</h4>
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>※上にある部屋・ルールから順番に、スタッフが割り当てられていきます。「絶対優先人数」で追加した部屋は、追加した順番に優先して処理されます。</p>
             <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", marginBottom: 16 }}>
@@ -1965,7 +1977,7 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
         
         {/* 🌟 曜日タブとアクションボタンの統合＆追従化 */}
-        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", gap: 10, borderBottom: "none", paddingBottom: 0, marginBottom: 0, alignItems: "center" }}>
+        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", gap: 10, borderBottom: "none", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 6 }}>
             {days.map(d => {
               return (
@@ -2069,7 +2081,7 @@ export default function App() {
       {selectedStaffForStats && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(2px)" }} onClick={() => setSelectedStaffForStats(null)}>
           <div className="modal-animate" style={{ background: "#fff", padding: 24, borderRadius: 20, width: "90%", maxWidth: 400, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 12, borderBottom: "2px solid #f1f5f9" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 12, borderBottom: "1px solid #e2e8f0" }}>
               <h3 style={{ margin: 0, fontSize: 18, color: "#0f172a", fontWeight: 800 }}>👤 {selectedStaffForStats} さんの稼働詳細</h3>
               <button onClick={() => setSelectedStaffForStats(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 32, height: 32, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>✖</button>
             </div>
