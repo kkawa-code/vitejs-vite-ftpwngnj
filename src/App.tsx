@@ -634,9 +634,10 @@ export default function App() {
     }
   };
 
+  // 🌟稼働メーターに透視（6号・11号）を追加
   const weeklyStats = useMemo(() => {
-    const stats: Record<string, { total: number, portable: number, ct: number, mri: number }> = {};
-    activeGeneralStaff.forEach(s => { stats[s] = { total: 0, portable: 0, ct: 0, mri: 0 }; });
+    const stats: Record<string, { total: number, portable: number, ct: number, mri: number, room6: number, room11: number }> = {};
+    activeGeneralStaff.forEach(s => { stats[s] = { total: 0, portable: 0, ct: 0, mri: 0, room6: 0, room11: 0 }; });
     
     days.forEach(d => {
       if (d.isPublicHoliday) return;
@@ -649,6 +650,8 @@ export default function App() {
             if (sec === "ポータブル") stats[m].portable += 1;
             if (sec === "CT") stats[m].ct += 1;
             if (sec === "MRI") stats[m].mri += 1;
+            if (sec === "透視（6号）") stats[m].room6 += 1;
+            if (sec === "透視（11号）") stats[m].room11 += 1;
           }
         });
       });
@@ -753,7 +756,7 @@ export default function App() {
   }, [cur, days, customRules, activeGeneralStaff]);
 
   // ==========================================
-  // 👑 自動割当アルゴリズム（完全版・半休バグ修正対応）
+  // 👑 自動割当アルゴリズム（完全版・相組み最適化対応）
   // ==========================================
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
@@ -774,9 +777,8 @@ export default function App() {
       });
       split(dayCells["不在"]).forEach(m => {
         const core = getCoreName(m);
-        // AM不在なら「AMをブロック」、PM不在なら「PMをブロック」
-        if (m.includes("(AM)")) blockMap.set(core, 'AM');
-        else if (m.includes("(PM)")) blockMap.set(core, 'PM');
+        if (m.includes("(AM)")) blockMap.set(core, 'AM'); 
+        else if (m.includes("(PM)")) blockMap.set(core, 'PM'); 
         else blockMap.set(core, 'ALL');
       });
     };
@@ -936,7 +938,6 @@ export default function App() {
       return result;
     }
 
-    // 🌟 半休対応の精密な fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
@@ -975,7 +976,6 @@ export default function App() {
         const hasAmFree = validAvail.some(s => blockMap.get(s) === 'PM');
         const hasPmFree = validAvail.some(s => blockMap.get(s) === 'AM');
         
-        // 🌟 半休の人を最優先にするソート！
         const sortCandidates = (candidates: string[]) => {
            return [...candidates].sort((a, b) => {
                const bA = blockMap.get(a);
@@ -984,13 +984,13 @@ export default function App() {
                let scoreA = 0; let scoreB = 0;
 
                if (needTag === "") {
-                   if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; // 完璧なペア！
-                   else if (bA === 'AM' || bA === 'PM') scoreA += 150; // 単独の半休（必ず優先して枠を与える！）
-                   else if (bA === 'NONE') scoreA += 100; // フルタイム
+                   if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; 
+                   else if (bA === 'AM' || bA === 'PM') scoreA += 150; 
+                   else if (bA === 'NONE') scoreA += 100; 
                } else {
-                   if (needTag === "(AM)" && bA === 'PM') scoreA += 200; // ピッタリの半休
-                   if (needTag === "(PM)" && bA === 'AM') scoreA += 200; // ピッタリの半休
-                   if (bA === 'NONE') scoreA += 100; // フルタイムを割る
+                   if (needTag === "(AM)" && bA === 'PM') scoreA += 200; 
+                   if (needTag === "(PM)" && bA === 'AM') scoreA += 200; 
+                   if (bA === 'NONE') scoreA += 100; 
                }
 
                if (needTag === "") {
@@ -1026,7 +1026,7 @@ export default function App() {
             if (needTag) {
                 tag = needTag;
                 f = 0.5;
-                blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM'); // ★バグ修正箇所！
+                blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM');
             } else {
                 tag = ""; 
                 f = 1;
@@ -1240,11 +1240,8 @@ export default function App() {
           const currentCore = current.map(getCoreName);
           const candidates = availGeneral.filter(name => {
             if (currentCore.includes(name)) return false;
-            
-            // ★ 修正箇所: 午後不在/稼働済の人は遅番に入れない！
             const b = blockMap.get(name);
             if (b === 'ALL' || b === 'PM') return false; 
-            
             if (isForbidden(name, rule.section)) return false;
             if (hasNGPair(name, currentCore, false)) return false;
             return true;
@@ -1515,7 +1512,7 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>在籍スタッフ名簿（一般）</label>
-                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やajま), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やまだ), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
                 <div style={{ fontSize: 11, color: "#10b981", marginTop: 6, fontWeight: 600 }}>※カッコでふりがなを入れると50音順にソートされます！</div>
               </div>
               <div>
@@ -1881,6 +1878,8 @@ export default function App() {
                       {stat.portable > 0 && <span style={{ color: "#ef4444", background: "#fee2e2", padding: "2px 4px", borderRadius: 4 }}>ポ:{stat.portable}</span>}
                       {stat.ct > 0 && <span style={{ color: "#0ea5e9", background: "#e0f2fe", padding: "2px 4px", borderRadius: 4 }}>C:{stat.ct}</span>}
                       {stat.mri > 0 && <span style={{ color: "#10b981", background: "#d1fae5", padding: "2px 4px", borderRadius: 4 }}>M:{stat.mri}</span>}
+                      {stat.room6 > 0 && <span style={{ color: "#8b5cf6", background: "#ede9fe", padding: "2px 4px", borderRadius: 4 }}>6号:{stat.room6}</span>}
+                      {stat.room11 > 0 && <span style={{ color: "#f59e0b", background: "#fef3c7", padding: "2px 4px", borderRadius: 4 }}>11号:{stat.room11}</span>}
                     </div>
                   </div>
                 </div>
