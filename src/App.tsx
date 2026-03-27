@@ -5,7 +5,6 @@ const globalStyle = `
   body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
-  /* 🌟 追加: 入力欄フォーカス時の青枠（視認性アップ） */
   textarea:focus, select:focus, input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
@@ -14,7 +13,6 @@ const globalStyle = `
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   
-  /* 🌟 追加: 曜日タブの追従スタイル（すりガラス風） */
   .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
@@ -652,7 +650,6 @@ export default function App() {
     return Object.entries(stats).sort((a, b) => b[1].total - a[1].total);
   }, [days, activeGeneralStaff]);
 
-  // ★ 優先順位リストの補完処理（古いデータや不足している部屋を自動追加）
   const priorityRoomsList = useMemo(() => {
     const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
     const list = [...base];
@@ -750,7 +747,7 @@ export default function App() {
   }, [cur, days, customRules, activeGeneralStaff]);
 
   // ==========================================
-  // 👑 自動割当アルゴリズム（完全版）
+  // 👑 自動割当アルゴリズム（完全版・半休＆ロック対応）
   // ==========================================
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
@@ -936,15 +933,36 @@ export default function App() {
       return result;
     }
 
+    // 🌟 半休対応の精密な fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
       
+      const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + (m.includes("(AM)") || m.includes("(PM)") || m.match(/\(〜/) || m.match(/〜\)/) ? 0.5 : 1), 0);
+
       let safeCounter = 0;
-      while (current.length < targetCount && safeCounter < 20) {
+      while (getCurrentAmount(current) < targetCount && safeCounter < 20) {
         safeCounter++;
-        const validPreferred = preferredList.filter(name => !isUsed(name) && !isForbidden(name, section) && !current.map(getCoreName).includes(name) && blockMap.get(name) !== 'ALL');
-        const validAvail = availList.filter(name => !isUsed(name) && !isForbidden(name, section) && !current.map(getCoreName).includes(name) && blockMap.get(name) !== 'ALL');
+        const remaining = targetCount - getCurrentAmount(current);
+        
+        let needTag = "";
+        if (remaining === 0.5 || remaining === 1.5 || remaining === 2.5) {
+           const amCount = current.filter(m => m.includes("(AM)")).length;
+           const pmCount = current.filter(m => m.includes("(PM)")).length;
+           if (amCount > pmCount) needTag = "(PM)";
+           if (pmCount > amCount) needTag = "(AM)";
+        }
+
+        const isValidBlock = (name: string) => {
+           const b = blockMap.get(name);
+           if (b === 'ALL') return false;
+           if (needTag === "(PM)" && b === 'PM') return false; 
+           if (needTag === "(AM)" && b === 'AM') return false; 
+           return true;
+        };
+
+        const validPreferred = preferredList.filter(name => !isUsed(name) && !isForbidden(name, section) && !current.map(getCoreName).includes(name) && isValidBlock(name));
+        const validAvail = availList.filter(name => !isUsed(name) && !isForbidden(name, section) && !current.map(getCoreName).includes(name) && isValidBlock(name));
 
         if (validPreferred.length === 0 && validAvail.length === 0) break;
 
@@ -956,11 +974,20 @@ export default function App() {
 
         const block = blockMap.get(core);
         let tag = ""; let f = 1;
-        if (block === 'AM') { tag = "(PM)"; f = 0.5; } 
-        else if (block === 'PM') { tag = "(AM)"; f = 0.5; } 
-        else { tag = ""; f = 1; }
+        if (block === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(core, 'ALL'); } 
+        else if (block === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(core, 'ALL'); } 
+        else { 
+            if (needTag) {
+                tag = needTag;
+                f = 0.5;
+                blockMap.set(core, needTag === "(AM)" ? 'PM' : 'AM');
+            } else {
+                tag = ""; 
+                f = 1;
+                blockMap.set(core, 'ALL');
+            }
+        }
         
-        blockMap.set(core, 'ALL');
         current.push(`${core}${tag}`);
         addU(core, f);
       }
@@ -1030,13 +1057,21 @@ export default function App() {
           }
           dayCells["受付"] = join(currentUketsuke);
         } else {
+          // 🌟 月間担当者の取得と特殊部屋（strictRooms）のロック処理
           let preferredList: string[] = [];
           if (["治療", "RI", "CT", "MRI", "MMG", "透析後胸部"].includes(room)) {
              preferredList = getMonthlyStaffForSection(room).filter(s => availGeneral.includes(s));
           } else if (monthlyAssign[room]) {
              preferredList = split(monthlyAssign[room]).filter(s => availGeneral.includes(s));
           }
-          fill(availGeneral, room, preferredList, targetCount);
+          
+          let candidates = availGeneral;
+          const strictRooms = ["治療", "RI", "MMG", "透析後胸部"];
+          if (strictRooms.includes(room)) {
+             candidates = preferredList; // 月間設定がない人は絶対に入れない
+          }
+          
+          fill(candidates, room, preferredList, targetCount);
 
           const currentAssigned = split(dayCells[room]);
           if (currentAssigned.length === 0) {
@@ -1382,11 +1417,6 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
-          <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
-          <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
-          <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
-          <button className="btn-hover" onClick={handleUndo} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), cursor: history.length === 0 ? "not-allowed" : "pointer"}} disabled={history.length === 0}>↩️ 戻る</button>
-          <div style={{ width: "1px", height: "30px", background: "#e2e8f0", margin: "0 4px" }}></div>
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
@@ -1813,16 +1843,17 @@ export default function App() {
         </details>
       </div>
 
+      {/* 🌟 週間一覧（表ヘッダーの追従化） */}
       <div className="print-area" style={{ ...panelStyle(), marginBottom: 24, padding: "20px 12px" }}>
         <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18, fontWeight: 800, color: "#1e293b", paddingLeft: 8, letterSpacing: "0.02em" }}>週間一覧</h3>
-        <div className="scroll-container">
+        <div className="scroll-container" style={{ maxHeight: "70vh", overflowY: "auto", borderBottom: "1px solid #e2e8f0", borderRadius: 8 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800, background: "#fff" }}>
-            <thead>
+            <thead style={{ position: "sticky", top: 0, zIndex: 20, boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
               <tr>
-                <th style={{...cellStyle(true, false, false, true), minWidth: "100px", borderRight: "2px solid #e2e8f0"}}>区分</th>
+                <th style={{...cellStyle(true, false, false, true), position: "sticky", top: 0, left: 0, zIndex: 30, minWidth: "100px", borderRight: "2px solid #e2e8f0", borderBottom: "2px solid #e2e8f0"}}>区分</th>
                 {days.map(day => {
                   return (
-                    <th key={day.id} style={cellStyle(true, day.isPublicHoliday, day.id === sel)}>
+                    <th key={day.id} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), position: "sticky", top: 0, zIndex: 20, borderBottom: "2px solid #e2e8f0"}}>
                       <div style={{ fontSize: 14, letterSpacing: "0.02em" }}>{day.label}</div>
                       {day.isPublicHoliday && <div style={{ fontSize: 10, color: "#ef4444", marginTop: 4, fontWeight: 600 }}>🎌 {day.holidayName}</div>}
                     </th>
@@ -1847,16 +1878,27 @@ export default function App() {
       </div>
 
       <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
-        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", gap: 6, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 20, alignItems: "center" }}>
-          {days.map(d => {
-            return (
-              <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
-                {d.label} {d.isPublicHoliday && "🎌"}
-              </button>
-            )
-          })}
-          <div style={{ flex: 1 }}></div>
-          <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1", flexShrink: 0 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
+        
+        {/* 🌟 曜日タブとアクションボタンの統合＆追従化 */}
+        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", gap: 10, borderBottom: "2px solid #e2e8f0", paddingBottom: 12, marginBottom: 20, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {days.map(d => {
+              return (
+                <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "12px 12px 0 0", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
+                  {d.label} {d.isPublicHoliday && "🎌"}
+                </button>
+              )
+            })}
+          </div>
+          
+          <div style={{ width: "2px", height: "30px", background: "#e2e8f0", margin: "0 4px", flexShrink: 0 }}></div>
+          
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
+            <button className="btn-hover" onClick={handleAutoOne} style={{...btnStyle("#10b981"), padding: "8px 14px", fontSize: 13}}>✨ 表示日を自動割当</button>
+            <button className="btn-hover" onClick={handleAutoAll} style={{...btnStyle("#0ea5e9"), padding: "8px 14px", fontSize: 13}}>⚡ 全日程を自動割当</button>
+            <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc"), color: "#475569", border: "1px solid #cbd5e1", padding: "8px 14px", fontSize: 13 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
+            <button className="btn-hover" onClick={handleUndo} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), padding: "8px 14px", fontSize: 13, cursor: history.length === 0 ? "not-allowed" : "pointer"}} disabled={history.length === 0}>↩️ 戻る</button>
+          </div>
         </div>
 
         {cur.isPublicHoliday ? (
@@ -1933,14 +1975,6 @@ export default function App() {
                 </div>
               </div>
             ))}
-
-            {/* ★ 下部のアクションボタン */}
-            <div className="no-print" style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", marginTop: 32, paddingTop: 20, borderTop: "2px dashed #cbd5e1", flexWrap: "wrap" }}>
-              <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
-              <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
-              <button className="btn-hover" onClick={handleUndo} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), cursor: history.length === 0 ? "not-allowed" : "pointer"}} disabled={history.length === 0}>↩️ 戻る</button>
-            </div>
-
           </div>
         )}
       </div>
