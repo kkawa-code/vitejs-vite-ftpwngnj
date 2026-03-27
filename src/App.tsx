@@ -143,9 +143,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v119"; 
-const KEY_MONTHLY = "shifto_monthly_v119"; 
-const KEY_RULES = "shifto_rules_v119";
+const KEY_ALL_DAYS = "shifto_alldays_v118"; 
+const KEY_MONTHLY = "shifto_monthly_v118"; 
+const KEY_RULES = "shifto_rules_v118";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -621,7 +621,7 @@ class AutoAssigner {
     const result: string[] = [];
     const uniqueList = Array.from(new Set(list.filter(Boolean)));
     
-    const filterFn = (name: string, isFallback: boolean, checkSoftNg: boolean) => {
+    const filterFn = (name: string, checkSoftNg: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
       const isFixed = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || (section ? isMonthlyMainStaff(section, name, this.ctx.monthlyAssign) : false);
       if (!allowRepeatFromPrev && this.prevDay && section && !isFixed) {
@@ -631,8 +631,8 @@ class AutoAssigner {
       return true;
     };
 
-    for (const name of uniqueList.filter(n => filterFn(n, false, true))) { result.push(name); if (result.length >= n) return result; }
-    for (const name of uniqueList.filter(n => filterFn(n, true, false))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, true))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, false))) { result.push(name); if (result.length >= n) return result; }
     
     const lastResort = uniqueList.filter(name => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
@@ -1011,6 +1011,8 @@ class AutoAssigner {
 
       if (!current.some(m => m.includes(rule.lateTime))) {
         const currentCore = current.map(extractStaffName);
+        
+        // 🌟 修正点：前日の遅番担当者を取得し、連続を防止する
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(extractStaffName) : [];
 
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean) => {
@@ -1019,6 +1021,7 @@ class AutoAssigner {
             const b = this.blockMap.get(name);
             if (b === 'PM') return false; 
             if (this.isForbidden(name, rule.section)) return false;
+            // 🌟 連続防止のチェック
             if (!allowConsecutive && prevLateStaff.includes(name)) return false; 
             return true;
           });
@@ -1029,8 +1032,13 @@ class AutoAssigner {
           return null;
         };
 
+        // 1. 連続にならない人を優先して探す
         let picked = getCandidate(helpMembers, false) || getCandidate(availGeneral, false);
-        if (!picked) picked = getCandidate(helpMembers, true) || getCandidate(availGeneral, true);
+        
+        // 2. どうしてもいない場合は連続を許容して探す（誰もいないよりマシなので）
+        if (!picked) {
+            picked = getCandidate(helpMembers, true) || getCandidate(availGeneral, true);
+        }
 
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
@@ -1519,13 +1527,12 @@ export default function App() {
       const count = split(cells[room]).length;
       const target = dynamicCapacityW[room];
 
-      // 🌟変更点：受付ヘルプの空室警告を「受付が1人の時だけ」に限定
       if (room === "受付ヘルプ") {
         const uketsukeCount = split(cells["受付"]).length;
         if (uketsukeCount === 1 && count === 0) {
           w.push({type: 'alert', msg: `💡【受付ヘルプ】受付が1名のためヘルプの配置を推奨します`});
         }
-        return; // 通常の「空室リスト」には入れない
+        return; 
       }
 
       if (target !== undefined && target > 0) {
@@ -1604,8 +1611,8 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const assigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const updatedDay = assigner.execute();
+      const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const updatedDay: DayData = assigner.execute();
       
       nextAll[updatedDay.id] = updatedDay.cells;
       return nextAll;
@@ -1621,8 +1628,8 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const assigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const updatedDay = assigner.execute();
+        const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const updatedDay: DayData = assigner.execute();
         nextAll[updatedDay.id] = updatedDay.cells;
         prevDayObj = updatedDay;
         tempDays.push(updatedDay);
@@ -1728,7 +1735,7 @@ export default function App() {
 
                 <div style={{ marginTop: 32, paddingTop: 24, borderTop: "2px dashed #cbd5e1" }}>
                   <h5 style={{ margin: "0 0 16px 0", color: "#0ea5e9", fontSize: 24, fontWeight: 800 }}>📅 特定の日だけ枠を追加する（増枠）</h5>
-                  <p style={{ fontSize: 20, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>※「この日のAMだけCTを1人増やす」といったイレギュラーに対応します。</p>
+                  <p style={{ fontSize: 20, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>※「この日のAMだけCTを1人増やす」といったイレギュラーに対応します。基本人数より優先されます。</p>
                   {(customRules.dailyAdditions || []).map((rule: any, idx: number) => (
                     <div key={idx} className="rule-row" style={{ background: "#fff", padding: "16px 24px", border: "2px solid #bae6fd", borderRadius: 12 }}>
                       <input type="date" value={rule.date} onChange={e => updateRule("dailyAdditions", idx, "date", e.target.value)} className="rule-sel" style={{ flex: "0 0 240px", padding: "14px 16px", borderColor: "#7dd3fc" }} />
@@ -2296,7 +2303,7 @@ export default function App() {
                     Object.entries(d.cells).forEach(([sec, val]) => {
                       if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
                       const members = split(val as string);
-                      const myAssign = members.find(m => getCoreName(m) === selectedStaffForStats);
+                      const myAssign = members.find(m => extractStaffName(m) === selectedStaffForStats);
                       if (myAssign) {
                          const timeStr = myAssign.substring(selectedStaffForStats.length);
                          assigns.push(`${sec}${timeStr}`);
