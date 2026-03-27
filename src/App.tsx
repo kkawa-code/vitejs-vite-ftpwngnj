@@ -1,54 +1,43 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 
-// ==========================================
-// 🎨 グローバルCSS＆デザイン（モダンSaaS風）
-// ==========================================
 const globalStyle = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  body { margin: 0; background: #f8fafc; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; overflow-x: hidden; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1em; padding-right: 2.5rem; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
-  details > summary:hover { color: #2563eb; }
+  details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
-  
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
-  /* 🌟 追従ヘッダーのデザインを強化し、折り返し対応に */
-  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(248, 250, 252, 0.85); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; marginBottom: 20px; }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
-  
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; filter: brightness(1.05); }
+  .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
-  
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
-  
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  
-  .rule-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02); }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; width: 100%; }
-  .rule-sel { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 13px; color: #334155; background-color: #f8fafc; flex: 1 1 120px; min-width: 110px; transition: all 0.2s; }
-  .rule-sel:hover { border-color: #94a3b8; }
-  .rule-num { width: 60px; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; font-size: 14px; background-color: #f8fafc; }
-  .rule-del { border: none; background: #fee2e2; color: #ef4444; border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: 0.2s; }
-  .rule-del:hover { background: #fecaca; }
-  .rule-add { background: #f8fafc; color: #4f46e5; border: 1px dashed #cbd5e1; padding: 10px 16px; font-size: 13px; width: 100%; display: flex; justify-content: center; font-weight: 700; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
-  .rule-add:hover { background: #e0e7ff; border-color: #818cf8; color: #3730a3; }
-  .rule-label { font-size: 13px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; width: 100%; }
+  .rule-sel { padding: 6px 24px 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 110px; min-width: 100px; transition: border-color 0.2s; }
+  .rule-num { width: 50px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 16px; flex-shrink: 0; padding: 0 4px; transition: 0.2s; }
+  .rule-del:hover { background: #fee2e2; border-radius: 4px; }
+  .rule-add { background: #fff; color: #4f46e5; border: 1px dashed #a5b4fc; padding: 6px 12px; font-size: 12px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
+  .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
+  .rule-label { font-size: 12px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
 
   @media print {
-    body { background: #fff; } .no-print { display: none !important; }
+    body { background: #fff; overflow: visible; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed; }
     tr { page-break-inside: avoid; }
@@ -56,9 +45,6 @@ const globalStyle = `
   }
 `;
 
-// ==========================================
-// ⚙️ 定数・型定義
-// ==========================================
 type RenderGroup = { title: string; color: string; sections: string[] };
 
 const SECTIONS = [
@@ -98,14 +84,14 @@ const DEFAULT_RULES = {
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   kenmuPairs: [], 
-  lateShifts: [], // 🌟 デフォルト遅番なし
+  lateShifts: [], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v108"; 
-const KEY_MONTHLY = "shifto_monthly_v108"; 
-const KEY_RULES = "shifto_rules_v108";
+const KEY_ALL_DAYS = "shifto_alldays_v109"; 
+const KEY_MONTHLY = "shifto_monthly_v109"; 
+const KEY_RULES = "shifto_rules_v109";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -126,9 +112,7 @@ const RENDER_GROUPS: RenderGroup[] = [
   { title: "待機", color: "#f59e0b", sections: ["待機","透析後胸部"] }
 ];
 
-// ==========================================
-// 🛠️ ヘルパー関数群
-// ==========================================
+// ============== 🌟 ヘルパー関数群 ==============
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDayForDisplay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
@@ -166,14 +150,12 @@ const isMonthlyMainStaff = (section: string, name: string, monthlyAssign: Record
   return getMonthlyStaffForSection(section, monthlyAssign).includes(name);
 };
 
-// ==========================================
-// 🎨 UIスタイリング関数
-// ==========================================
+// ============== 🌟 UIスタイリング関数 ==============
 function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { 
-  return { background: bg, color: color, border: "none", borderRadius: "8px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
+  return { background: bg, color: color, border: "none", borderRadius: "10px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
 }
 function panelStyle(): React.CSSProperties { 
-  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)", width: "100%", boxSizing: "border-box" }; 
+  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)", width: "100%", boxSizing: "border-box" }; 
 }
 function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
@@ -182,9 +164,7 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
   return { border: "1px solid #e2e8f0", padding: "12px", background: bg, fontWeight: isHeader ? 800 : 500, textAlign: isHeader ? "center" : "left", fontSize: 13, minWidth: isHeader && !isSticky ? "100px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 5px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
-// ==========================================
-// 🧩 汎用コンポーネント
-// ==========================================
+// ============== 🌟 UIコンポーネント ==============
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
   const handleAdd = (sec: string) => { if (sec && !current.includes(sec)) onChange(join([...current, sec])); };
@@ -343,8 +323,8 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   };
 
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
-      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 12, letterSpacing: "0.02em" }}>{section}</label>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
+      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = getCoreName(m);
@@ -384,7 +364,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </div>
           )
         })}
-        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "6px 28px 6px 8px" }}>
+        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 28px 4px 8px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">
             {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
@@ -1023,8 +1003,13 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
 
         const getHelp = (exclude: string[]) => {
-          let cand = availGeneral.filter(n => !exclude.includes(n) && !helpMems.map(getCoreName).includes(n) && blockMap.get(n) !== 'ALL' && !isForbidden(n, "受付ヘルプ"));
+          // 🌟 修正: blockMap.get(n) !== 'ALL' の条件を撤廃。フルタイムの人も昼当番以外なら受付ヘルプ12:15〜に入れるようにする。
+          let cand = availGeneral.filter(n => !exclude.includes(n) && !helpMems.map(getCoreName).includes(n) && !isForbidden(n, "受付ヘルプ"));
           if (cand.length > 0) { cand.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0)); return cand[0]; }
+          
+          let cand2 = availGeneral.filter(n => !helpMems.map(getCoreName).includes(n) && !isForbidden(n, "受付ヘルプ"));
+          if (cand2.length > 0) { cand2.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0)); return cand2[0]; }
+          
           return null; 
         };
 
@@ -1333,7 +1318,7 @@ export default function App() {
 
   const weeklyStats = useMemo(() => {
     const stats: Record<string, { total: number, portable: number, ct: number, mri: number, room6: number, room11: number }> = {};
-    activeGeneralStaff.forEach(s => { stats[s] = { total: 0, portable: 0, ct: 0, mri: 0, room6: 0, room11: 0 }; });
+    activeGeneralStaff.forEach(s => { stats[s] = { total: number, portable: 0, ct: 0, mri: 0, room6: 0, room11: 0 }; });
     
     days.forEach(d => {
       if (d.isPublicHoliday) return;
@@ -1486,13 +1471,13 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 16px", width: "100%", overflowX: "hidden" }}>
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
       <style>{globalStyle}</style>
       
-      {/* 🌟 ヘッダー */}
-      <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
+      <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
+          <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: 13, fontWeight: 600 }}>現場のルールに基づき、自動で最適な人員配置を行います。</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1505,13 +1490,13 @@ export default function App() {
         </div>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, padding: "12px 20px" }}>
+      <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, padding: "16px 24px" }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#be185d", fontSize: 15, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
             <span>📱</span> スマホ・PC間のデータ連携（テキストのコピー＆復元）を開く
           </summary>
-          <div style={{ marginTop: 12, paddingTop: 16, borderTop: "2px dashed #fbcfe8" }}>
-            <p style={{ fontSize: 12, color: "#9d174d", marginBottom: 12, fontWeight: 600 }}>
+          <div style={{ marginTop: 12, paddingTop: 16, borderTop: "1px dashed #e2e8f0" }}>
+            <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>
               Android等でファイルが保存・選択できない場合、以下のボタンでデータをコピーし、LINE等でスマホに送ってください。<br/>
               スマホ側でその文字を下の枠に貼り付けて「復元」を押せばデータを移行できます。
             </p>
@@ -1524,7 +1509,7 @@ export default function App() {
         </details>
       </div>
 
-      {/* 🌟 1つのアコーディオンにまとめた元のレイアウト（色はオリジナル） */}
+      {/* 🌟 元の使いやすい「1つのアコーディオンにまとまったUI」 */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#0f766e", padding: "4px", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
@@ -1790,7 +1775,7 @@ export default function App() {
                 <button className="rule-add" style={{color:"#c2410c", borderColor:"#fdba74"}} onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })}>＋ 代打ルールを追加</button>
               </div>
 
-              <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca", gridColumn: "1 / -1" }}>
+              <div style={{ background: "#fef2f2", padding: 16, borderRadius: 12, border: "1px solid #fecaca" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#b91c1c", fontSize: 14, fontWeight: 800 }}>🚫 NGペア</h4>
                 {(customRules.ngPairs || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row">
@@ -1806,7 +1791,7 @@ export default function App() {
                 <button className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}} onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })}>＋ 追加</button>
               </div>
 
-              <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
+              <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🔒 専従（必ずここに配置）</h4>
                 {(customRules.fixed || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row">
@@ -1818,7 +1803,7 @@ export default function App() {
                 <button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("fixed", { staff: "", section: "" })}>＋ 追加</button>
               </div>
 
-              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", gridColumn: "1 / -1" }}>
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1" }}>
                 <h4 style={{ margin: "0 0 12px 0", color: "#475569", fontSize: 14, fontWeight: 800 }}>🙅 担当不可（複数選択可）</h4>
                 {(customRules.forbidden || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
@@ -1998,8 +1983,8 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
         
         {/* 🌟 曜日タブとアクションボタンの統合＆追従化 */}
-        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "center", borderBottom: "none", marginBottom: 0 }}>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6 }}>
             {days.map(d => {
               return (
                 <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "10px", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
@@ -2008,7 +1993,10 @@ export default function App() {
               )
             })}
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          
+          <div style={{ width: "2px", height: "30px", background: "#e2e8f0", margin: "0 4px", flexShrink: 0 }}></div>
+          
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
             <button className="btn-hover" onClick={handleAutoOne} style={{...btnStyle("#10b981"), padding: "10px 16px", fontSize: 13}}>✨ 表示日を自動割当</button>
             <button className="btn-hover" onClick={handleAutoAll} style={{...btnStyle("#0ea5e9"), padding: "10px 16px", fontSize: 13}}>⚡ 全日程を自動割当</button>
             <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "1px solid #cbd5e1", padding: "10px 16px", fontSize: 13 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
