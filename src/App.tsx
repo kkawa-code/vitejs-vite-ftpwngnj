@@ -7,13 +7,13 @@ const globalStyle = `
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
-  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
+  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 16px; margin-top: -16px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
@@ -24,14 +24,14 @@ const globalStyle = `
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; width: 100%; }
-  .rule-sel { padding: 8px 28px 8px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 110px; min-width: 100px; transition: border-color 0.2s; }
-  .rule-num { width: 56px; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 18px; flex-shrink: 0; padding: 0 6px; transition: 0.2s; }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: center; width: 100%; }
+  .rule-sel { padding: 10px 32px 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 120px; min-width: 120px; font-size: 16px; transition: border-color 0.2s; }
+  .rule-num { width: 64px; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 16px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 20px; flex-shrink: 0; padding: 0 8px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 4px; }
-  .rule-add { background: #fff; color: #4f46e5; border: 1px dashed #a5b4fc; padding: 8px 14px; font-size: 14px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
+  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 10px 16px; font-size: 16px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
-  .rule-label { font-size: 14px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  .rule-label { font-size: 16px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
@@ -41,7 +41,7 @@ const globalStyle = `
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed; }
     tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #000 !important; padding: 8px !important; font-size: 12pt !important; color: #000 !important; position: static !important; max-width: 150px; word-break: break-all; }
+    th, td { border: 1px solid #000 !important; padding: 10px !important; font-size: 14pt !important; color: #000 !important; position: static !important; max-width: 150px; word-break: break-all; }
   }
 `;
 
@@ -141,16 +141,16 @@ const isMonthlyMainStaff = (section: string, name: string, monthlyAssign: Record
 };
 
 function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { 
-  return { background: bg, color: color, border: "none", borderRadius: "10px", padding: "12px 18px", cursor: "pointer", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
+  return { background: bg, color: color, border: "none", borderRadius: "10px", padding: "12px 20px", cursor: "pointer", fontWeight: 700, fontSize: 16, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
 }
 function panelStyle(): React.CSSProperties { 
-  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)", width: "100%", boxSizing: "border-box" }; 
+  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "24px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)", width: "100%", boxSizing: "border-box" }; 
 }
 function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
   if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; 
   else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); 
-  return { border: "1px solid #e2e8f0", padding: "14px", background: bg, fontWeight: isHeader ? 800 : 500, textAlign: isHeader ? "center" : "left", fontSize: 15, minWidth: isHeader && !isSticky ? "110px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 5px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
+  return { border: "1px solid #e2e8f0", padding: "16px", background: bg, fontWeight: isHeader ? 800 : 500, textAlign: isHeader ? "center" : "left", fontSize: 16, minWidth: isHeader && !isSticky ? "130px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 5px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
@@ -159,13 +159,13 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, alignItems: "center" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10, alignItems: "center" }}>
       {current.map((sec, i) => (
-        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 16, padding: "6px 12px", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, border: "1px solid #bae6fd" }}>
+        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 16, padding: "8px 14px", fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, border: "1px solid #bae6fd" }}>
           {sec} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
         </div>
       ))}
-      <select className="rule-sel" style={{ padding: "6px 24px 6px 8px", fontSize: 14, minWidth: 100, flex: "0 0 auto", height: 30 }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "8px 24px 8px 12px", fontSize: 15, minWidth: 120, flex: "0 0 auto", height: 36 }} onChange={(e) => handleAdd(e.target.value)} value="">
         <option value="">＋追加</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -179,13 +179,13 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
       {current.map((name, i) => (
-        <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 16, padding: "6px 12px", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, border: "1px solid #cbd5e1" }}>
+        <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 16, padding: "8px 14px", fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, border: "1px solid #cbd5e1" }}>
           {name} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
         </div>
       ))}
-      <select className="rule-sel" style={{ padding: "6px 24px 6px 8px", fontSize: 14, minWidth: 100, flex: "0 0 auto", height: 30 }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "8px 24px 8px 12px", fontSize: 15, minWidth: 120, flex: "0 0 auto", height: 36 }} onChange={(e) => handleAdd(e.target.value)} value="">
         <option value="">{placeholder}</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -233,20 +233,20 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
 
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "1px solid #bfdbfe", padding: "10px 16px", fontSize: 15 }}>
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "1px solid #bfdbfe", padding: "12px 20px", fontSize: 16 }}>
         📅 {targetMonday} の週 ▼
       </button>
       {isOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setIsOpen(false)}></div>
-          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "1px solid #cbd5e1", borderRadius: 16, padding: 20, zIndex: 50, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)", minWidth: 320 }}>
+          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "1px solid #cbd5e1", borderRadius: 16, padding: 24, zIndex: 50, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)", minWidth: 340 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <button onClick={handlePrev} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "8px 16px", cursor: "pointer", color: "#475569", fontWeight: "bold", fontSize: 15 }}>◀</button>
+              <button onClick={handlePrev} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "8px 16px", cursor: "pointer", color: "#475569", fontWeight: "bold", fontSize: 16 }}>◀</button>
               <div style={{ fontWeight: 800, fontSize: 18, color: "#1e293b", letterSpacing: "0.05em" }}>{year}年 {month}月</div>
-              <button onClick={handleNext} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "8px 16px", cursor: "pointer", color: "#475569", fontWeight: "bold", fontSize: 15 }}>▶</button>
+              <button onClick={handleNext} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "8px 16px", cursor: "pointer", color: "#475569", fontWeight: "bold", fontSize: 16 }}>▶</button>
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 16 }}>
-              <thead><tr><th style={{ color: "#ef4444", padding: 8, fontWeight: 700 }}>日</th><th style={{ padding: 8, fontWeight: 700 }}>月</th><th style={{ padding: 8, fontWeight: 700 }}>火</th><th style={{ padding: 8, fontWeight: 700 }}>水</th><th style={{ padding: 8, fontWeight: 700 }}>木</th><th style={{ padding: 8, fontWeight: 700 }}>金</th><th style={{ color: "#3b82f6", padding: 8, fontWeight: 700 }}>土</th></tr></thead>
+              <thead><tr><th style={{ color: "#ef4444", padding: 10, fontWeight: 700 }}>日</th><th style={{ padding: 10, fontWeight: 700 }}>月</th><th style={{ padding: 10, fontWeight: 700 }}>火</th><th style={{ padding: 10, fontWeight: 700 }}>水</th><th style={{ padding: 10, fontWeight: 700 }}>木</th><th style={{ padding: 10, fontWeight: 700 }}>金</th><th style={{ color: "#3b82f6", padding: 10, fontWeight: 700 }}>土</th></tr></thead>
               <tbody>
                 {weeks.map((w, wIdx) => {
                   const isSelectedWeek = w.some(d => {
@@ -274,7 +274,7 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
                         return (
                           <td key={dIdx} style={{ padding: 12, color, fontWeight: isHoliday ? 800 : 500, position: "relative" }} title={holidayName || ""}>
                             {d}
-                            {isHoliday && <div style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, background: "#ef4444", borderRadius: "50%" }}></div>}
+                            {isHoliday && <div style={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", width: 5, height: 5, background: "#ef4444", borderRadius: "50%" }}></div>}
                           </td>
                         );
                       })}
@@ -311,8 +311,8 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   };
 
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
-      <label style={{ fontSize: 15, fontWeight: 800, color: "#475569", marginBottom: 10, letterSpacing: "0.02em" }}>{section}</label>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
+      <label style={{ fontSize: 16, fontWeight: 800, color: "#475569", marginBottom: 12, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = getCoreName(m);
@@ -320,13 +320,13 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
           
           return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 16, padding: "4px 10px 4px 12px", fontSize: 14, display: "flex", alignItems: "center", gap: 4, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
+            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 16, padding: "6px 12px 6px 14px", fontSize: 15, display: "flex", alignItems: "center", gap: 6, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
               <span style={{ userSelect: "none" }}>{coreName}</span>
               {!noTime && (
                 <select 
                   value={currentMod} 
                   onChange={(e) => handleTimeChange(i, e.target.value)}
-                  style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 13, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 18px 0 2px" }}
+                  style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 14, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 20px 0 4px" }}
                 >
                   <option value="">終日</option>
                   {!isTaiki && <option value="(AM)">AM</option>}
@@ -352,7 +352,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </div>
           )
         })}
-        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 14, color: "#64748b", flex: 1, minWidth: 100, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "6px 28px 6px 10px" }}>
+        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 15, color: "#64748b", flex: 1, minWidth: 110, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "8px 28px 8px 12px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">
             {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
@@ -1472,7 +1472,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px", width: "100%", boxSizing: "border-box", overflowX: "hidden" }}>
+    <div style={{ maxWidth: 1600, margin: "0 auto", padding: "20px", width: "100%", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{globalStyle}</style>
       
       {/* 🌟 ヘッダー */}
@@ -1519,7 +1519,7 @@ export default function App() {
           </summary>
           <div style={{ paddingTop: 20, borderTop: "2px dashed #e2e8f0", marginTop: 16 }}>
             
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 15, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>在籍スタッフ名簿（一般）</label>
                 <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やまだ), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 16, lineHeight: 1.5 }} />
@@ -1537,7 +1537,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24, marginBottom: 20 }}>
               
               <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 16, fontWeight: 800 }}>👥 絶対優先の人数設定（自動割当用）</h4>
@@ -1635,7 +1635,7 @@ export default function App() {
                 <h4 style={{ margin: "0 0 10px 0", color: "#15803d", fontSize: 16, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
                 <p style={{ fontSize: 14, color: "#166534", marginBottom: 12, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
-                  <div style={{ flex: 1, minWidth: "200px" }}>
+                  <div style={{ flex: 1, minWidth: "220px" }}>
                     <label style={{ fontSize: 14, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>対象スタッフ名（複数可）</label>
                     <div style={{ background: "#fff", padding: "6px", borderRadius: 8, border: "1px solid #86efac", minHeight: "34px", display: "flex", alignItems: "center" }}>
                       <MultiStaffPicker 
@@ -1646,7 +1646,7 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  <div style={{ flex: 2, minWidth: "250px" }}>
+                  <div style={{ flex: 2, minWidth: "260px" }}>
                     <label style={{ fontSize: 14, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>優先する対象部屋</label>
                     <MultiSectionPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={v => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
                   </div>
@@ -1660,7 +1660,7 @@ export default function App() {
                   <input type="number" min="0" value={customRules.lunchBaseCount ?? 3} onChange={e => setCustomRules({...customRules, lunchBaseCount: Number(e.target.value)})} style={{ width: 50, padding: "6px", borderRadius: 6, border: "1px solid #a5b4fc", textAlign: "center", fontWeight: 800, color: "#4f46e5", fontSize: 16 }} />
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-                  <div style={{ flex: 1, minWidth: "260px", background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                  <div style={{ flex: 1, minWidth: "280px", background: "#fff", padding: 16, borderRadius: 10, border: "1px solid #e0e7ff" }}>
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 15, color: "#4f46e5", fontWeight: 800 }}>📅 曜日で人数を変える</h5>
                     {(customRules.lunchSpecialDays || []).map((rule: any, idx: number) => (
                       <div key={idx} className="rule-row">
@@ -1674,7 +1674,7 @@ export default function App() {
                     ))}
                     <button className="rule-add" onClick={() => addRule("lunchSpecialDays", { day: "火", count: 4 })}>＋ 曜日ルールを追加</button>
                   </div>
-                  <div style={{ flex: 1, minWidth: "260px", background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                  <div style={{ flex: 1, minWidth: "280px", background: "#fff", padding: 16, borderRadius: 10, border: "1px solid #e0e7ff" }}>
                     <h5 style={{ margin: "0 0 10px 0", fontSize: 15, color: "#4f46e5", fontWeight: 800 }}>⚖️ 条件付き選出（特定部屋が多い時）</h5>
                     {(customRules.lunchConditional || []).map((rule: any, idx: number) => (
                       <div key={idx} className="rule-row">
@@ -1692,11 +1692,11 @@ export default function App() {
                 </div>
                 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16 }}>
-                  <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                  <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff", minWidth: "280px" }}>
                     <h5 style={{ margin: "0 0 6px 0", fontSize: 15, color: "#4f46e5", fontWeight: 800 }}>🎯 優先的に選出する部屋</h5>
                     <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={v => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} />
                   </div>
-                  <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff" }}>
+                  <div style={{ flex: 1, background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #e0e7ff", minWidth: "280px" }}>
                     <h5 style={{ margin: "0 0 6px 0", fontSize: 15, color: "#4f46e5", fontWeight: 800 }}>⚠️ 緊急時のみ選出する部屋（なるべく除外）</h5>
                     <MultiSectionPicker selected={customRules.lunchLastResortSections ?? "治療"} onChange={v => setCustomRules({...customRules, lunchLastResortSections: v})} options={ROOM_SECTIONS} />
                   </div>
@@ -1713,12 +1713,12 @@ export default function App() {
                       <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <span className="rule-label" style={{color:"#6d28d9"}}>に</span>
-                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 110px"}}>
+                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 120px"}}>
                       <option value="">遅番の時間</option>
                       {TIME_OPTIONS.filter(t => t.includes("〜)")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                     </select>
                     <span className="rule-label" style={{color:"#6d28d9"}}>の担当を追加する（日勤は</span>
-                    <select value={rule.dayEndTime} onChange={e => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 110px"}}>
+                    <select value={rule.dayEndTime} onChange={e => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 120px"}}>
                       <option value="">日勤の終了時間</option>
                       {TIME_OPTIONS.filter(t => t.includes("(〜")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                     </select>
@@ -1758,16 +1758,16 @@ export default function App() {
                 {(customRules.substitutes || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center", background: "#fff", padding: "14px", borderRadius: 8, border: "1px solid #fdba74", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
                     
-                    <div style={{ flex: 1, minWidth: "150px" }}>
+                    <div style={{ flex: 1, minWidth: "160px" }}>
                       <MultiStaffPicker selected={rule.target} onChange={v => updateRule("substitutes", idx, "target", v)} options={activeGeneralStaff} placeholder="対象スタッフ(休)" />
                     </div>
                     
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#c2410c" }}>が全員休みの時➔</span>
-                    <div style={{ flex: 1, minWidth: "180px" }}>
+                    <div style={{ flex: 1, minWidth: "200px" }}>
                       <MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" />
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#c2410c" }}>を</span>
-                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c", flex: "0 0 120px"}}>
+                    <select value={rule.section} onChange={e => updateRule("substitutes", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fed7aa", color: "#c2410c", flex: "0 0 130px"}}>
                       <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#c2410c" }}>に優先</span>
@@ -1784,7 +1784,7 @@ export default function App() {
                     <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                     <span className="rule-label">と</span>
                     <select value={rule.s2} onChange={e => updateRule("ngPairs", idx, "s2", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5", color:"#b91c1c", flex:"0 0 auto", minWidth:"120px"}}>
+                    <select value={rule.level || "hard"} onChange={e => updateRule("ngPairs", idx, "level", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5", color:"#b91c1c", flex:"0 0 auto", minWidth:"130px"}}>
                       <option value="hard">絶対NG</option><option value="soft">なるべくNG</option>
                     </select>
                     <button onClick={() => removeRule("ngPairs", idx)} className="rule-del">✖</button>
