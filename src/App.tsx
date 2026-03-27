@@ -61,16 +61,15 @@ const MONTHLY_CATEGORIES = [
 const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "", 透析後胸部: "" };
 
-// 🌟 デフォルトの優先順位リスト
 const DEFAULT_PRIORITY_ROOMS = [
   "受付", "治療", "CT", "MRI", "RI", "ポータブル", "2号室", "5号室", 
-  "透視（6号）", "透視（11号）", "MMG", "1号室", "3号室", "DSA", "検像", "骨塩", "パノラマCT", "透析後胸部"
+  "透視（6号）", "透視（11号）", "MMG", "1号室", "3号室", "DSA", "検像", "骨塩", "パノラマCT", "透析後胸部", "受付ヘルプ"
 ];
 
 const DEFAULT_RULES = { 
   staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "1号室,2号室,5号室,パノラマCT", customHolidays: "", 
   capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1, 受付: 2 }, 
-  priorityRooms: DEFAULT_PRIORITY_ROOMS, // 優先順位データ
+  priorityRooms: DEFAULT_PRIORITY_ROOMS, 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
@@ -645,8 +644,14 @@ export default function App() {
     return Object.entries(stats).sort((a, b) => b[1].total - a[1].total);
   }, [days, activeGeneralStaff]);
 
+  // ★ 優先順位リストの補完処理（古いデータや不足している部屋を自動追加）
   const priorityRoomsList = useMemo(() => {
-    return customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS;
+    const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
+    const list = [...base];
+    ROOM_SECTIONS.forEach(r => {
+      if (!list.includes(r)) list.push(r);
+    });
+    return list;
   }, [customRules.priorityRooms]);
 
   const warnings = useMemo(() => {
@@ -742,7 +747,6 @@ export default function App() {
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
-    // 1. 前処理（入りの翌日を明けに）
     if (prevDay && prevDay.cells["入り"]) {
       const iriMembers = split(prevDay.cells["入り"]).map(getCoreName);
       const currentAke = split(dayCells["明け"]);
@@ -751,7 +755,6 @@ export default function App() {
 
     if (day.isPublicHoliday) return { ...day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])) };
 
-    // 2. BlockMap構築（AM/PMの半休対応）
     const blockMap = new Map<string, string>();
     const buildBlockMap = () => {
       allStaff.forEach(s => blockMap.set(s, 'NONE'));
@@ -767,7 +770,6 @@ export default function App() {
     };
     buildBlockMap();
 
-    // 各種チェック関数
     const isForbidden = (staff: string, section: string) => (customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
     const hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => members.some(member => (customRules.ngPairs || []).some((ng: any) => {
       const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate);
@@ -777,14 +779,12 @@ export default function App() {
       return false;
     }));
 
-    // ★ 担当不可（NG）の多さを計算
     const getForbiddenCount = (staffName: string) => {
       const rules = customRules.forbidden || [];
       const rule = rules.find((r: any) => r.staff === staffName);
       return rule ? split(rule.sections).length : 0;
     };
 
-    // 3. 緊急ルールの評価（兼務の計画、定員変更、クリア）
     let skipSections: string[] = [];
     let roleAssignments: Record<string, any> = {};
     let currentKenmu: any[] = [];
@@ -799,14 +799,13 @@ export default function App() {
           if (em.type === "change_capacity" && em.section) { dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); }
           if (em.type === "kenmu") { 
             currentKenmu.push(em); 
-            if (em.s2) skipSections.push(em.s2); // 計画的兼務先は一旦ロック
+            if (em.s2) skipSections.push(em.s2);
           }
         }
       });
     };
     evaluateEmergencies();
 
-    // 4. 実績集計とスタッフのソート
     const assignCounts: Record<string, number> = {};
     const maxAssigns: Record<string, number> = {};
     const counts: Record<string, number> = {};
@@ -848,18 +847,17 @@ export default function App() {
     
     const shuffledStaff = shuffleArray(allStaff);
     
-    // 👑 制約が厳しい人を最優先にするソート
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aBlock = blockMap.get(a) !== 'NONE';
       const bBlock = blockMap.get(b) !== 'NONE';
-      if (aBlock && !bBlock) return -1; // 半休優先
+      if (aBlock && !bBlock) return -1; 
       if (!aBlock && bBlock) return 1;
 
       const aForbidCount = getForbiddenCount(a);
       const bForbidCount = getForbiddenCount(b);
-      if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount; // NGが多い人を前へ！
+      if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount;
 
-      if (counts[a] !== counts[b]) return counts[a] - counts[b]; // 今週の回数が少ない人を前へ
+      if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
       return 0; 
     });
     
@@ -868,7 +866,6 @@ export default function App() {
     const effectiveReceptionStaff = activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff;
     const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s) && !supportStaffList.includes(s));
 
-    // --- ヘルパー関数 ---
     function pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false) {
       const result: string[] = [];
       const uniqueList = Array.from(new Set(list.filter(Boolean)));
@@ -970,11 +967,7 @@ export default function App() {
       return staff.map(getCoreName);
     };
 
-    // ==========================================
-    // 5. 部屋埋め（👑 優先順位＆トリアージ版）
-    // ==========================================
     const assignRooms = () => {
-      // (1) 強制ルール（専従）
       (customRules.fixed || []).forEach((rule: any) => {
         if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
         if (skipSections.includes(rule.section)) return;
@@ -991,7 +984,6 @@ export default function App() {
         addU(rule.staff, f);
       });
 
-      // (2) ロール割り当て
       Object.values(roleAssignments).forEach((ra: any) => {
         if (skipSections.includes(ra.section)) return;
         const candidates = split(monthlyAssign[ra.role] || "");
@@ -1008,16 +1000,10 @@ export default function App() {
         }
       });
 
-      // 🌟 新ルール：UIで設定した【絶対に必要な部屋】の優先順位リスト
-      const basePriority = customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS;
-      const PRIORITY_LIST = [...basePriority];
-      // リストにない部屋（ユーザーが新しく追加した場合など）を末尾に追加
-      ROOM_SECTIONS.forEach(rs => {
-         if (!PRIORITY_LIST.includes(rs)) PRIORITY_LIST.push(rs);
-      });
+      const PRIORITY_LIST = [...priorityRoomsList];
 
       PRIORITY_LIST.forEach(room => {
-        if (skipSections.includes(room)) return; // 兼務先などでロックされていればスキップ
+        if (skipSections.includes(room)) return;
 
         const targetCount = dynamicCapacity[room] !== undefined ? dynamicCapacity[room] : 1;
 
@@ -1036,7 +1022,6 @@ export default function App() {
           }
           dayCells["受付"] = join(currentUketsuke);
         } else {
-          // (3) 通常の専任スタッフの割り当て（月間担当を優先）
           let preferredList: string[] = [];
           if (["治療", "RI", "CT", "MRI", "MMG", "透析後胸部"].includes(room)) {
              preferredList = getMonthlyStaffForSection(room).filter(s => availGeneral.includes(s));
@@ -1045,23 +1030,19 @@ export default function App() {
           }
           fill(availGeneral, room, preferredList, targetCount);
 
-          // 🌊 (4) 段階的兼務フォールバック（人が尽きて空室になった場合、自動的に兼務を発動）
           const currentAssigned = split(dayCells[room]);
           if (currentAssigned.length === 0) {
-            // UIで設定された emergencies (type="kenmu") を探し、兼務先がこの部屋に該当するかチェック
             const kenmuRule = (customRules.emergencies || []).find((em: any) => em.type === "kenmu" && em.s2 === room);
-            
             if (kenmuRule && kenmuRule.s1) {
               const sourceStaff = split(dayCells[kenmuRule.s1]);
               if (sourceStaff.length > 0) {
-                // 兼務元から、遅番などの時間制限がない、かつNG指定されていない人を1名探す
                 const allowed = sourceStaff.filter(m => {
                    if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
                    return !isForbidden(getCoreName(m), room);
                 }).map(getCoreName);
 
                 if (allowed.length > 0) {
-                  dayCells[room] = allowed[0]; // 名前だけをコピーして兼務完了
+                  dayCells[room] = allowed[0]; 
                 }
               }
             }
@@ -1069,7 +1050,6 @@ export default function App() {
         }
       });
 
-      // 🚑 計画的兼務の適用（しきい値に達して事前にロックされた部屋の処理）
       currentKenmu.forEach((km: any) => {
         const p1 = split(dayCells[km.s1]);
         if (p1.length > 0 && skipSections.includes(km.s2)) { 
@@ -1083,7 +1063,6 @@ export default function App() {
         }
       });
       
-      // 玉突き・同室回避ルールの処理
       (customRules.pushOuts || []).forEach((po: any) => {
         const s1 = po.s1 || po.triggerStaff;
         const s2 = po.s2 || po.targetStaff;
@@ -1120,7 +1099,6 @@ export default function App() {
         }
       });
 
-      // 代打ルールの処理
       (customRules.substitutes || []).forEach((sub: any) => {
         const targets = split(sub.target);
         if (targets.length === 0 || skipSections.includes(sub.section)) return; 
@@ -1148,9 +1126,6 @@ export default function App() {
     };
     assignRooms();
 
-    // ==========================================
-    // 6. 後処理（遅番、サポート2人目、昼当番など）
-    // ==========================================
     const processPostTasks = () => {
       let helpMembers: string[] = [];
       const tempAvailCountForHelp = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
@@ -1494,21 +1469,21 @@ export default function App() {
                 <h4 style={{ margin: "0 0 10px 0", color: "#b45309", fontSize: 14, fontWeight: 800 }}>👑 部屋の割り当て優先順位（上から順に埋めます）</h4>
                 <p style={{ fontSize: 12, color: "#d97706", marginBottom: 12, fontWeight: 600 }}>人が足りない場合、優先順位が低い（下にある）部屋から空室になり、自動的に兼務扱いになります。</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {(customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS).map((room: string, idx: number, arr: string[]) => (
+                  {priorityRoomsList.map((room: string, idx: number, arr: string[]) => (
                     <div key={room} style={{ display: "flex", alignItems: "center", background: "#fff", padding: "4px 8px", borderRadius: 8, border: "1px solid #fcd34d", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
                       <span style={{ fontSize: 12, fontWeight: 800, color: "#92400e", marginRight: 8, minWidth: 20 }}>{idx + 1}.</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#b45309", marginRight: 8 }}>{room}</span>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <button onClick={() => {
                           setCustomRules((prev: any) => {
-                            const newArr = [...(prev.priorityRooms || DEFAULT_PRIORITY_ROOMS)];
+                            const newArr = [...priorityRoomsList];
                             [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]];
                             return { ...prev, priorityRooms: newArr };
                           });
                         }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#fef3c7", cursor: idx === 0 ? "default" : "pointer", fontSize: 10, padding: "2px 6px", borderRadius: 4, color: "#92400e", lineHeight: 1 }}>▲</button>
                         <button onClick={() => {
                           setCustomRules((prev: any) => {
-                            const newArr = [...(prev.priorityRooms || DEFAULT_PRIORITY_ROOMS)];
+                            const newArr = [...priorityRoomsList];
                             [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]];
                             return { ...prev, priorityRooms: newArr };
                           });
@@ -1526,7 +1501,6 @@ export default function App() {
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
                   <div style={{ flex: 1, minWidth: "200px" }}>
                     <label style={{ fontSize: 12, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>対象スタッフ名（複数可）</label>
-                    {/* ▼ ここをMultiStaffPickerに変更 ▼ */}
                     <div style={{ background: "#fff", padding: "6px", borderRadius: 8, border: "1px solid #86efac", minHeight: "34px", display: "flex", alignItems: "center" }}>
                       <MultiStaffPicker 
                         selected={customRules.supportStaffList || ""} 
@@ -1535,7 +1509,6 @@ export default function App() {
                         placeholder="＋スタッフを選択" 
                       />
                     </div>
-                    {/* ▲ ここまで ▲ */}
                   </div>
                   <div style={{ flex: 2, minWidth: "250px" }}>
                     <label style={{ fontSize: 12, fontWeight: 700, color: "#166534", display: "block", marginBottom: 4 }}>優先する対象部屋</label>
