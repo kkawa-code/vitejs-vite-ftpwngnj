@@ -103,9 +103,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v115"; 
-const KEY_MONTHLY = "shifto_monthly_v115"; 
-const KEY_RULES = "shifto_rules_v115";
+const KEY_ALL_DAYS = "shifto_alldays_v116"; 
+const KEY_MONTHLY = "shifto_monthly_v116"; 
+const KEY_RULES = "shifto_rules_v116";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -438,7 +438,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
     return rule ? split(rule.sections).length : 0;
   };
 
-  // 🌟変更点：clearルールで弾く部屋と、単なるスキップを分ける
   let skipSections: string[] = [];
   let clearSections: string[] = []; 
   let roleAssignments: Record<string, any> = {};
@@ -464,7 +463,7 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
         if (em.type === "clear" && em.section) { 
            skipSections.push(em.section); 
-           clearSections.push(em.section); // 🌟 clearの場合は兼務からも弾く
+           clearSections.push(em.section); 
         }
         if (em.type === "change_capacity" && em.section && !(customRules.dailyAdditions || []).some((r:any) => r.date === day.id && r.section === em.section)) { 
            dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); 
@@ -472,7 +471,7 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
         if (em.type === "kenmu") { 
           currentKenmu.push(em); 
           if (em.s2) {
-             split(em.s2).forEach(s => skipSections.push(s)); // 🌟 通常のアサインからはスキップするが兼務では使う
+             split(em.s2).forEach(s => skipSections.push(s)); 
           }
         }
       }
@@ -871,15 +870,18 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
+    // 🌟変更点：兼務ルールで人数の数え方を「要素数」から「AM/PMを0.5人として計算」に変更
     const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
        const targetCap = dynamicCapacity[targetRoom] || 1;
        const targetCores = targetMems.map(getCoreName);
-       let currentCount = targetMems.length;
        
-       if (currentCount >= targetCap) return targetMems;
+       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + (m.includes("(AM)") || m.includes("(PM)") || m.match(/\(〜/) || m.match(/〜\)/) ? 0.5 : 1), 0);
+       let currentAmount = getCurrentAmount(targetMems);
+       
+       if (currentAmount >= targetCap) return targetMems;
        
        for (const m of sourceMems) {
-          if (currentCount >= targetCap) break;
+          if (currentAmount >= targetCap) break;
           const core = getCoreName(m);
           
           if (targetCores.includes(core)) continue;
@@ -888,7 +890,7 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
           
           targetMems.push(m);
           targetCores.push(core);
-          currentCount++;
+          currentAmount += (m.includes("(AM)") || m.includes("(PM)") || m.match(/\(〜/) || m.match(/〜\)/)) ? 0.5 : 1;
        }
        return targetMems;
     };
@@ -909,7 +911,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       if (sourceMembers.length > 0) {
         const targets = split(km.s2);
         targets.forEach(targetRoom => {
-          // 🌟 修正点：clearルールで弾かれた部屋のみスキップし、kenmu等で設定された部屋には入れる
           if (clearSections.includes(targetRoom)) return; 
           let currentTarget = split(dayCells[targetRoom]);
           dayCells[targetRoom] = join(processKenmu(sourceMembers, currentTarget, targetRoom));
@@ -1552,6 +1553,7 @@ export default function App() {
   };
 
   return (
+    {/* 🌟 overflowX: hidden を削除してスクロール追従の邪魔をなくしました */}
     <div style={{ maxWidth: "96%", margin: "0 auto", padding: "32px", width: "100%", boxSizing: "border-box" }}>
       <style>{globalStyle}</style>
       
