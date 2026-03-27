@@ -103,9 +103,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v116"; 
-const KEY_MONTHLY = "shifto_monthly_v116"; 
-const KEY_RULES = "shifto_rules_v116";
+const KEY_ALL_DAYS = "shifto_alldays_v117"; 
+const KEY_MONTHLY = "shifto_monthly_v117"; 
+const KEY_RULES = "shifto_rules_v117";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -870,7 +870,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 🌟変更点：兼務ルールで人数の数え方を「要素数」から「AM/PMを0.5人として計算」に変更
     const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
        const targetCap = dynamicCapacity[targetRoom] || 1;
        const targetCores = targetMems.map(getCoreName);
@@ -1553,7 +1552,6 @@ export default function App() {
   };
 
   return (
-    {/* 🌟 overflowX: hidden を削除してスクロール追従の邪魔をなくしました */}
     <div style={{ maxWidth: "96%", margin: "0 auto", padding: "32px", width: "100%", boxSizing: "border-box" }}>
       <style>{globalStyle}</style>
       
