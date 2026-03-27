@@ -582,12 +582,20 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       const hasPmFree = validAvail.some(s => blockMap.get(s) === 'AM');
       
       const sortCandidates = (candidates: string[]) => {
+         // 🌟 メイン担当者を抽出（サブを含まない純粋な月間設定の担当者）
+         const mainStaff = split(monthlyAssign[section] || "").map(getCoreName);
+         
          return [...candidates].sort((a, b) => {
              const bA = blockMap.get(a);
              const bB = blockMap.get(b);
 
              let scoreA = 0; let scoreB = 0;
 
+             // 🌟 メイン担当者には圧倒的ボーナスを与え、回数に関わらず強制優先
+             if (mainStaff.includes(a)) scoreA += 10000;
+             if (mainStaff.includes(b)) scoreB += 10000;
+
+             // 以降は既存のスコアリング
              if (needTag === "") {
                  if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; 
                  else if (bA === 'AM' || bA === 'PM') scoreA += 150; 
@@ -832,20 +840,28 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 6. 常時兼務ペア
+    // 🌟 6. 常時兼務ペア（双方向化）
     (customRules.kenmuPairs || []).forEach((pair: any) => {
       if (!pair.s1 || !pair.s2) return;
-      if (split(dayCells[pair.s2]).length > 0) return;
-      const source = split(dayCells[pair.s1]);
-      if (source.length === 0) return;
-      const allowed = source
-        .filter(m => {
+      
+      const m1 = split(dayCells[pair.s1]);
+      const m2 = split(dayCells[pair.s2]);
+
+      // s1に人がいて、s2が空のとき（s1 -> s2）
+      if (m1.length > 0 && m2.length === 0) {
+        const allowed = m1.filter(m => {
           if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
           return !isForbidden(getCoreName(m), pair.s2);
-        })
-        .map(getCoreName);
-      if (allowed.length > 0) {
-        dayCells[pair.s2] = join(allowed);
+        }).map(getCoreName);
+        if (allowed.length > 0) dayCells[pair.s2] = join(allowed);
+      }
+      // s2に人がいて、s1が空のとき（s2 -> s1）
+      else if (m2.length > 0 && m1.length === 0) {
+        const allowed = m2.filter(m => {
+          if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
+          return !isForbidden(getCoreName(m), pair.s1);
+        }).map(getCoreName);
+        if (allowed.length > 0) dayCells[pair.s1] = join(allowed);
       }
     });
 
