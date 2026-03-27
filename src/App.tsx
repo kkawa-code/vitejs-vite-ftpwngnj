@@ -1,41 +1,54 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 
+// ==========================================
+// 🎨 グローバルCSS＆デザイン（モダンSaaS風）
+// ==========================================
 const globalStyle = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; overflow-x: hidden; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  body { margin: 0; background: #f8fafc; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1em; padding-right: 2.5rem; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
-  details > summary:hover { color: #0d9488; }
+  details > summary:hover { color: #2563eb; }
   details > summary::-webkit-details-marker { display: none; }
+  
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
-  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
+  /* 🌟 追従ヘッダーのデザインを強化し、折り返し対応に */
+  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(248, 250, 252, 0.85); backdrop-filter: blur(8px); padding: 12px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
+  
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
+  .btn-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; filter: brightness(1.05); }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
+  
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
-  .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; width: 100%; }
-  .rule-sel { padding: 6px 24px 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 110px; min-width: 100px; transition: border-color 0.2s; }
-  .rule-num { width: 50px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 16px; flex-shrink: 0; padding: 0 4px; transition: 0.2s; }
-  .rule-del:hover { background: #fee2e2; border-radius: 4px; }
-  .rule-add { background: #fff; color: #4f46e5; border: 1px dashed #a5b4fc; padding: 6px 12px; font-size: 12px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
-  .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
-  .rule-label { font-size: 12px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  
+  .rule-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02); }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; width: 100%; }
+  .rule-sel { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 13px; color: #334155; background-color: #f8fafc; flex: 1 1 120px; min-width: 110px; transition: all 0.2s; }
+  .rule-sel:hover { border-color: #94a3b8; }
+  .rule-num { width: 60px; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; font-size: 14px; background-color: #f8fafc; }
+  .rule-del { border: none; background: #fee2e2; color: #ef4444; border-radius: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: 0.2s; }
+  .rule-del:hover { background: #fecaca; }
+  .rule-add { background: #f8fafc; color: #4f46e5; border: 1px dashed #cbd5e1; padding: 10px 16px; font-size: 13px; width: 100%; display: flex; justify-content: center; font-weight: 700; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
+  .rule-add:hover { background: #e0e7ff; border-color: #818cf8; color: #3730a3; }
+  .rule-label { font-size: 13px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
+
   @media print {
-    body { background: #fff; overflow: visible; } .no-print { display: none !important; }
+    body { background: #fff; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed; }
     tr { page-break-inside: avoid; }
@@ -43,6 +56,9 @@ const globalStyle = `
   }
 `;
 
+// ==========================================
+// ⚙️ 定数・型定義
+// ==========================================
 type RenderGroup = { title: string; color: string; sections: string[] };
 
 const SECTIONS = [
@@ -82,7 +98,7 @@ const DEFAULT_RULES = {
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   kenmuPairs: [], 
-  lateShifts: [], 
+  lateShifts: [], // 🌟 デフォルト遅番なし
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
@@ -110,7 +126,9 @@ const RENDER_GROUPS: RenderGroup[] = [
   { title: "待機", color: "#f59e0b", sections: ["待機","透析後胸部"] }
 ];
 
-// ============== 🌟 ヘルパー関数群 ==============
+// ==========================================
+// 🛠️ ヘルパー関数群
+// ==========================================
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDayForDisplay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
@@ -148,12 +166,14 @@ const isMonthlyMainStaff = (section: string, name: string, monthlyAssign: Record
   return getMonthlyStaffForSection(section, monthlyAssign).includes(name);
 };
 
-// ============== 🌟 UIスタイリング関数 ==============
+// ==========================================
+// 🎨 UIスタイリング関数
+// ==========================================
 function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { 
-  return { background: bg, color: color, border: "none", borderRadius: "10px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
+  return { background: bg, color: color, border: "none", borderRadius: "8px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
 }
 function panelStyle(): React.CSSProperties { 
-  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)", width: "100%", boxSizing: "border-box" }; 
+  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)", width: "100%", boxSizing: "border-box" }; 
 }
 function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
@@ -162,7 +182,9 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
   return { border: "1px solid #e2e8f0", padding: "12px", background: bg, fontWeight: isHeader ? 800 : 500, textAlign: isHeader ? "center" : "left", fontSize: 13, minWidth: isHeader && !isSticky ? "100px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 5px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
-// ============== 🌟 UIコンポーネント ==============
+// ==========================================
+// 🧩 汎用コンポーネント
+// ==========================================
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
   const handleAdd = (sec: string) => { if (sec && !current.includes(sec)) onChange(join([...current, sec])); };
@@ -321,8 +343,8 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   };
 
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
-      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 8, letterSpacing: "0.02em" }}>{section}</label>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
+      <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", marginBottom: 12, letterSpacing: "0.02em" }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = getCoreName(m);
@@ -362,7 +384,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </div>
           )
         })}
-        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "4px 28px 4px 8px" }}>
+        <select onChange={(e) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 12, color: "#64748b", flex: 1, minWidth: 90, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "6px 28px 6px 8px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">
             {activeStaff.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
@@ -864,8 +886,8 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         const getCandidate = (candidatesList: string[]) => {
           let cand = candidatesList.filter(name => {
             if (currentCore.includes(name)) return false;
-            // 🌟 修正: 午後不在の人（PMがブロックされている人）だけを遅番候補から外す！
-            if (blockMap.get(name) === 'PM') return false; 
+            const b = blockMap.get(name);
+            if (b === 'PM') return false; 
             if (isForbidden(name, rule.section)) return false;
             return true;
           });
@@ -877,7 +899,6 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         };
 
         let picked = getCandidate(helpMembers) || getCandidate(availGeneral);
-        
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
           addU(picked, 0.5);
@@ -948,7 +969,7 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         if (currentLunch.length >= lunchTarget) break;
         split(dayCells[sec]).forEach(name => {
           const core = getCoreName(name);
-          if (!currentLunch.includes(core) && currentLunch.length < lunchTarget && !isForbidden(core, "昼当番")) {
+          if (!currentLunch.map(getCoreName).includes(core) && currentLunch.length < lunchTarget && !isForbidden(core, "昼当番")) {
             currentLunch.push(core);
           }
         });
@@ -963,7 +984,7 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
             for (const name of secMembers) {
               if (picked >= Number(cond.out) || currentLunch.length >= lunchTarget) break;
               const core = getCoreName(name);
-              if (!currentLunch.includes(core) && !isForbidden(core, "昼当番")) {
+              if (!currentLunch.map(getCoreName).includes(core) && !isForbidden(core, "昼当番")) {
                 currentLunch.push(core);
                 picked++;
               }
@@ -979,13 +1000,13 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
           split(dayCells[sec]).forEach(name => lastResortMembers.push(getCoreName(name)));
         });
 
-        const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.includes(name) && !isForbidden(name, "昼当番"));
+        const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name) && !isForbidden(name, "昼当番"));
         for (const name of fallbackCandidates) { 
           if (currentLunch.length < lunchTarget) currentLunch.push(name); 
         }
         
         if (currentLunch.length < lunchTarget) {
-           const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.includes(name) && !isForbidden(name, "昼当番"));
+           const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.map(getCoreName).includes(name) && !isForbidden(name, "昼当番"));
            for (const name of finalFallback) {
              if (currentLunch.length < lunchTarget) currentLunch.push(name); 
            }
@@ -1465,21 +1486,20 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 12px", width: "100%", overflowX: "hidden" }}>
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 16px", width: "100%", overflowX: "hidden" }}>
       <style>{globalStyle}</style>
       
+      {/* 🌟 ヘッダー */}
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
-          
+          {/* 🌟 復活: 一番上の保存ボタン */}
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
-          
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
           <input type="file" ref={fileInputRef} accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
-          
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
@@ -1504,6 +1524,7 @@ export default function App() {
         </details>
       </div>
 
+      {/* 🌟 1つのアコーディオンにまとめた元のレイアウト（色はオリジナル） */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#0f766e", padding: "4px", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
@@ -1544,7 +1565,7 @@ export default function App() {
                         const newCap = {...customRules.capacity};
                         delete newCap[room];
                         setCustomRules({...customRules, capacity: newCap});
-                      }} className="rule-del">✖</span>
+                      }} className="rule-del" style={{background: "transparent", width: "auto", height: "auto"}}>✖</span>
                     </div>
                   ))}
                   <select onChange={e => {
@@ -1891,7 +1912,7 @@ export default function App() {
           <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
             <span>📊</span> 今週のスタッフ稼働メーター（自動集計）を開く
           </summary>
-          <div style={{ marginTop: 16, borderTop: "1px dashed #e2e8f0", paddingTop: 16 }}>
+          <div style={{ marginTop: 16, borderTop: "2px dashed #cbd5e1", paddingTop: 16 }}>
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>※表示中の1週間（月〜日）で、誰が何回「業務（待機・当番除く）」に割り当てられているかを自動集計します。クリックで詳細が見れます。</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               {weeklyStats.map(([name, stat]) => (
@@ -1919,7 +1940,7 @@ export default function App() {
           <summary style={{ fontWeight: 800, color: "#475569", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
             <span>📋</span> 自動割当のルール（部屋が埋まる優先度）を開く
           </summary>
-          <div style={{ marginTop: 16, borderTop: "1px dashed #e2e8f0", paddingTop: 16 }}>
+          <div style={{ marginTop: 16, borderTop: "2px dashed #cbd5e1", paddingTop: 16 }}>
             <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>📌 部屋が埋まる順番（処理の優先順位）</h4>
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>※上にある部屋・ルールから順番に、スタッフが割り当てられていきます。「絶対優先人数」で追加した部屋は、追加した順番に優先して処理されます。</p>
             <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", marginBottom: 16 }}>
@@ -1977,8 +1998,8 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
         
         {/* 🌟 曜日タブとアクションボタンの統合＆追従化 */}
-        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", gap: 10, borderBottom: "none", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 6 }}>
+        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "center", borderBottom: "none", marginBottom: 0 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {days.map(d => {
               return (
                 <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "10px", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
@@ -1987,10 +2008,7 @@ export default function App() {
               )
             })}
           </div>
-          
-          <div style={{ width: "2px", height: "30px", background: "#e2e8f0", margin: "0 4px", flexShrink: 0 }}></div>
-          
-          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button className="btn-hover" onClick={handleAutoOne} style={{...btnStyle("#10b981"), padding: "10px 16px", fontSize: 13}}>✨ 表示日を自動割当</button>
             <button className="btn-hover" onClick={handleAutoAll} style={{...btnStyle("#0ea5e9"), padding: "10px 16px", fontSize: 13}}>⚡ 全日程を自動割当</button>
             <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "1px solid #cbd5e1", padding: "10px 16px", fontSize: 13 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
