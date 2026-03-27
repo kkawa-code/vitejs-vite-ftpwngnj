@@ -143,9 +143,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v118"; 
-const KEY_MONTHLY = "shifto_monthly_v118"; 
-const KEY_RULES = "shifto_rules_v118";
+const KEY_ALL_DAYS = "shifto_alldays_v119"; 
+const KEY_MONTHLY = "shifto_monthly_v119"; 
+const KEY_RULES = "shifto_rules_v119";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -595,14 +595,19 @@ class AutoAssigner {
     });
   }
 
-  isUsed = (name: string) => (this.assignCounts[name] || 0) >= (this.maxAssigns[name] || 1);
-  addU = (name: string, f = 1) => { this.assignCounts[name] = (this.assignCounts[name] || 0) + f; };
+  isUsed(name: string): boolean {
+    return (this.assignCounts[name] || 0) >= (this.maxAssigns[name] || 1);
+  }
 
-  isForbidden = (staff: string, section: string) => {
+  addU(name: string, f = 1): void {
+    this.assignCounts[name] = (this.assignCounts[name] || 0) + f;
+  }
+
+  isForbidden(staff: string, section: string): boolean {
     return (this.ctx.customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section));
-  };
+  }
   
-  hasNGPair = (candidate: string, members: string[], checkSoft: boolean) => {
+  hasNGPair(candidate: string, members: string[], checkSoft: boolean): boolean {
     return members.some(member => (this.ctx.customRules.ngPairs || []).some((ng: any) => {
       const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate);
       if (!match) return false;
@@ -610,7 +615,7 @@ class AutoAssigner {
       if ((ng.level || "hard") === "soft" && checkSoft) return true;
       return false;
     }));
-  };
+  }
 
   pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false): string[] {
     const result: string[] = [];
@@ -725,6 +730,7 @@ class AutoAssigner {
       if (pickedCoreList.length === 0) break;
 
       const core = pickedCoreList[0];
+
       const block = this.blockMap.get(core);
       let tag = ""; let f = 1;
       
@@ -1005,8 +1011,6 @@ class AutoAssigner {
 
       if (!current.some(m => m.includes(rule.lateTime))) {
         const currentCore = current.map(extractStaffName);
-        
-        // 🌟 修正点：前日の遅番担当者を取得し、連続を防止する
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(extractStaffName) : [];
 
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean) => {
@@ -1269,10 +1273,10 @@ export default function App() {
     if (REST_SECTIONS.includes(section)) return baseStaff;
     
     const absentStaff = [
-      ...split(currentDayCells["明け"]).map(getCoreName),
-      ...split(currentDayCells["入り"]).map(getCoreName),
-      ...split(currentDayCells["土日休日代休"]).map(getCoreName),
-      ...split(currentDayCells["不在"]).map(getCoreName)
+      ...split(currentDayCells["明け"]).map(extractStaffName),
+      ...split(currentDayCells["入り"]).map(extractStaffName),
+      ...split(currentDayCells["土日休日代休"]).map(extractStaffName),
+      ...split(currentDayCells["不在"]).map(extractStaffName)
     ];
     return baseStaff.filter(s => !absentStaff.includes(s));
   };
@@ -1308,7 +1312,7 @@ export default function App() {
         dateObj.setDate(dateObj.getDate() + 1);
         const nextId = `${dateObj.getFullYear()}-${pad(dateObj.getMonth()+1)}-${pad(dateObj.getDate())}`;
         const nextCells = nextState[nextId] || Object.fromEntries(SECTIONS.map(s => [s, ""]));
-        nextState[nextId] = { ...nextCells, "明け": join(split(v).map(getCoreName)) };
+        nextState[nextId] = { ...nextCells, "明け": join(split(v).map(extractStaffName)) };
       }
       return nextState;
     }); 
@@ -1457,7 +1461,7 @@ export default function App() {
       if (d.isPublicHoliday) return;
       const taskRooms = ASSIGNABLE_SECTIONS.filter(s => !["待機", "昼当番", "受付", "受付ヘルプ"].includes(s));
       taskRooms.forEach(sec => {
-        const members = split(d.cells[sec]).map(getCoreName);
+        const members = split(d.cells[sec]).map(extractStaffName);
         members.forEach(m => {
           if (stats[m]) {
             stats[m].total += 1;
@@ -1491,7 +1495,7 @@ export default function App() {
     let tempAvailCountW = activeGeneralStaff.length;
     ["明け","入り","土日休日代休","不在"].forEach(sec => {
       split(cells[sec]).forEach(m => {
-        if(activeGeneralStaff.includes(getCoreName(m))) tempAvailCountW--; 
+        if(activeGeneralStaff.includes(extractStaffName(m))) tempAvailCountW--; 
       });
     });
     
@@ -1544,7 +1548,7 @@ export default function App() {
     (customRules.ngPairs || []).forEach((ng: any) => {
       if (ng.level === 'soft' && ng.s1 && ng.s2) {
         SECTIONS.forEach(sec => {
-          const names = split(cells[sec]).map(getCoreName);
+          const names = split(cells[sec]).map(extractStaffName);
           if (names.includes(ng.s1) && names.includes(ng.s2)) {
             w.push({type: 'alert', msg: `🤝【${sec}】${ng.s1}さんと${ng.s2}さんが一緒です`});
           }
@@ -1569,8 +1573,8 @@ export default function App() {
       const prevDay = days[curIndex - 1];
       if (!prevDay.isPublicHoliday) {
         
-        const prevPortable = split(prevDay.cells["ポータブル"]).map(getCoreName);
-        const curPortable = split(cells["ポータブル"]).map(getCoreName);
+        const prevPortable = split(prevDay.cells["ポータブル"]).map(extractStaffName);
+        const curPortable = split(cells["ポータブル"]).map(extractStaffName);
         const consecutive = curPortable.filter(n => prevPortable.includes(n));
         consecutive.forEach(n => {
           w.push({ type: 'error', msg: `🚨【ポータブル連続】${n}さんが昨日と連続で入っています！` });
@@ -1578,8 +1582,8 @@ export default function App() {
 
         (customRules.lateShifts || []).forEach((rule: any) => {
           if (!rule.section || !rule.lateTime) return;
-          const prevLate = split(prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(getCoreName);
-          const curLate = split(cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(getCoreName);
+          const prevLate = split(prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(extractStaffName);
+          const curLate = split(cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(extractStaffName);
           const consecutiveLate = curLate.filter(n => prevLate.includes(n));
           consecutiveLate.forEach(n => {
             w.push({ type: 'error', msg: `🚨【遅番連続】${n}さんが昨日と連続で ${rule.section} の遅番に入っています！` });
@@ -1724,7 +1728,7 @@ export default function App() {
 
                 <div style={{ marginTop: 32, paddingTop: 24, borderTop: "2px dashed #cbd5e1" }}>
                   <h5 style={{ margin: "0 0 16px 0", color: "#0ea5e9", fontSize: 24, fontWeight: 800 }}>📅 特定の日だけ枠を追加する（増枠）</h5>
-                  <p style={{ fontSize: 20, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>※「この日のAMだけCTを1人増やす」といったイレギュラーに対応します。基本人数より優先されます。</p>
+                  <p style={{ fontSize: 20, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>※「この日のAMだけCTを1人増やす」といったイレギュラーに対応します。</p>
                   {(customRules.dailyAdditions || []).map((rule: any, idx: number) => (
                     <div key={idx} className="rule-row" style={{ background: "#fff", padding: "16px 24px", border: "2px solid #bae6fd", borderRadius: 12 }}>
                       <input type="date" value={rule.date} onChange={e => updateRule("dailyAdditions", idx, "date", e.target.value)} className="rule-sel" style={{ flex: "0 0 240px", padding: "14px 16px", borderColor: "#7dd3fc" }} />
