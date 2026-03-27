@@ -80,7 +80,7 @@ const DEFAULT_RULES = {
   staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "1号室,2号室,5号室,パノラマCT", customHolidays: "", 
   capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1, 受付: 2 }, 
   priorityRooms: DEFAULT_PRIORITY_ROOMS, 
-  fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", // 🌟追加: 終日専任のデフォルト
+  fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
@@ -752,6 +752,9 @@ export default function App() {
     return w;
   }, [cur, days, customRules, activeGeneralStaff]);
 
+  // ==========================================
+  // 👑 自動割当アルゴリズム（完全版・半休バグ修正対応）
+  // ==========================================
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
@@ -771,6 +774,7 @@ export default function App() {
       });
       split(dayCells["不在"]).forEach(m => {
         const core = getCoreName(m);
+        // AM不在なら「AMをブロック」、PM不在なら「PMをブロック」
         if (m.includes("(AM)")) blockMap.set(core, 'AM');
         else if (m.includes("(PM)")) blockMap.set(core, 'PM');
         else blockMap.set(core, 'ALL');
@@ -853,7 +857,6 @@ export default function App() {
     const supportStaffList = parseAndSortStaff(customRules.supportStaffList || "");
     const supportTargetRooms = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
     
-    // 🌟 終日専任ルールのリストを取得
     const fullDayOnlyList = split(customRules.fullDayOnlyRooms || "DSA,検像,骨塩,パノラマCT");
     
     const shuffledStaff = shuffleArray(allStaff);
@@ -933,6 +936,7 @@ export default function App() {
       return result;
     }
 
+    // 🌟 半休対応の精密な fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
@@ -958,7 +962,6 @@ export default function App() {
            if (needTag === "(AM)" && b === 'AM') return false; 
            if (needTag === "(PM)" && b === 'PM') return false; 
            
-           // 🌟 終日専任ルールのチェック（半休の人を弾く）
            if (fullDayOnlyList.includes(section) && b !== 'NONE') return false;
 
            return true;
@@ -972,6 +975,7 @@ export default function App() {
         const hasAmFree = validAvail.some(s => blockMap.get(s) === 'PM');
         const hasPmFree = validAvail.some(s => blockMap.get(s) === 'AM');
         
+        // 🌟 半休の人を最優先にするソート！
         const sortCandidates = (candidates: string[]) => {
            return [...candidates].sort((a, b) => {
                const bA = blockMap.get(a);
@@ -980,21 +984,23 @@ export default function App() {
                let scoreA = 0; let scoreB = 0;
 
                if (needTag === "") {
-                   if (bA === 'NONE') scoreA += 100; 
-                   if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 120; 
+                   if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; // 完璧なペア！
+                   else if (bA === 'AM' || bA === 'PM') scoreA += 150; // 単独の半休（必ず優先して枠を与える！）
+                   else if (bA === 'NONE') scoreA += 100; // フルタイム
                } else {
-                   if (needTag === "(AM)" && bA === 'PM') scoreA += 100;
-                   if (needTag === "(PM)" && bA === 'AM') scoreA += 100;
-                   if (bA === 'NONE') scoreA += 50; 
+                   if (needTag === "(AM)" && bA === 'PM') scoreA += 200; // ピッタリの半休
+                   if (needTag === "(PM)" && bA === 'AM') scoreA += 200; // ピッタリの半休
+                   if (bA === 'NONE') scoreA += 100; // フルタイムを割る
                }
 
                if (needTag === "") {
-                   if (bB === 'NONE') scoreB += 100;
-                   if (hasAmFree && hasPmFree && (bB === 'AM' || bB === 'PM')) scoreB += 120;
+                   if (hasAmFree && hasPmFree && (bB === 'AM' || bB === 'PM')) scoreB += 200;
+                   else if (bB === 'AM' || bB === 'PM') scoreB += 150;
+                   else if (bB === 'NONE') scoreB += 100;
                } else {
-                   if (needTag === "(AM)" && bB === 'PM') scoreB += 100;
-                   if (needTag === "(PM)" && bB === 'AM') scoreB += 100;
-                   if (bB === 'NONE') scoreB += 50;
+                   if (needTag === "(AM)" && bB === 'PM') scoreB += 200;
+                   if (needTag === "(PM)" && bB === 'AM') scoreB += 200;
+                   if (bB === 'NONE') scoreB += 100;
                }
 
                if (scoreA !== scoreB) return scoreB - scoreA;
@@ -1020,7 +1026,7 @@ export default function App() {
             if (needTag) {
                 tag = needTag;
                 f = 0.5;
-                blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM');
+                blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM'); // ★バグ修正箇所！
             } else {
                 tag = ""; 
                 f = 1;
@@ -1161,7 +1167,6 @@ export default function App() {
               const allowedRooms = split(po.targetSections).filter(s => !skipSections.includes(s));
               for (const room of allowedRooms) {
                 if (isForbidden(s2, room)) continue;
-                // 🌟 玉突き先が終日専任部屋の場合、半休の人は弾く
                 if (fullDayOnlyList.includes(room) && blockMap.get(s2) !== 'NONE') continue;
 
                 const current = split(dayCells[room]);
@@ -1194,7 +1199,6 @@ export default function App() {
           if (fallbackStaff.length > 0) {
             const currentSec = split(dayCells[sub.section]);
             for (const f of fallbackStaff) {
-              // 🌟 代打先が終日専任部屋の場合、半休の人は弾く
               if (fullDayOnlyList.includes(sub.section) && blockMap.get(f) !== 'NONE') continue;
 
               if (!hasNGPair(f, currentSec.map(getCoreName), false) && currentSec.length < 6) {
@@ -1236,7 +1240,11 @@ export default function App() {
           const currentCore = current.map(getCoreName);
           const candidates = availGeneral.filter(name => {
             if (currentCore.includes(name)) return false;
-            if (blockMap.get(name) === 'AM') return false;
+            
+            // ★ 修正箇所: 午後不在/稼働済の人は遅番に入れない！
+            const b = blockMap.get(name);
+            if (b === 'ALL' || b === 'PM') return false; 
+            
             if (isForbidden(name, rule.section)) return false;
             if (hasNGPair(name, currentCore, false)) return false;
             return true;
@@ -1248,7 +1256,13 @@ export default function App() {
             picked = candidates[0];
           }
           if (!picked) {
-            const forceCandidates = availGeneral.filter(name => !currentCore.includes(name) && blockMap.get(name) !== 'AM' && !isForbidden(name, rule.section));
+            const forceCandidates = availGeneral.filter(name => {
+              if (currentCore.includes(name)) return false;
+              const b = blockMap.get(name);
+              if (b === 'ALL' || b === 'PM') return false; 
+              if (isForbidden(name, rule.section)) return false;
+              return true;
+            });
             if (forceCandidates.length > 0) picked = forceCandidates[0];
           }
           
@@ -1501,7 +1515,7 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>在籍スタッフ名簿（一般）</label>
-                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やまだ), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
+                <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} placeholder="例: 山田(やajま), 佐藤(さとう)" style={{ width: "100%", padding: 12, border: "1px solid #cbd5e1", borderRadius: 10, minHeight: 80, fontSize: 14, lineHeight: 1.5 }} />
                 <div style={{ fontSize: 11, color: "#10b981", marginTop: 6, fontWeight: 600 }}>※カッコでふりがなを入れると50音順にソートされます！</div>
               </div>
               <div>
@@ -1577,7 +1591,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 追加: 終日専任ルールのUI */}
+              {/* 🌟 終日専任ルールのUI */}
               <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🕒 終日専任（半休・AM/PM不可）の部屋</h4>
                 <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>検査数が少ない部屋や、半休の人をわざわざアサインする意味がない部屋を指定します。ここには「1日通しで入れる人」しか配置されません。</p>
@@ -1588,6 +1602,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* ★ サポート専任ルールのUI変更 */}
               <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
                 <p style={{ fontSize: 12, color: "#166534", marginBottom: 12, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
