@@ -157,7 +157,7 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
-const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
+const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
@@ -747,7 +747,7 @@ export default function App() {
   }, [cur, days, customRules, activeGeneralStaff]);
 
   // ==========================================
-  // 👑 自動割当アルゴリズム（完全版・半休＆ロック対応）
+  // 👑 自動割当アルゴリズム（完全版・半休バグ修正対応）
   // ==========================================
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
@@ -768,6 +768,7 @@ export default function App() {
       });
       split(dayCells["不在"]).forEach(m => {
         const core = getCoreName(m);
+        // AM不在なら「AMをブロック」、PM不在なら「PMをブロック」
         if (m.includes("(AM)")) blockMap.set(core, 'AM');
         else if (m.includes("(PM)")) blockMap.set(core, 'PM');
         else blockMap.set(core, 'ALL');
@@ -933,11 +934,12 @@ export default function App() {
       return result;
     }
 
-    // 🌟 半休対応の精密な fill 関数
+    // 🌟 半休バグを修正した fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
       
+      // 現在のアサイン量を計算（半休は0.5、終日は1）
       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + (m.includes("(AM)") || m.includes("(PM)") || m.match(/\(〜/) || m.match(/〜\)/) ? 0.5 : 1), 0);
 
       let safeCounter = 0;
@@ -946,6 +948,7 @@ export default function App() {
         const remaining = targetCount - getCurrentAmount(current);
         
         let needTag = "";
+        // 残り枠に端数（0.5）がある場合、AMとPMのどっちが足りないかを判定
         if (remaining === 0.5 || remaining === 1.5 || remaining === 2.5) {
            const amCount = current.filter(m => m.includes("(AM)")).length;
            const pmCount = current.filter(m => m.includes("(PM)")).length;
@@ -956,8 +959,10 @@ export default function App() {
         const isValidBlock = (name: string) => {
            const b = blockMap.get(name);
            if (b === 'ALL') return false;
-           if (needTag === "(PM)" && b === 'PM') return false; 
+           // AMが欲しい時に、AMがブロックされている人（b==='AM'）は除外
            if (needTag === "(AM)" && b === 'AM') return false; 
+           // PMが欲しい時に、PMがブロックされている人（b==='PM'）は除外
+           if (needTag === "(PM)" && b === 'PM') return false; 
            return true;
         };
 
@@ -974,13 +979,15 @@ export default function App() {
 
         const block = blockMap.get(core);
         let tag = ""; let f = 1;
+        
         if (block === 'AM') { tag = "(PM)"; f = 0.5; blockMap.set(core, 'ALL'); } 
         else if (block === 'PM') { tag = "(AM)"; f = 0.5; blockMap.set(core, 'ALL'); } 
         else { 
             if (needTag) {
                 tag = needTag;
                 f = 0.5;
-                blockMap.set(core, needTag === "(AM)" ? 'PM' : 'AM');
+                // ★ バグ修正箇所！ AMに入ったらAMをブロックする（次はPMに回す）
+                blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM');
             } else {
                 tag = ""; 
                 f = 1;
@@ -998,7 +1005,7 @@ export default function App() {
       let staff: string[] = [];
       if (sec === "治療") staff = [...split(monthlyAssign.治療), ...split(monthlyAssign.治療サブ優先), ...split(monthlyAssign.治療サブ)];
       else if (sec === "RI") staff = [...split(monthlyAssign.RI), ...split(monthlyAssign.RIサブ)];
-      else if (monthlyAssign[sec] !== undefined) staff = split(monthlyAssign[sec]);
+      else if (monthlyAssign[sec] !== undefined) staff = staff = split(monthlyAssign[sec]);
       return staff.map(getCoreName);
     };
 
@@ -1057,7 +1064,6 @@ export default function App() {
           }
           dayCells["受付"] = join(currentUketsuke);
         } else {
-          // 🌟 月間担当者の取得と特殊部屋（strictRooms）のロック処理
           let preferredList: string[] = [];
           if (["治療", "RI", "CT", "MRI", "MMG", "透析後胸部"].includes(room)) {
              preferredList = getMonthlyStaffForSection(room).filter(s => availGeneral.includes(s));
@@ -1065,10 +1071,11 @@ export default function App() {
              preferredList = split(monthlyAssign[room]).filter(s => availGeneral.includes(s));
           }
           
+          // 🚨 月間設定必須の部屋（資格がない人を絶対に入れない）
           let candidates = availGeneral;
           const strictRooms = ["治療", "RI", "MMG", "透析後胸部"];
           if (strictRooms.includes(room)) {
-             candidates = preferredList; // 月間設定がない人は絶対に入れない
+             candidates = preferredList; // 資格者のみに絞る
           }
           
           fill(candidates, room, preferredList, targetCount);
@@ -1532,7 +1539,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ★ サポート専任ルールのUI変更 */}
               <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
                 <p style={{ fontSize: 12, color: "#166534", marginBottom: 12, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
