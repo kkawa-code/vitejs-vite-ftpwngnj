@@ -80,6 +80,7 @@ const DEFAULT_RULES = {
   staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "1号室,2号室,5号室,パノラマCT", customHolidays: "", 
   capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1, 受付: 2 }, 
   priorityRooms: DEFAULT_PRIORITY_ROOMS, 
+  fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", // 🌟追加: 終日専任のデフォルト
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
@@ -751,9 +752,6 @@ export default function App() {
     return w;
   }, [cur, days, customRules, activeGeneralStaff]);
 
-  // ==========================================
-  // 👑 自動割当アルゴリズム（完全版・相組み最適化対応）
-  // ==========================================
   const autoAssign = (day: any, prevDay: any = null, pastDays: any[] = []) => {
     const dayCells = { ...day.cells };
     
@@ -773,8 +771,8 @@ export default function App() {
       });
       split(dayCells["不在"]).forEach(m => {
         const core = getCoreName(m);
-        if (m.includes("(AM)")) blockMap.set(core, 'AM'); // AM不在＝PMのみ可
-        else if (m.includes("(PM)")) blockMap.set(core, 'PM'); // PM不在＝AMのみ可
+        if (m.includes("(AM)")) blockMap.set(core, 'AM');
+        else if (m.includes("(PM)")) blockMap.set(core, 'PM');
         else blockMap.set(core, 'ALL');
       });
     };
@@ -855,9 +853,11 @@ export default function App() {
     const supportStaffList = parseAndSortStaff(customRules.supportStaffList || "");
     const supportTargetRooms = split(customRules.supportTargetRooms || "1号室,2号室,5号室,パノラマCT");
     
+    // 🌟 終日専任ルールのリストを取得
+    const fullDayOnlyList = split(customRules.fullDayOnlyRooms || "DSA,検像,骨塩,パノラマCT");
+    
     const shuffledStaff = shuffleArray(allStaff);
     
-    // ★ グローバルソートから半休優先を排除。入れる部屋が少ない人を優先するだけにする。
     const availAll = shuffledStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
       const aForbidCount = getForbiddenCount(a);
       const bForbidCount = getForbiddenCount(b);
@@ -933,7 +933,6 @@ export default function App() {
       return result;
     }
 
-    // 🌟 スマート・ペアリング対応の fill 関数
     function fill(availList: string[], section: string, preferredList: string[], targetCount: number) {
       if (skipSections.includes(section)) return;
       let current = split(dayCells[section]);
@@ -958,6 +957,10 @@ export default function App() {
            if (b === 'ALL') return false;
            if (needTag === "(AM)" && b === 'AM') return false; 
            if (needTag === "(PM)" && b === 'PM') return false; 
+           
+           // 🌟 終日専任ルールのチェック（半休の人を弾く）
+           if (fullDayOnlyList.includes(section) && b !== 'NONE') return false;
+
            return true;
         };
 
@@ -966,7 +969,6 @@ export default function App() {
 
         if (validPreferred.length === 0 && validAvail.length === 0) break;
 
-        // 🌟 ペアリング判定（相性の良い半休同士がいるか）
         const hasAmFree = validAvail.some(s => blockMap.get(s) === 'PM');
         const hasPmFree = validAvail.some(s => blockMap.get(s) === 'AM');
         
@@ -977,15 +979,13 @@ export default function App() {
 
                let scoreA = 0; let scoreB = 0;
 
-               // フルタイムが必要な枠の場合
                if (needTag === "") {
-                   if (bA === 'NONE') scoreA += 100; // フルタイムの人を優先
-                   if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 120; // 完璧なペアが作れるなら最強！
+                   if (bA === 'NONE') scoreA += 100; 
+                   if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 120; 
                } else {
-                   // 半休が必要な枠の場合
                    if (needTag === "(AM)" && bA === 'PM') scoreA += 100;
                    if (needTag === "(PM)" && bA === 'AM') scoreA += 100;
-                   if (bA === 'NONE') scoreA += 50; // 仕方なくフルタイムを割る
+                   if (bA === 'NONE') scoreA += 50; 
                }
 
                if (needTag === "") {
@@ -998,7 +998,7 @@ export default function App() {
                }
 
                if (scoreA !== scoreB) return scoreB - scoreA;
-               return candidates.indexOf(a) - candidates.indexOf(b); // 同点なら元の優先順位（NGが多い人）を守る
+               return candidates.indexOf(a) - candidates.indexOf(b); 
            });
         };
 
@@ -1020,7 +1020,6 @@ export default function App() {
             if (needTag) {
                 tag = needTag;
                 f = 0.5;
-                // ★ 修正箇所: (AM)に入ったらAMをブロックし、次はPMに回るようにする
                 blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM');
             } else {
                 tag = ""; 
@@ -1107,7 +1106,6 @@ export default function App() {
           
           let candidates = availGeneral;
           const strictRooms = ["治療", "RI", "MMG", "透析後胸部"];
-          // 🚨 月間設定必須の部屋（資格がない人を絶対に入れない）
           if (strictRooms.includes(room)) {
              candidates = preferredList; 
           }
@@ -1163,6 +1161,9 @@ export default function App() {
               const allowedRooms = split(po.targetSections).filter(s => !skipSections.includes(s));
               for (const room of allowedRooms) {
                 if (isForbidden(s2, room)) continue;
+                // 🌟 玉突き先が終日専任部屋の場合、半休の人は弾く
+                if (fullDayOnlyList.includes(room) && blockMap.get(s2) !== 'NONE') continue;
+
                 const current = split(dayCells[room]);
                 if (hasNGPair(s2, current.map(getCoreName), false)) continue;
                 
@@ -1193,6 +1194,9 @@ export default function App() {
           if (fallbackStaff.length > 0) {
             const currentSec = split(dayCells[sub.section]);
             for (const f of fallbackStaff) {
+              // 🌟 代打先が終日専任部屋の場合、半休の人は弾く
+              if (fullDayOnlyList.includes(sub.section) && blockMap.get(f) !== 'NONE') continue;
+
               if (!hasNGPair(f, currentSec.map(getCoreName), false) && currentSec.length < 6) {
                 const b = blockMap.get(f);
                 let tag = ""; let fr = 1;
@@ -1573,7 +1577,17 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ★ サポート専任ルールのUI変更 */}
+              {/* 🌟 追加: 終日専任ルールのUI */}
+              <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid #cbd5e1", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 10px 0", color: "#334155", fontSize: 14, fontWeight: 800 }}>🕒 終日専任（半休・AM/PM不可）の部屋</h4>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, fontWeight: 600 }}>検査数が少ない部屋や、半休の人をわざわざアサインする意味がない部屋を指定します。ここには「1日通しで入れる人」しか配置されません。</p>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, minWidth: "250px" }}>
+                    <MultiSectionPicker selected={customRules.fullDayOnlyRooms || "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
+                  </div>
+                </div>
+              </div>
+
               <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "#15803d", fontSize: 14, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
                 <p style={{ fontSize: 12, color: "#166534", marginBottom: 12, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
