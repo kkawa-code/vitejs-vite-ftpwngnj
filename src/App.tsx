@@ -103,9 +103,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v117"; 
-const KEY_MONTHLY = "shifto_monthly_v117"; 
-const KEY_RULES = "shifto_rules_v117";
+const KEY_ALL_DAYS = "shifto_alldays_v118"; 
+const KEY_MONTHLY = "shifto_monthly_v118"; 
+const KEY_RULES = "shifto_rules_v118";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -939,12 +939,18 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
 
       if (!current.some(m => m.includes(rule.lateTime))) {
         const currentCore = current.map(getCoreName);
-        const getCandidate = (candidatesList: string[]) => {
+        
+        // 🌟変更点：前日の遅番担当者を取得し、連続を防止する
+        const prevLateStaff = prevDay ? split(prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(getCoreName) : [];
+
+        const getCandidate = (candidatesList: string[], allowConsecutive: boolean) => {
           let cand = candidatesList.filter(name => {
             if (currentCore.includes(name)) return false;
             const b = blockMap.get(name);
             if (b === 'PM') return false; 
             if (isForbidden(name, rule.section)) return false;
+            // 🌟 連続防止のチェック
+            if (!allowConsecutive && prevLateStaff.includes(name)) return false; 
             return true;
           });
           if (cand.length > 0) {
@@ -954,7 +960,14 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
           return null;
         };
 
-        let picked = getCandidate(helpMembers) || getCandidate(availGeneral);
+        // 1. 連続にならない人を優先して探す
+        let picked = getCandidate(helpMembers, false) || getCandidate(availGeneral, false);
+        
+        // 2. どうしてもいない場合は連続を許容して探す（誰もいないよりマシなので）
+        if (!picked) {
+            picked = getCandidate(helpMembers, true) || getCandidate(availGeneral, true);
+        }
+
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
           addU(picked, 0.5);
@@ -1494,22 +1507,29 @@ export default function App() {
       w.push({type: 'info', msg: `💡【昼当番】が不足（現在 ${lunchCount}人 / 目安 ${lunchTarget}人）`});
     }
     
-    (customRules.lateShifts || []).forEach((rule: any) => {
-       const m = split(cells[rule.section]);
-       if (m.length > 0 && !m.some(x => x.includes(rule.lateTime))) {
-         w.push({type: 'alert', msg: `🌇【${rule.section}】${rule.lateTime}の担当がいません`});
-       }
-    });
-
+    // 🌟 遅番連続のアラートを追加
     const curIndex = days.findIndex(d => d.id === cur.id);
     if (curIndex > 0) {
       const prevDay = days[curIndex - 1];
       if (!prevDay.isPublicHoliday) {
+        
+        // 1. ポータブルの連続チェック
         const prevPortable = split(prevDay.cells["ポータブル"]).map(getCoreName);
         const curPortable = split(cells["ポータブル"]).map(getCoreName);
         const consecutive = curPortable.filter(n => prevPortable.includes(n));
         consecutive.forEach(n => {
           w.push({ type: 'error', msg: `🚨【ポータブル連続】${n}さんが昨日と連続で入っています！` });
+        });
+
+        // 2. 遅番の連続チェック
+        (customRules.lateShifts || []).forEach((rule: any) => {
+          if (!rule.section || !rule.lateTime) return;
+          const prevLate = split(prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(getCoreName);
+          const curLate = split(cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(getCoreName);
+          const consecutiveLate = curLate.filter(n => prevLate.includes(n));
+          consecutiveLate.forEach(n => {
+            w.push({ type: 'error', msg: `🚨【遅番連続】${n}さんが昨日と連続で ${rule.section} の遅番に入っています！` });
+          });
         });
       }
     }
