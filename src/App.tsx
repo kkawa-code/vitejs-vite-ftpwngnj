@@ -56,7 +56,10 @@ const SECTIONS = [
 const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在"].includes(s));
 const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番"].includes(s));
 const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
-const ROLE_PLACEHOLDERS = ["CT枠", "MRI枠", "RI枠", "治療枠", "MMG枠", "透視枠", "受付枠"];
+
+// 🌟変更点：どの部屋でも「〇〇枠」を出せるように自動生成
+const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
+
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "透析後胸部", "検像"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = {
@@ -363,7 +366,8 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </optgroup>
           )}
           <optgroup label="担当枠（未定）">
-            {ROLE_PLACEHOLDERS.filter(s => !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
+            {/* 🌟ここでも、追加されていないプレースホルダー枠のみ表示 */}
+            {ROLE_PLACEHOLDERS.filter(s => s.startsWith(section) && !members.some(m => getCoreName(m) === s)).map(s => <option key={s} value={s}>{s}</option>)}
           </optgroup>
         </select>
       </div>
@@ -464,6 +468,9 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       let members = split(dayCells[sec]);
       members = members.map(m => {
         const core = getCoreName(m);
+        // 🌟 プレースホルダーはそのまま通す
+        if (ROLE_PLACEHOLDERS.includes(core)) return m;
+
         const block = blockMap.get(core);
         if (block === 'ALL') return null; 
         if (block === 'AM' && m.includes('(AM)')) return null; 
@@ -477,6 +484,7 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       if (!REST_SECTIONS.includes(sec) && sec !== "昼当番") {
           split(dayCells[sec]).forEach(name => { 
               const c = getCoreName(name); 
+              if (ROLE_PLACEHOLDERS.includes(c)) return; // プレースホルダーは稼働数にカウントしない
               const isHalf = name.includes("(AM)") || name.includes("(PM)") || name.match(/\(〜/) || name.match(/〜\)/);
               assignCounts[c] = (assignCounts[c] || 0) + (isHalf ? 0.5 : 1);
           }); 
@@ -582,7 +590,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       const hasPmFree = validAvail.some(s => blockMap.get(s) === 'AM');
       
       const sortCandidates = (candidates: string[]) => {
-         // 🌟 メイン担当者を抽出（サブを含まない純粋な月間設定の担当者）
          const mainStaff = split(monthlyAssign[section] || "").map(getCoreName);
          
          return [...candidates].sort((a, b) => {
@@ -591,11 +598,9 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
 
              let scoreA = 0; let scoreB = 0;
 
-             // 🌟 メイン担当者には圧倒的ボーナスを与え、回数に関わらず強制優先
              if (mainStaff.includes(a)) scoreA += 10000;
              if (mainStaff.includes(b)) scoreB += 10000;
 
-             // 以降は既存のスコアリング
              if (needTag === "") {
                  if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; 
                  else if (bA === 'AM' || bA === 'PM') scoreA += 150; 
@@ -661,7 +666,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
   }
 
   const assignRooms = () => {
-    // 1. 固定（専従）の処理 - 事前に他部屋から削除
     (customRules.fixed || []).forEach((rule: any) => {
       if (!rule.staff || !rule.section) return;
       Object.keys(dayCells).forEach(sec => {
@@ -677,7 +681,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       });
     });
 
-    // 1. 固定（専従）の処理 - アサイン
     (customRules.fixed || []).forEach((rule: any) => {
       if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
       if (skipSections.includes(rule.section)) return;
@@ -694,7 +697,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       addU(rule.staff, f);
     });
 
-    // 2. 緊急時の役割アサイン
     Object.values(roleAssignments).forEach((ra: any) => {
       if (skipSections.includes(ra.section)) return;
       const candidates = split(monthlyAssign[ra.role] || "");
@@ -711,7 +713,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 🌟 3. 代打の処理（優先度引き上げ）
     (customRules.substitutes || []).forEach((sub: any) => {
       const targets = split(sub.target);
       if (targets.length === 0 || skipSections.includes(sub.section)) return; 
@@ -739,7 +740,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 🌟 4. 玉突き・同室回避ルール（優先度引き上げ：アサイン前に移動させる）
     (customRules.pushOuts || []).forEach((po: any) => {
       const s1 = po.s1 || po.triggerStaff;
       const s2 = po.s2 || po.targetStaff;
@@ -748,7 +748,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       if (!s1 || !s2 || !tSec || !po.targetSections) return;
       
       if (availGeneral.includes(s1) && availGeneral.includes(s2) && !isUsed(s2)) {
-         // アサイン前なので、月間メインスタッフとして被るかどうかで判定する
          const s1In = split(dayCells[tSec]).map(getCoreName).includes(s1) || isMonthlyMainStaff(tSec, s1, monthlyAssign);
          const s2In = split(dayCells[tSec]).map(getCoreName).includes(s2) || isMonthlyMainStaff(tSec, s2, monthlyAssign);
          
@@ -770,7 +769,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
                 else { blockMap.set(s2, 'ALL'); }
                 dayCells[room] = join([...current, `${s2}${tag}`]);
                 addU(s2, f);
-                // もし既にtSecにアサインされていた場合は抜く
                 dayCells[tSec] = join(split(dayCells[tSec]).filter(m => getCoreName(m) !== s2));
                 break;
               }
@@ -779,15 +777,22 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 🌟 5. PRIORITY_LISTの処理
     const basePriorityList = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
-    // 治療枠をリストの先頭に持ってくる
     const PRIORITY_LIST = ["治療", ...basePriorityList.filter((r: string) => r !== "治療")];
 
     PRIORITY_LIST.forEach((room: string) => {
       if (skipSections.includes(room)) return;
 
-      const targetCount = dynamicCapacity[room] !== undefined ? dynamicCapacity[room] : (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
+      let targetCount = dynamicCapacity[room] !== undefined ? dynamicCapacity[room] : (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
+
+      // 🌟 変更点：手動で置かれた「未定枠」の数をカウントし、定員を引き上げる
+      let currentMembersForTarget = split(dayCells[room]);
+      const placeholders = currentMembersForTarget.filter(m => ROLE_PLACEHOLDERS.includes(getCoreName(m)));
+      if (placeholders.length > 0) {
+         targetCount += placeholders.length;
+         // プレースホルダーを消して、後続のfillに枠を埋めさせる
+         dayCells[room] = join(currentMembersForTarget.filter(m => !ROLE_PLACEHOLDERS.includes(getCoreName(m))));
+      }
 
       if (room === "受付") {
         let currentUketsuke = split(dayCells["受付"]);
@@ -840,14 +845,12 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 🌟 6. 常時兼務ペア（双方向化）
     (customRules.kenmuPairs || []).forEach((pair: any) => {
       if (!pair.s1 || !pair.s2) return;
       
       const m1 = split(dayCells[pair.s1]);
       const m2 = split(dayCells[pair.s2]);
 
-      // s1に人がいて、s2が空のとき（s1 -> s2）
       if (m1.length > 0 && m2.length === 0) {
         const allowed = m1.filter(m => {
           if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
@@ -855,7 +858,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
         }).map(getCoreName);
         if (allowed.length > 0) dayCells[pair.s2] = join(allowed);
       }
-      // s2に人がいて、s1が空のとき（s2 -> s1）
       else if (m2.length > 0 && m1.length === 0) {
         const allowed = m2.filter(m => {
           if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) return false;
@@ -865,7 +867,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 7. 緊急兼務
     currentKenmu.forEach((km: any) => {
       const p1 = split(dayCells[km.s1]);
       if (p1.length > 0) {
