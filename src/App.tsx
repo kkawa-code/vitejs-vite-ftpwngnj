@@ -93,7 +93,7 @@ const DEFAULT_PRIORITY_ROOMS = [
 const DEFAULT_RULES = { 
   staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "1号室,2号室,5号室,パノラマCT", customHolidays: "", 
   capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1, 受付: 2 }, 
-  dailyAdditions: [], // 🌟変更：特定日の増枠（AM/PM対応）
+  dailyAdditions: [], 
   priorityRooms: DEFAULT_PRIORITY_ROOMS, 
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
@@ -103,9 +103,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v114"; 
-const KEY_MONTHLY = "shifto_monthly_v114"; 
-const KEY_RULES = "shifto_rules_v114";
+const KEY_ALL_DAYS = "shifto_alldays_v115"; 
+const KEY_MONTHLY = "shifto_monthly_v115"; 
+const KEY_RULES = "shifto_rules_v115";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -164,7 +164,7 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
   if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; 
   else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); 
-  return { border: "1px solid #e2e8f0", padding: "24px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 24, color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
+  return { border: "1px solid #e2e8f0", padding: "24px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 24, minWidth: isHeader && !isSticky ? "200px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
@@ -438,12 +438,13 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
     return rule ? split(rule.sections).length : 0;
   };
 
+  // 🌟変更点：clearルールで弾く部屋と、単なるスキップを分ける
   let skipSections: string[] = [];
+  let clearSections: string[] = []; 
   let roleAssignments: Record<string, any> = {};
   let currentKenmu: any[] = [];
   let dynamicCapacity = { ...(customRules.capacity || {}) };
   
-  // 🌟 新仕様：特定日の増枠ルールを反映（プレースホルダーを強制挿入）
   (customRules.dailyAdditions || []).forEach((rule: any) => {
     if (rule.date === day.id && rule.section && rule.count > 0) {
       const timeTag = rule.time === "全日" || !rule.time ? "" : rule.time;
@@ -461,14 +462,17 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
     (customRules.emergencies || []).forEach((em: any) => {
       if (tempAvailCount <= Number(em.threshold)) {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
-        if (em.type === "clear" && em.section) { skipSections.push(em.section); }
-        if (em.type === "change_capacity" && em.section) { 
+        if (em.type === "clear" && em.section) { 
+           skipSections.push(em.section); 
+           clearSections.push(em.section); // 🌟 clearの場合は兼務からも弾く
+        }
+        if (em.type === "change_capacity" && em.section && !(customRules.dailyAdditions || []).some((r:any) => r.date === day.id && r.section === em.section)) { 
            dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); 
         }
         if (em.type === "kenmu") { 
           currentKenmu.push(em); 
           if (em.s2) {
-             split(em.s2).forEach(s => skipSections.push(s));
+             split(em.s2).forEach(s => skipSections.push(s)); // 🌟 通常のアサインからはスキップするが兼務では使う
           }
         }
       }
@@ -867,7 +871,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       }
     });
 
-    // 🌟 変更点：兼務ルールを「定員に達するまで」に修正
     const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
        const targetCap = dynamicCapacity[targetRoom] || 1;
        const targetCores = targetMems.map(getCoreName);
@@ -896,10 +899,7 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       let m1 = split(dayCells[pair.s1]);
       let m2 = split(dayCells[pair.s2]);
 
-      // s1 -> s2 への兼務を試みる
       dayCells[pair.s2] = join(processKenmu(m1, m2, pair.s2));
-      
-      // 更新された s2 から s1 への兼務を試みる
       m2 = split(dayCells[pair.s2]); 
       dayCells[pair.s1] = join(processKenmu(m2, m1, pair.s1));
     });
@@ -909,7 +909,8 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       if (sourceMembers.length > 0) {
         const targets = split(km.s2);
         targets.forEach(targetRoom => {
-          if (skipSections.includes(targetRoom)) return;
+          // 🌟 修正点：clearルールで弾かれた部屋のみスキップし、kenmu等で設定された部屋には入れる
+          if (clearSections.includes(targetRoom)) return; 
           let currentTarget = split(dayCells[targetRoom]);
           dayCells[targetRoom] = join(processKenmu(sourceMembers, currentTarget, targetRoom));
         });
@@ -1579,7 +1580,7 @@ export default function App() {
           <div style={{ marginTop: 20, paddingTop: 24, borderTop: "2px dashed #fbcfe8" }}>
             <p style={{ fontSize: 20, color: "#9d174d", marginBottom: 20, fontWeight: 600 }}>
               Android等でファイルが保存・選択できない場合、以下のボタンでデータをコピーし、LINE等でスマホに送ってください。<br/>
-              スマホ側で taking 付けて「復元」を押せばデータを移行できます。
+              スマホ側でその文字を下の枠に貼り付けて「復元」を押せばデータを移行できます。
             </p>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
               <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, justifyContent: "center" }}>📋 データをコピー</button>
@@ -1662,7 +1663,7 @@ export default function App() {
                         <option value="(AM)">AM</option>
                         <option value="(PM)">PM</option>
                       </select>
-                    <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", e.target.value)} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
+                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", Number(e.target.value))} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
                       <span className="rule-label" style={{ color: "#0369a1" }}>人追加する</span>
                       <button onClick={() => removeRule("dailyAdditions", idx)} className="rule-del">✖</button>
                     </div>
