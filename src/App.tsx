@@ -487,11 +487,13 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
   const supportTargetRooms = split(customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
   const fullDayOnlyList = split(customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT");
   
+  // 🌟まんべんなく配置するため、availAllも週・当日のアサイン回数でソート
   const availAll = allStaff.filter(s => blockMap.get(s) !== 'ALL').sort((a, b) => {
     const aForbidCount = getForbiddenCount(a);
     const bForbidCount = getForbiddenCount(b);
     if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount;
-    if (counts[a] !== counts[b]) return counts[a] - counts[b]; 
+    if ((counts[a] || 0) !== (counts[b] || 0)) return (counts[a] || 0) - (counts[b] || 0); 
+    if ((assignCounts[a] || 0) !== (assignCounts[b] || 0)) return (assignCounts[a] || 0) - (assignCounts[b] || 0); 
     return a.localeCompare(b, 'ja');
   });
   
@@ -608,6 +610,16 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
              }
 
              if (scoreA !== scoreB) return scoreB - scoreA;
+             
+             // 🌟 修正ポイント：週間アサイン数が少ない人を優先
+             if ((counts[a] || 0) !== (counts[b] || 0)) {
+                 return (counts[a] || 0) - (counts[b] || 0);
+             }
+             // 🌟 修正ポイント：当日アサイン数が少ない人を優先
+             if ((assignCounts[a] || 0) !== (assignCounts[b] || 0)) {
+                 return (assignCounts[a] || 0) - (assignCounts[b] || 0);
+             }
+
              return a.localeCompare(b, 'ja');
          });
       };
