@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; }
+  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.01em; overflow-x: hidden; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
@@ -11,20 +11,24 @@ const globalStyle = `
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
-  .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
-  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; marginBottom: 20px; }
+  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(244, 247, 249, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; marginBottom: 20px; }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
+  
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05) !important; }
+  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
+  
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+  
+  .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; width: 100%; }
   .rule-sel { padding: 6px 24px 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 110px; min-width: 100px; transition: border-color 0.2s; }
   .rule-num { width: 50px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
   .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 16px; flex-shrink: 0; padding: 0 4px; transition: 0.2s; }
@@ -37,7 +41,7 @@ const globalStyle = `
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
 
   @media print {
-    body { background: #fff; } .no-print { display: none !important; }
+    body { background: #fff; overflow: visible; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed; }
     tr { page-break-inside: avoid; }
@@ -84,7 +88,7 @@ const DEFAULT_RULES = {
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   kenmuPairs: [], 
-  lateShifts: [], // 🌟 デフォルトの遅番を削除（勝手に6号室が遅番になるのを防止）
+  lateShifts: [], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
@@ -154,9 +158,8 @@ const isMonthlyMainStaff = (section: string, name: string, monthlyAssign: Record
 function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { 
   return { background: bg, color: color, border: "none", borderRadius: "10px", padding: "10px 16px", cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 }; 
 }
-// 元のレイアウト（色付き背景やシャドウを復活）
 function panelStyle(): React.CSSProperties { 
-  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)" }; 
+  return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02)", width: "100%", boxSizing: "border-box" }; 
 }
 function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
@@ -246,7 +249,7 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
 
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff"), color: "#2563eb", border: "1px solid #bfdbfe" }}>
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#2563eb", "#fff"), border: "1px solid #3b82f6" }}>
         📅 {targetMonday} の週 ▼
       </button>
       {isOpen && (
@@ -866,8 +869,8 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         const currentCore = current.map(getCoreName);
         const candidates = availGeneral.filter(name => {
           if (currentCore.includes(name)) return false;
-          // ★ 修正箇所: 午後休みの人（b === 'PM'）だけを候補から外す！
           const b = blockMap.get(name);
+          // 🌟 修正: PMがブロックされている（午後休みの人）だけを遅番から除外
           if (b === 'PM') return false; 
           if (isForbidden(name, rule.section)) return false;
           if (hasNGPair(name, currentCore, false)) return false;
@@ -1498,19 +1501,19 @@ export default function App() {
   };
 
   return (
-    <div style={{ padding: "20px 12px", maxWidth: 1400, margin: "0 auto", background: "#f4f7f9" }}>
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px", width: "100%", boxSizing: "border-box", overflowX: "hidden" }}>
       <style>{globalStyle}</style>
       
+      {/* 🌟 ヘッダー */}
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
-          
+          <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
           <input type="file" ref={fileInputRef} accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
-          
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
           <button className="btn-hover" onClick={handleResetAll} style={btnStyle("#ef4444")}>🗑️ リセット</button>
         </div>
@@ -1535,7 +1538,7 @@ export default function App() {
         </details>
       </div>
 
-      {/* 🌟 1つのアコーディオンにまとめた元のレイアウト */}
+      {/* 🌟 1つのアコーディオンにまとめた元のレイアウト（色はオリジナル） */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#0f766e", padding: "4px", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
@@ -1576,7 +1579,7 @@ export default function App() {
                         const newCap = {...customRules.capacity};
                         delete newCap[room];
                         setCustomRules({...customRules, capacity: newCap});
-                      }} className="rule-del">✖</span>
+                      }} className="rule-del" style={{background: "transparent", width: "auto", height: "auto"}}>✖</span>
                     </div>
                   ))}
                   <select onChange={e => {
@@ -1900,22 +1903,23 @@ export default function App() {
               </div>
 
             </div>
+          </details>
+        </div>
 
-            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "2px dashed #cbd5e1" }}>
-              <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
-              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-                {MONTHLY_CATEGORIES.map(({ key, label }) => {
-                  const membersStr = monthlyAssign[key] || "";
-                  const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
-                  return (
-                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
-                  )
-                })}
-              </div>
-            </div>
+        {/* 月間担当者の設定 */}
+        <div style={{ ...panelStyle(), padding: "16px 20px" }}>
+          <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
+          <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+            {MONTHLY_CATEGORIES.map(({ key, label }) => {
+              const membersStr = monthlyAssign[key] || "";
+              const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
+              return (
+                <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+              )
+            })}
           </div>
-        </details>
+        </div>
       </div>
 
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24, background: "#f8fafc" }}>
@@ -1924,7 +1928,7 @@ export default function App() {
             <span>📊</span> 今週のスタッフ稼働メーター（自動集計）を開く
           </summary>
           <div style={{ marginTop: 16, borderTop: "2px dashed #cbd5e1", paddingTop: 16 }}>
-            <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>※表示中の1週間（月〜日）で、誰が何回「業務（待機・当番除く）」に割り当てられているかを自動集計します。クリックで詳細が見れます。</p>
+            <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>※表示中の1週間（月〜日）で、誰が何回「業務（待機・当番除く）」に割り当てられているかを自動集計します。手動調整の目安にしてください。</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               {weeklyStats.map(([name, stat]) => (
                 <div key={name} className="card-hover btn-hover" onClick={() => setSelectedStaffForStats(name)} style={{ background: stat.total > 0 ? "#fff" : "#f1f5f9", border: `1px solid ${stat.total > 0 ? "#bfdbfe" : "#e2e8f0"}`, padding: "8px 12px", borderRadius: 8, minWidth: 150, boxShadow: stat.total > 0 ? "0 1px 2px rgba(0,0,0,0.05)" : "none" }}>
@@ -1989,7 +1993,7 @@ export default function App() {
             </thead>
             <tbody>
               {SECTIONS.map((section, index) => {
-                const isZebra = index % 2 === 1; // 🌟 ゼブラストライプ適用
+                const isZebra = index % 2 === 1; 
                 return (
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, isZebra), borderRight: "2px solid #e2e8f0"}}>{section}</td>
@@ -2039,16 +2043,16 @@ export default function App() {
         ) : (
           <div style={{ display: "grid", gap: 32 }}>
             {warnings.length > 0 && (
-              <div style={{ background: "#fffbeb", border: "1px dashed #fcd34d", padding: "16px 20px", borderRadius: "12px", display: "flex", gap: "12px", alignItems: "flex-start", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
-                <div style={{ fontSize: "20px" }}>💡</div>
+              <div style={{ background: "#f8fafc", border: "1px dashed #cbd5e1", padding: "12px 16px", borderRadius: "12px", display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                <div style={{ fontSize: "16px" }}>💡</div>
                 <div>
-                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#b45309", marginBottom: "8px" }}>配置のチェックリスト</div>
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#64748b", marginBottom: "4px" }}>配置のチェックリスト</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                     {warnings.map((w, i) => (
                       <div key={i} style={{ 
                         background: w.type === 'error' ? "#fef2f2" : w.type === 'alert' ? "#fff7ed" : "#f0f9ff", 
                         border: `1px solid ${w.type === 'error' ? "#fecaca" : w.type === 'alert' ? "#fdba74" : "#bae6fd"}`, 
-                        padding: "6px 12px", borderRadius: "8px", fontSize: "12px", 
+                        padding: "6px 12px", borderRadius: "8px", fontSize: "11px", 
                         color: w.type === 'error' ? "#b91c1c" : w.type === 'alert' ? "#c2410c" : "#0369a1", 
                         fontWeight: 700 
                       }}>
@@ -2062,31 +2066,31 @@ export default function App() {
             
             {RENDER_GROUPS.map((group: RenderGroup) => (
               <div key={group.title}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 8, borderBottom: "2px solid #e2e8f0" }}>
-                  <h4 style={{ fontSize: 16, color: "#1e293b", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-                    <span style={{ display: "inline-block", width: 6, height: 18, background: group.color, borderRadius: 3 }}></span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 6, borderBottom: "2px solid #f1f5f9" }}>
+                  <h4 style={{ fontSize: 14, color: "#475569", margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+                    <span style={{ display: "inline-block", width: 4, height: 16, background: group.color, borderRadius: 2 }}></span>
                     {group.title}
                   </h4>
                   {group.title === "休務・夜勤" && (
                     <div style={{display: "flex", gap: 8}}>
-                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
-                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
+                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
                     </div>
                   )}
                   {group.title === "モダリティ" && (
                     <div style={{display: "flex", gap: 8}}>
-                      <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務1日クリア</button>
-                      <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務週間クリア</button>
+                      <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務1日クリア</button>
+                      <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 業務週間クリア</button>
                     </div>
                   )}
                   {group.title === "待機" && (
                     <div style={{display: "flex", gap: 8}}>
-                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
-                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 1日クリア</button>
+                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "transparent", border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>🧹 週間クリア</button>
                     </div>
                   )}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
                   {group.sections.map((s: string) => {
                     const noTimeSections = ["明け","入り","土日休日代休","不在","昼当番"];
                     const isNoTime = noTimeSections.includes(s);
@@ -2113,7 +2117,7 @@ export default function App() {
       {selectedStaffForStats && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(2px)" }} onClick={() => setSelectedStaffForStats(null)}>
           <div className="modal-animate" style={{ background: "#fff", padding: 24, borderRadius: 20, width: "90%", maxWidth: 400, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 12, borderBottom: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingBottom: 12, borderBottom: "2px solid #f1f5f9" }}>
               <h3 style={{ margin: 0, fontSize: 18, color: "#0f172a", fontWeight: 800 }}>👤 {selectedStaffForStats} さんの稼働詳細</h3>
               <button onClick={() => setSelectedStaffForStats(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 32, height: 32, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>✖</button>
             </div>
@@ -2145,7 +2149,7 @@ export default function App() {
                     return (
                       <tr key={d.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                         <td style={{ padding: "12px 4px", fontWeight: 600, color: "#334155", verticalAlign: "top", width: "40%" }}>{d.label}</td>
-                        <td style={{ padding: "12px 4px", color: assigns.length > 0 ? "#0ea5e9" : "#94a3b8", fontWeight: 700 }}>
+                        <td style={{ padding: "12px 4px", color: assigns.length > 0 ? "#0369a1" : "#94a3b8", fontWeight: 700 }}>
                           {assigns.length > 0 ? assigns.join(" / ") : "なし（または休務）"}
                         </td>
                       </tr>
