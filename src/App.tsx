@@ -2,7 +2,16 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  body { margin: 0; background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; overflow-x: hidden; font-size: 24px; }
+  
+  /* 🌟 Viteのデフォルトの壁（横幅制限）を強制的に破壊！ */
+  html, body, #root { 
+    max-width: 100% !important; 
+    width: 100% !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+  }
+
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; overflow-x: hidden; font-size: 24px; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
@@ -82,7 +91,7 @@ const DEFAULT_PRIORITY_ROOMS = [
 const DEFAULT_RULES = { 
   staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "1号室,2号室,5号室,パノラマCT", customHolidays: "", 
   capacity: { CT: 3, MRI: 3, 治療: 3, RI: 1, 受付: 2 }, 
-  dailyCapacities: [], // 🌟 追加：特定日の人数変更ルール
+  dailyCapacities: [], 
   priorityRooms: DEFAULT_PRIORITY_ROOMS, 
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
@@ -153,7 +162,7 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
   if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; 
   else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); 
-  return { border: "1px solid #e2e8f0", padding: "24px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 24, minWidth: isHeader && !isSticky ? "200px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
+  return { border: "1px solid #e2e8f0", padding: "24px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 24, color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
@@ -445,7 +454,6 @@ const executeAutoAssign = (day: DayData, prevDay: DayData | null, pastDays: DayD
       if (tempAvailCount <= Number(em.threshold)) {
         if (em.type === "role_assign") { if (!roleAssignments[em.role] || em.threshold < roleAssignments[em.role].threshold) { roleAssignments[em.role] = em; } }
         if (em.type === "clear" && em.section) { skipSections.push(em.section); }
-        // ※特定日の設定（dailyCapacities）がない場合のみ、緊急時の人数変更を適用する
         if (em.type === "change_capacity" && em.section && !(customRules.dailyCapacities || []).some((r:any) => r.date === day.id && r.section === em.section)) { 
            dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); 
         }
@@ -1408,9 +1416,20 @@ export default function App() {
     });
     
     const dynamicCapacityW = { ...(customRules.capacity || {}) };
+    
+    // 🌟 特定日の人数変更ルールを警告メーターにも反映
+    (customRules.dailyCapacities || []).forEach((rule: any) => {
+      if (rule.date === cur.id && rule.section) {
+        dynamicCapacityW[rule.section] = Number(rule.capacity);
+      }
+    });
+
     (customRules.emergencies || []).forEach((em: any) => {
       if (tempAvailCountW <= Number(em.threshold) && em.type === "change_capacity" && em.section) {
-        dynamicCapacityW[em.section] = Number(em.newCapacity ?? 3);
+        // 特定日の設定がない場合のみ緊急定員を反映
+        if (!(customRules.dailyCapacities || []).some((r:any) => r.date === cur.id && r.section === em.section)) {
+           dynamicCapacityW[em.section] = Number(em.newCapacity ?? 3);
+        }
       }
     });
 
