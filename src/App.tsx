@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   
+  /* 🌟 Viteのデフォルトの壁（横幅制限）を強制的に破壊！ */
   html, body, #root { 
     max-width: 100% !important; 
     width: 100% !important; 
@@ -10,6 +11,7 @@ const globalStyle = `
     padding: 0 !important; 
   }
 
+  /* 🌟 全体の横スクロールは防止しつつ、固定ヘッダー（sticky）を殺さない設定 */
   body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
   
   * { box-sizing: border-box; }
@@ -644,7 +646,7 @@ class AutoAssigner {
 
     const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
 
-    let prevAmount = -1; // 🌟変更点：状態ベースのループガード
+    let prevAmount = -1;
     while (getCurrentAmount(current) < targetCount) {
       const currentAmount = getCurrentAmount(current);
       if (currentAmount === prevAmount) break; 
@@ -1003,6 +1005,8 @@ class AutoAssigner {
 
       if (!current.some(m => m.includes(rule.lateTime))) {
         const currentCore = current.map(extractStaffName);
+        
+        // 🌟 修正点：前日の遅番担当者を取得し、連続を防止する
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(extractStaffName) : [];
 
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean) => {
@@ -1205,7 +1209,6 @@ export default function App() {
     return DEFAULT_MONTHLY_ASSIGN;
   });
   
-  // 🌟変更点：ストレージ破損時のアラート対応
   const [customRules, setCustomRules] = useState<CustomRules>(() => {
     try { 
       const saved = localStorage.getItem(KEY_RULES); 
@@ -1512,6 +1515,15 @@ export default function App() {
       const count = split(cells[room]).length;
       const target = dynamicCapacityW[room];
 
+      // 🌟変更点：受付ヘルプの空室警告を「受付が1人の時だけ」に限定
+      if (room === "受付ヘルプ") {
+        const uketsukeCount = split(cells["受付"]).length;
+        if (uketsukeCount === 1 && count === 0) {
+          w.push({type: 'alert', msg: `💡【受付ヘルプ】受付が1名のためヘルプの配置を推奨します`});
+        }
+        return; // 通常の「空室リスト」には入れない
+      }
+
       if (target !== undefined && target > 0) {
         if (count === 0) {
           w.push({type: 'alert', msg: `💡【${room}】が空室です（目安 ${target}人）`});
@@ -1712,7 +1724,7 @@ export default function App() {
 
                 <div style={{ marginTop: 32, paddingTop: 24, borderTop: "2px dashed #cbd5e1" }}>
                   <h5 style={{ margin: "0 0 16px 0", color: "#0ea5e9", fontSize: 24, fontWeight: 800 }}>📅 特定の日だけ枠を追加する（増枠）</h5>
-                  <p style={{ fontSize: 20, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>※「この日のAMだけCTを1人増やす」といったイレギュラーに対応します。</p>
+                  <p style={{ fontSize: 20, color: "#64748b", marginBottom: 20, fontWeight: 600 }}>※「この日のAMだけCTを1人増やす」といったイレギュラーに対応します。基本人数より優先されます。</p>
                   {(customRules.dailyAdditions || []).map((rule: any, idx: number) => (
                     <div key={idx} className="rule-row" style={{ background: "#fff", padding: "16px 24px", border: "2px solid #bae6fd", borderRadius: 12 }}>
                       <input type="date" value={rule.date} onChange={e => updateRule("dailyAdditions", idx, "date", e.target.value)} className="rule-sel" style={{ flex: "0 0 240px", padding: "14px 16px", borderColor: "#7dd3fc" }} />
@@ -1727,7 +1739,7 @@ export default function App() {
                         <option value="(AM)">AM</option>
                         <option value="(PM)">PM</option>
                       </select>
-                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", Number(e.target.value))} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
+                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", e.target.value)} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
                       <span className="rule-label" style={{ color: "#0369a1" }}>人追加する</span>
                       <button onClick={() => removeRule("dailyAdditions", idx)} className="rule-del">✖</button>
                     </div>
@@ -1838,7 +1850,7 @@ export default function App() {
                           {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
                         </select>
                         <span className="rule-label">は</span>
-                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", Number(e.target.value))} className="rule-num" />
+                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", e.target.value)} className="rule-num" />
                         <button onClick={() => removeRule("lunchSpecialDays", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
@@ -1851,9 +1863,9 @@ export default function App() {
                         <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} className="rule-sel">
                           <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", Number(e.target.value))} className="rule-num" />
+                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", e.target.value)} className="rule-num" />
                         <span className="rule-label">人以上➔</span>
-                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", Number(e.target.value))} className="rule-num" />
+                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", e.target.value)} className="rule-num" />
                         <button onClick={() => removeRule("lunchConditional", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
