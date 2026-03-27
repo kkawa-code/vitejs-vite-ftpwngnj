@@ -13,17 +13,21 @@ const globalStyle = `
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
-  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; marginBottom: 20px; }
+  .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(244, 247, 249, 0.95); backdrop-filter: blur(4px); padding-top: 12px; margin-top: -12px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; marginBottom: 20px; }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
+  
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05) !important; }
+  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
+  
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  
   .rule-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; width: 100%; }
   .rule-sel { padding: 6px 24px 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 110px; min-width: 100px; transition: border-color 0.2s; }
   .rule-num { width: 50px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
@@ -89,9 +93,9 @@ const DEFAULT_RULES = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v109"; 
-const KEY_MONTHLY = "shifto_monthly_v109"; 
-const KEY_RULES = "shifto_rules_v109";
+const KEY_ALL_DAYS = "shifto_alldays_v110"; 
+const KEY_MONTHLY = "shifto_monthly_v110"; 
+const KEY_RULES = "shifto_rules_v110";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -654,6 +658,22 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
   }
 
   const assignRooms = () => {
+    // 🌟 専従スタッフが他の部屋にいる場合、一度除去してカウントとブロックをリセットする
+    (customRules.fixed || []).forEach((rule: any) => {
+      if (!rule.staff || !rule.section) return;
+      Object.keys(dayCells).forEach(sec => {
+        if (sec === rule.section) return;
+        if (REST_SECTIONS.includes(sec)) return;
+        const before = split(dayCells[sec]);
+        const after = before.filter(m => getCoreName(m) !== rule.staff);
+        if (before.length !== after.length) {
+          dayCells[sec] = join(after);
+          assignCounts[rule.staff] = 0; 
+          blockMap.set(rule.staff, 'NONE'); 
+        }
+      });
+    });
+
     (customRules.fixed || []).forEach((rule: any) => {
       if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || isUsed(rule.staff) || isForbidden(rule.staff, rule.section)) return;
       if (skipSections.includes(rule.section)) return;
@@ -866,7 +886,6 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         const getCandidate = (candidatesList: string[]) => {
           let cand = candidatesList.filter(name => {
             if (currentCore.includes(name)) return false;
-            // 🌟 修正: 午後不在の人（PMがブロックされている人）だけを遅番から除外
             if (blockMap.get(name) === 'PM') return false; 
             if (isForbidden(name, rule.section)) return false;
             return true;
@@ -1003,7 +1022,6 @@ const executeAutoAssign = (day: any, prevDay: any, pastDays: any[], ctx: AutoAss
         const lunchCores = split(dayCells["昼当番"]).map(getCoreName);
 
         const getHelp = (exclude: string[]) => {
-          // 🌟 修正: フルタイムの人も昼当番以外なら受付ヘルプ(12:15〜)に入れるようにする
           let cand = availGeneral.filter(n => !exclude.includes(n) && !helpMems.map(getCoreName).includes(n) && !isForbidden(n, "受付ヘルプ"));
           if (cand.length > 0) { cand.sort((a, b) => (assignCounts[a] || 0) - (assignCounts[b] || 0)); return cand[0]; }
           return null; 
@@ -1470,14 +1488,17 @@ export default function App() {
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 16px", width: "100%", overflowX: "hidden" }}>
       <style>{globalStyle}</style>
       
+      {/* 🌟 一番上のヘッダーエリアに保存ボタンを復活 */}
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 16, flexWrap: "wrap", padding: "16px 24px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <div>
           <h2 style={{ margin: 0, color: "#0f172a", letterSpacing: "0.02em", fontSize: 24, fontWeight: 800 }}>勤務割付システム</h2>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
+          
           {/* 🌟 復活: 一番上の保存ボタン */}
           <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 保存</button>
+          
           <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 読込</button>
           <input type="file" ref={fileInputRef} accept=".json,application/json,text/plain,*/*" style={{ display: "none" }} onChange={handleImport} />
           <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#475569")}>🖨️ 印刷</button>
@@ -1504,7 +1525,7 @@ export default function App() {
         </details>
       </div>
 
-      {/* 🌟 1つのアコーディオンにまとめた元のレイアウト（色はオリジナル） */}
+      {/* 🌟 元の使いやすい「1つのアコーディオンにまとまったUI」 */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#0f766e", padding: "4px", fontSize: 16, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.02em" }}>
@@ -1869,23 +1890,22 @@ export default function App() {
               </div>
 
             </div>
-          </details>
-        </div>
 
-        {/* 月間担当者の設定 */}
-        <div style={{ ...panelStyle(), padding: "16px 20px" }}>
-          <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
-          <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-            {MONTHLY_CATEGORIES.map(({ key, label }) => {
-              const membersStr = monthlyAssign[key] || "";
-              const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
-              return (
-                <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
-              )
-            })}
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "2px dashed #cbd5e1" }}>
+              <h4 style={{ margin: "0 0 6px 0", color: "#1e293b", fontSize: 16, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
+              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontWeight: 600 }}>今月のベースとなる各モダリティの担当者を設定します。（追加形式）</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                {MONTHLY_CATEGORIES.map(({ key, label }) => {
+                  const membersStr = monthlyAssign[key] || "";
+                  const opts = (key === "受付ヘルプ") ? GENERAL_ROOMS : [];
+                  return (
+                    <SectionEditor key={key} section={label} value={membersStr} activeStaff={getStaffForCategory(key)} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                  )
+                })}
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
       </div>
 
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 24 }}>
@@ -1979,8 +1999,8 @@ export default function App() {
       <div className="no-print" style={{ ...panelStyle(), borderRadius: "24px 24px 0 0", boxShadow: "0 -4px 20px rgba(0,0,0,0.03)" }}>
         
         {/* 🌟 曜日タブとアクションボタンの統合＆追従化 */}
-        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "center", borderBottom: "none", marginBottom: 0 }}>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", gap: 10, borderBottom: "none", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6 }}>
             {days.map(d => {
               return (
                 <button className="btn-hover" key={d.id} onClick={() => setSel(d.id)} style={{ flexShrink: 0, padding: "10px 18px", cursor: "pointer", border: "none", borderRadius: "10px", background: d.id === sel ? "#2563eb" : "transparent", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: d.id === sel ? 800 : 600, fontSize: 15, whiteSpace: "nowrap", transition: "0.2s" }}>
@@ -1990,10 +2010,13 @@ export default function App() {
             })}
           </div>
           
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ width: "2px", height: "30px", background: "#e2e8f0", margin: "0 4px", flexShrink: 0 }}></div>
+          
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
             <button className="btn-hover" onClick={handleAutoOne} style={{...btnStyle("#10b981"), padding: "10px 16px", fontSize: 13}}>✨ 表示日を自動割当</button>
             <button className="btn-hover" onClick={handleAutoAll} style={{...btnStyle("#0ea5e9"), padding: "10px 16px", fontSize: 13}}>⚡ 全日程を自動割当</button>
             <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "1px solid #cbd5e1", padding: "10px 16px", fontSize: 13 }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
+            <button className="btn-hover" onClick={handleExport} style={{...btnStyle("#6366f1"), padding: "10px 16px", fontSize: 13}}>💾 保存</button>
             <button className="btn-hover" onClick={handleUndo} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), padding: "10px 16px", fontSize: 13, cursor: history.length === 0 ? "not-allowed" : "pointer"}} disabled={history.length === 0}>↩️ 戻る</button>
           </div>
         </div>
