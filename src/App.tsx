@@ -948,7 +948,6 @@ class AutoAssigner {
 
     PRIORITY_LIST.forEach((room: string) => {
       if (this.skipSections.includes(room)) return;
-      // 🌟 追加：受付ヘルプ等の後処理専用部屋はメインループで処理しない
       if (["受付ヘルプ", "昼当番", "待機"].includes(room)) return;
 
       let targetCount = this.dynamicCapacity[room] !== undefined ? this.dynamicCapacity[room] : (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
@@ -1092,6 +1091,51 @@ class AutoAssigner {
       .filter(m => !m.includes("(AM)")) 
       .map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
+
+    // 🌟 空室救済（お助け兼務）ロジック
+    ROOM_SECTIONS.forEach(targetRoom => {
+      if (this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
+      if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
+
+      const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
+      let currentMems = split(this.dayCells[targetRoom]);
+      const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
+      
+      let currentAmount = getCurrentAmount(currentMems);
+      if (currentAmount >= targetCap) return;
+
+      const rescueSourceRooms = ["1号室", "2号室", "3号室", "5号室", "パノラマCT", "骨塩", "透視（6号）", "透視（11号）", "MMG", "ポータブル", "CT", "MRI", "RI", "治療"];
+      let candidates: { core: string, fullStr: string }[] = [];
+      
+      rescueSourceRooms.forEach(srcRoom => {
+         if (srcRoom === targetRoom) return;
+         split(this.dayCells[srcRoom]).forEach(m => {
+            const core = extractStaffName(m);
+            if (!ROLE_PLACEHOLDERS.includes(core) && !candidates.some(c => c.core === core) && !this.isForbidden(core, targetRoom)) {
+               if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
+                  candidates.push({ core, fullStr: m });
+               }
+            }
+         });
+      });
+
+      const currentCores = currentMems.map(extractStaffName);
+      candidates = candidates.filter(c => !currentCores.includes(c.core));
+
+      candidates.sort((a, b) => {
+         if ((this.assignCounts[a.core] || 0) !== (this.assignCounts[b.core] || 0)) return (this.assignCounts[a.core] || 0) - (this.assignCounts[b.core] || 0);
+         return (this.counts[a.core] || 0) - (this.counts[b.core] || 0);
+      });
+
+      for (const cand of candidates) {
+         if (currentAmount >= targetCap) break;
+         currentMems.push(cand.fullStr);
+         const amount = getStaffAmount(cand.fullStr);
+         currentAmount += amount;
+         this.addU(cand.core, amount);
+      }
+      this.dayCells[targetRoom] = join(currentMems);
+    });
 
     let helpMembers: string[] = [];
     const tempAvailCountForHelp = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length;
@@ -1746,10 +1790,10 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const updatedDay: DayData = assigner.execute();
+      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const res = worker.execute();
       
-      nextAll[updatedDay.id] = updatedDay.cells;
+      nextAll[res.id] = res.cells;
       return nextAll;
     });
   };
@@ -1763,11 +1807,11 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const updatedDay: DayData = assigner.execute();
-        nextAll[updatedDay.id] = updatedDay.cells;
-        prevDayObj = updatedDay;
-        tempDays.push(updatedDay);
+        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const res = worker.execute();
+        nextAll[res.id] = res.cells;
+        prevDayObj = res;
+        tempDays.push(res);
       }
       return nextAll;
     });
@@ -1932,6 +1976,7 @@ export default function App() {
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
                     <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
                   </div>
+                  {/* 🌟 変更点：連日禁止部屋のUI追加 */}
                   <div style={{ flex: 1, minWidth: "360px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
                     <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? "MMG,ポータブル"} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
