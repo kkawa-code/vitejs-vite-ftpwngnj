@@ -18,7 +18,19 @@ const globalStyle = `
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 1.5em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 48px !important; }
+  /* 🌟 文字被り防止のため padding-right を極端に広く設定 */
+  select { 
+    appearance: none; 
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
+    background-repeat: no-repeat; 
+    background-position: right 12px center; 
+    background-size: 1.5em; 
+    text-overflow: ellipsis; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    padding-right: 56px !important; 
+  }
+  
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
@@ -147,9 +159,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v125"; 
-const KEY_MONTHLY = "shifto_monthly_v125"; 
-const KEY_RULES = "shifto_rules_v125";
+const KEY_ALL_DAYS = "shifto_alldays_v124"; 
+const KEY_MONTHLY = "shifto_monthly_v124"; 
+const KEY_RULES = "shifto_rules_v124";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -467,6 +479,9 @@ class AutoAssigner {
   assignCounts: Record<string, number> = {};
   maxAssigns: Record<string, number> = {};
   counts: Record<string, number> = {};
+  
+  // 🌟 追加：各部屋ごとのこれまでのアサイン回数（ローテーション用）
+  roomCounts: Record<string, Record<string, number>> = {};
 
   initialAvailAll: string[] = [];
   initialAvailGeneral: string[] = [];
@@ -563,13 +578,22 @@ class AutoAssigner {
   }
 
   initCounts() {
-    this.ctx.allStaff.forEach(s => { this.assignCounts[s] = 0; this.maxAssigns[s] = 1; this.counts[s] = 0; });
+    this.ctx.allStaff.forEach(s => { 
+      this.assignCounts[s] = 0; 
+      this.maxAssigns[s] = 1; 
+      this.counts[s] = 0; 
+      this.roomCounts[s] = {};
+      SECTIONS.forEach(sec => this.roomCounts[s][sec] = 0);
+    });
     this.pastDays.forEach(pd => { 
       Object.entries(pd.cells).forEach(([sec, val]) => { 
         if (["明け","入り","不在","土日休日代休","昼当番"].includes(sec)) return; 
         split(val).forEach(m => { 
           const c = extractStaffName(m); 
-          if (this.counts[c] !== undefined) this.counts[c]++; 
+          if (this.counts[c] !== undefined) {
+             this.counts[c]++; 
+             this.roomCounts[c][sec] = (this.roomCounts[c][sec] || 0) + 1; // 🌟 部屋ごとの回数をカウント
+          }
         }); 
       }); 
     });
@@ -735,6 +759,11 @@ class AutoAssigner {
 
              if (mainStaff.includes(a)) scoreA += 10000;
              if (mainStaff.includes(b)) scoreB += 10000;
+
+             // 🌟追加：同一部屋の連続・偏り防止（この部屋に今週何回入ったか）
+             // 1回入るごとにマイナス100点（月間担当者の中でもローテーションさせるため）
+             scoreA -= (this.roomCounts[a]?.[section] || 0) * 100;
+             scoreB -= (this.roomCounts[b]?.[section] || 0) * 100;
 
              if (needTag === "") {
                  if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; 
@@ -1059,10 +1088,9 @@ class AutoAssigner {
     
     const noLateShiftStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
 
-    // 🌟 追加：午後（PM）に物理的に不在のスタッフリスト
     const absentAll = [...split(this.dayCells["明け"]), ...split(this.dayCells["入り"]), ...split(this.dayCells["土日休日代休"])].map(extractStaffName);
     const absentPM = split(this.dayCells["不在"])
-      .filter(m => !m.includes("(AM)")) // AM不在＝午後は出勤、それ以外（無印またはPM）は午後不在
+      .filter(m => !m.includes("(AM)")) 
       .map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
@@ -1089,7 +1117,6 @@ class AutoAssigner {
 
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean, checkIsUsed: boolean) => {
           let cand = candidatesList.filter(name => {
-            // 🌟 物理的に午後不在、または遅番不可設定のスタッフは弾く
             if (cannotLateShift.includes(name)) return false;
             
             if (currentCore.includes(name)) return false;
@@ -1234,7 +1261,6 @@ class AutoAssigner {
       if (needsUketsukeHelp && !this.skipSections.includes("受付ヘルプ")) {
         let helpMems = split(this.dayCells["受付ヘルプ"]);
         
-        // 🌟 修正：ヘルプ要員が0人の時のみスポット追加を行う
         if (helpMems.length === 0) {
           const lunchCores = split(this.dayCells["昼当番"]).map(extractStaffName);
 
@@ -1243,7 +1269,7 @@ class AutoAssigner {
               if (exclude.includes(n)) return false;
               if (helpMems.map(extractStaffName).includes(n)) return false;
               if (this.isForbidden(n, "受付ヘルプ")) return false;
-              if (cannotLateShift.includes(n)) return false; // 🌟 物理的に午後不在、遅番不可を弾く
+              if (cannotLateShift.includes(n)) return false; 
               return true;
             });
             if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
@@ -1899,7 +1925,6 @@ export default function App() {
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
                     <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
                   </div>
-                  {/* 🌟 変更点：連日禁止部屋のUI追加 */}
                   <div style={{ flex: 1, minWidth: "360px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
                     <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? "MMG,ポータブル"} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
@@ -2077,7 +2102,6 @@ export default function App() {
                 <button className="rule-add" style={{color:"#c2410c", borderColor:"#fdba74"}} onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })}>＋ 代打ルールを追加</button>
               </div>
 
-              {/* 🌟 変更点：UIの分離 */}
               <div style={{ background: "#fdf4ff", padding: 32, borderRadius: 16, border: "2px solid #f5d0fe", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#86198f", fontSize: 28, fontWeight: 800 }}>🏠 遅番不可スタッフ（17:00以降の枠に入れない）</h4>
                 <p style={{ fontSize: 22, color: "#a21caf", marginBottom: 24, fontWeight: 600 }}>ここに登録されたスタッフは、どれだけ人が足りなくても17時以降の枠（遅番、夕方の受付ヘルプなど）には割り当てられません。</p>
