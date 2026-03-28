@@ -85,8 +85,8 @@ interface CustomRules {
   dailyAdditions: RuleDailyAddition[];
   priorityRooms: string[];
   fullDayOnlyRooms: string;
-  noConsecutiveRooms: string; // 🌟 追加：連日禁止部屋
-  noLateShiftStaff: string;   // 🌟 追加：遅番不可スタッフ
+  noConsecutiveRooms: string;
+  noLateShiftStaff: string;
   ngPairs: RuleNgPair[];
   fixed: RuleFixed[];
   forbidden: RuleForbidden[];
@@ -139,17 +139,17 @@ const DEFAULT_RULES: CustomRules = {
   dailyCapacities: [], dailyAdditions: [], 
   priorityRooms: DEFAULT_PRIORITY_ROOMS, 
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
-  noConsecutiveRooms: "MMG,ポータブル", // 🌟 初期値
-  noLateShiftStaff: "", // 🌟 初期値
+  noConsecutiveRooms: "MMG,ポータブル",
+  noLateShiftStaff: "",
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   kenmuPairs: [], lateShifts: [], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v123"; 
-const KEY_MONTHLY = "shifto_monthly_v123"; 
-const KEY_RULES = "shifto_rules_v123";
+const KEY_ALL_DAYS = "shifto_alldays_v124"; 
+const KEY_MONTHLY = "shifto_monthly_v124"; 
+const KEY_RULES = "shifto_rules_v124";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -655,14 +655,11 @@ class AutoAssigner {
     const result: string[] = [];
     const uniqueList = Array.from(new Set(list.filter(Boolean)));
     
-    // 🌟変更点：指定された「連日禁止部屋」かどうかをチェックし、前日担当者をブロックする
     const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
     const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
 
     const filterFn = (name: string, checkSoftNg: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
-      
-      // 連日禁止のチェック
       if (prevDayMembers.includes(name)) return false;
 
       const isFixed = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || (section ? isMonthlyMainStaff(section, name, this.ctx.monthlyAssign) : false);
@@ -678,7 +675,7 @@ class AutoAssigner {
     
     const lastResort = uniqueList.filter(name => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
-      if (prevDayMembers.includes(name)) return false; // 連日禁止はラストリゾートでも守る
+      if (prevDayMembers.includes(name)) return false;
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), false)) return false;
       return true;
     });
@@ -1060,7 +1057,6 @@ class AutoAssigner {
     const availGeneral = this.initialAvailGeneral;
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
     
-    // 🌟 追加：遅番不可スタッフの取得
     const noLateShiftStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
 
     let helpMembers: string[] = [];
@@ -1086,7 +1082,6 @@ class AutoAssigner {
 
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean, checkIsUsed: boolean) => {
           let cand = candidatesList.filter(name => {
-            // 🌟 修正：遅番不可スタッフは絶対に選ばない
             if (noLateShiftStaffList.includes(name)) return false;
             if (currentCore.includes(name)) return false;
             const b = this.blockMap.get(name);
@@ -1236,7 +1231,6 @@ class AutoAssigner {
             if (exclude.includes(n)) return false;
             if (helpMems.map(extractStaffName).includes(n)) return false;
             if (this.isForbidden(n, "受付ヘルプ")) return false;
-            // 🌟 修正：受付ヘルプも17時以降のものは遅番不可スタッフを避ける
             if (noLateShiftStaffList.includes(n)) return false; 
             return true;
           });
@@ -1673,7 +1667,6 @@ export default function App() {
       const prevDay = days[curIndex - 1];
       if (!prevDay.isPublicHoliday) {
         
-        // 🌟変更点：連日禁止部屋のアラート対応
         const noConsecutiveRooms = split(customRules.noConsecutiveRooms || "");
         noConsecutiveRooms.forEach(room => {
           const prevMembers = split(prevDay.cells[room]).map(extractStaffName);
@@ -1708,10 +1701,10 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const assigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const updatedDay = assigner.execute();
+      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const res = worker.execute();
       
-      nextAll[updatedDay.id] = updatedDay.cells;
+      nextAll[res.id] = res.cells;
       return nextAll;
     });
   };
@@ -1725,11 +1718,11 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const assigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const updatedDay = assigner.execute();
-        nextAll[updatedDay.id] = updatedDay.cells;
-        prevDayObj = updatedDay;
-        tempDays.push(updatedDay);
+        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const res = worker.execute();
+        nextAll[res.id] = res.cells;
+        prevDayObj = res;
+        tempDays.push(res);
       }
       return nextAll;
     });
@@ -2026,7 +2019,7 @@ export default function App() {
 
               <div style={{ background: "#e0f2fe", padding: 32, borderRadius: 16, border: "2px solid #bae6fd", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 20px 0", color: "#0369a1", fontSize: 28, fontWeight: 800 }}>🎱 玉突き・同室回避ルール</h4>
-                <p style={{ fontSize: 22, color: "#0284c7", marginBottom: 24, fontWeight: 600 }}>「A বললোBさんが同じ部屋になりそうな時、Bさんを別の部屋に押し出す」ルールです。</p>
+                <p style={{ fontSize: 22, color: "#0284c7", marginBottom: 24, fontWeight: 600 }}>「AさんとBさんが同じ部屋になりそうな時、Bさんを別の部屋に押し出す」ルールです。</p>
                 {(customRules.pushOuts || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 28, borderBottom: "2px solid #bae6fd", paddingBottom: 28 }}>
                     <div className="rule-row">
