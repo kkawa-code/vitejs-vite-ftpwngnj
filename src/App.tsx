@@ -18,7 +18,7 @@ const globalStyle = `
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 0.8rem center; background-size: 1.5em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 1.5em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 48px !important; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
@@ -147,9 +147,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v124"; 
-const KEY_MONTHLY = "shifto_monthly_v124"; 
-const KEY_RULES = "shifto_rules_v124";
+const KEY_ALL_DAYS = "shifto_alldays_v125"; 
+const KEY_MONTHLY = "shifto_monthly_v125"; 
+const KEY_RULES = "shifto_rules_v125";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -233,8 +233,7 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
           {sec} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
         </div>
       ))}
-      {/* 🌟 変更点：横幅を広げて文字被りを防止 */}
-      <select className="rule-sel" style={{ padding: "12px 36px 12px 16px", fontSize: 22, minWidth: 220, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "12px 48px 12px 16px", fontSize: 22, minWidth: 200, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
         <option value="">＋追加</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -254,8 +253,7 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
           {name} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
         </div>
       ))}
-      {/* 🌟 変更点：横幅を広げて文字被りを防止 */}
-      <select className="rule-sel" style={{ padding: "12px 36px 12px 16px", fontSize: 22, minWidth: 220, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "12px 48px 12px 16px", fontSize: 22, minWidth: 200, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
         <option value="">{placeholder}</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -1061,6 +1059,13 @@ class AutoAssigner {
     
     const noLateShiftStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
 
+    // 🌟 追加：午後（PM）に物理的に不在のスタッフリスト
+    const absentAll = [...split(this.dayCells["明け"]), ...split(this.dayCells["入り"]), ...split(this.dayCells["土日休日代休"])].map(extractStaffName);
+    const absentPM = split(this.dayCells["不在"])
+      .filter(m => !m.includes("(AM)")) // AM不在＝午後は出勤、それ以外（無印またはPM）は午後不在
+      .map(extractStaffName);
+    const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
+
     let helpMembers: string[] = [];
     const tempAvailCountForHelp = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length;
     if (tempAvailCountForHelp <= (this.ctx.customRules.helpThreshold ?? 17)) {
@@ -1084,7 +1089,9 @@ class AutoAssigner {
 
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean, checkIsUsed: boolean) => {
           let cand = candidatesList.filter(name => {
-            if (noLateShiftStaffList.includes(name)) return false;
+            // 🌟 物理的に午後不在、または遅番不可設定のスタッフは弾く
+            if (cannotLateShift.includes(name)) return false;
+            
             if (currentCore.includes(name)) return false;
             const b = this.blockMap.get(name);
             if (b === 'PM') return false; 
@@ -1227,7 +1234,7 @@ class AutoAssigner {
       if (needsUketsukeHelp && !this.skipSections.includes("受付ヘルプ")) {
         let helpMems = split(this.dayCells["受付ヘルプ"]);
         
-        // 🌟 修正点：フルタイムのヘルプが既に入っている場合は、スポット追加をスキップ
+        // 🌟 修正：ヘルプ要員が0人の時のみスポット追加を行う
         if (helpMems.length === 0) {
           const lunchCores = split(this.dayCells["昼当番"]).map(extractStaffName);
 
@@ -1236,7 +1243,7 @@ class AutoAssigner {
               if (exclude.includes(n)) return false;
               if (helpMems.map(extractStaffName).includes(n)) return false;
               if (this.isForbidden(n, "受付ヘルプ")) return false;
-              if (noLateShiftStaffList.includes(n)) return false; 
+              if (cannotLateShift.includes(n)) return false; // 🌟 物理的に午後不在、遅番不可を弾く
               return true;
             });
             if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
@@ -1249,13 +1256,13 @@ class AutoAssigner {
           }
 
           const kenzoCores = split(this.dayCells["検像"]).map(extractStaffName);
-          const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !noLateShiftStaffList.includes(n));
+          const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n));
 
           let picked16 = validKenzo.length > 0 ? validKenzo[0] : null;
 
           if (!picked16) {
             const excl = lunchHelpCandidate ? [lunchHelpCandidate] : [];
-            let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !noLateShiftStaffList.includes(n));
+            let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n));
             if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); picked16 = cand[0]; }
           }
 
