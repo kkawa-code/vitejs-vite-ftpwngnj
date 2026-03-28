@@ -253,7 +253,7 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
-const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋スタッフを選択" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
+const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
@@ -1585,29 +1585,37 @@ export default function App() {
     }
   };
 
-  const weeklyStats = useMemo(() => {
-    const stats: Record<string, { total: number, portable: number, ct: number, mri: number, room6: number, room11: number }> = {};
-    activeGeneralStaff.forEach(s => { stats[s] = { total: 0, portable: 0, ct: 0, mri: 0, room6: 0, room11: 0 }; });
-    
-    days.forEach(d => {
-      if (d.isPublicHoliday) return;
-      const taskRooms = ASSIGNABLE_SECTIONS.filter(s => !["待機", "昼当番", "受付", "受付ヘルプ"].includes(s));
-      taskRooms.forEach(sec => {
-        const members = split(d.cells[sec]).map(extractStaffName);
-        members.forEach(m => {
-          if (stats[m]) {
-            stats[m].total += 1;
-            if (sec === "ポータブル") stats[m].portable += 1;
-            if (sec === "CT") stats[m].ct += 1;
-            if (sec === "MRI") stats[m].mri += 1;
-            if (sec === "透視（6号）") stats[m].room6 += 1;
-            if (sec === "透視（11号）") stats[m].room11 += 1;
-          }
-        });
+  // 🌟変更点：週間メーターを「月間モダリティ残数メーター」に進化！
+  const monthlyModalityStats = useMemo(() => {
+    const targetMonth = targetMonday.substring(0, 7); // 例: "2026-03"
+    const stats: { room: string, data: { name: string, count: number }[] }[] = [];
+    const targetRooms = ["CT", "MRI", "治療", "RI", "MMG"];
+
+    targetRooms.forEach(room => {
+      const assignedStaff = getMonthlyStaffForSection(room, monthlyAssign);
+      if (assignedStaff.length === 0) return;
+
+      const counts: Record<string, number> = {};
+      assignedStaff.forEach(s => counts[s] = 0);
+
+      Object.entries(allDays).forEach(([dateStr, cells]) => {
+        if (dateStr.startsWith(targetMonth)) {
+          const membersInRoom = split(cells[room] || "").map(extractStaffName);
+          membersInRoom.forEach(m => {
+            if (counts[m] !== undefined) {
+               counts[m] += 1;
+            }
+          });
+        }
+      });
+
+      stats.push({
+        room,
+        data: Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count)
       });
     });
-    return Object.entries(stats).sort((a, b) => b[1].total - a[1].total);
-  }, [days, activeGeneralStaff]);
+    return stats;
+  }, [targetMonday, allDays, monthlyAssign]);
 
   const priorityRoomsList = useMemo(() => {
     const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
@@ -1924,7 +1932,6 @@ export default function App() {
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
                     <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
                   </div>
-                  {/* 🌟 変更点：連日禁止部屋のUI追加 */}
                   <div style={{ flex: 1, minWidth: "360px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
                     <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? "MMG,ポータブル"} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
@@ -2229,26 +2236,30 @@ export default function App() {
         </details>
       </div>
 
+      {/* 🌟 変更点：月間のモダリティ配置残数メーター */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 32 }}>
         <details>
-          <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 28, display: "flex", alignItems: "center", gap: 12 }}>
-            <span>📊</span> 今週のスタッフ稼働メーター（自動集計）を開く
+          <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 28, display: "flex", alignItems: "center", gap: 12, letterSpacing: "0.02em" }}>
+            <span>📊</span> 今月のモダリティ配置バランス（月間担当者の消化回数）を開く
           </summary>
           <div style={{ marginTop: 24, borderTop: "2px dashed #cbd5e1", paddingTop: 24 }}>
-            <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>※表示中の1週間（月〜日）で、誰が何回「業務（待機・当番除く）」に割り当てられているかを自動集計します。クリックで詳細が見れます。</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-              {weeklyStats.map(([name, stat]) => (
-                <div key={name} className="card-hover btn-hover" onClick={() => setSelectedStaffForStats(name)} style={{ background: stat.total > 0 ? "#fff" : "#f1f5f9", border: `2px solid ${stat.total > 0 ? "#bfdbfe" : "#e2e8f0"}`, padding: "18px 24px", borderRadius: 12, minWidth: 240, boxShadow: stat.total > 0 ? "0 2px 4px rgba(0,0,0,0.05)" : "none" }}>
-                  <div style={{ fontWeight: 800, color: stat.total > 0 ? "#1e293b" : "#94a3b8", marginBottom: 12, fontSize: 24 }}>{name}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "2px solid #f1f5f9", paddingTop: 12 }}>
-                    <span style={{ fontSize: 20, color: "#64748b", fontWeight: 600 }}>総稼働: <strong style={{color:"#2563eb", fontSize:26}}>{stat.total}</strong> 枠</span>
-                    <div style={{ display: "flex", gap: 10, fontSize: 18, fontWeight: 800 }}>
-                      {stat.portable > 0 && <span style={{ color: "#ef4444", background: "#fee2e2", padding: "4px 10px", borderRadius: 8 }}>ポ:{stat.portable}</span>}
-                      {stat.ct > 0 && <span style={{ color: "#0ea5e9", background: "#e0f2fe", padding: "4px 10px", borderRadius: 8 }}>C:{stat.ct}</span>}
-                      {stat.mri > 0 && <span style={{ color: "#10b981", background: "#d1fae5", padding: "4px 10px", borderRadius: 8 }}>M:{stat.mri}</span>}
-                      {stat.room6 > 0 && <span style={{ color: "#8b5cf6", background: "#ede9fe", padding: "4px 10px", borderRadius: 8 }}>6号:{stat.room6}</span>}
-                      {stat.room11 > 0 && <span style={{ color: "#f59e0b", background: "#fef3c7", padding: "4px 10px", borderRadius: 8 }}>11号:{stat.room11}</span>}
-                    </div>
+            <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>
+              ※表示中の月（{targetMonday.substring(0, 7)}）において、各モダリティの「月間担当者」が、実際に何回その部屋に割り当てられているかを集計します。システムに保存されているデータのみカウントされます。
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+              {monthlyModalityStats.map((stat) => (
+                <div key={stat.room} style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 12, padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)" }}>
+                  <h4 style={{ margin: "0 0 16px 0", fontSize: 24, color: "#1e293b", borderBottom: "2px solid #f1f5f9", paddingBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                    <span>{stat.room}</span>
+                    <span style={{ fontSize: 16, color: "#94a3b8", fontWeight: 600 }}>月間担当</span>
+                  </h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {stat.data.map(d => (
+                       <div key={d.name} className="card-hover btn-hover" onClick={() => setSelectedStaffForStats(d.name)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: d.count > 0 ? "#f0f9ff" : "#f8fafc", border: `1px solid ${d.count > 0 ? "#bae6fd" : "#e2e8f0"}`, padding: "12px 16px", borderRadius: 8, cursor: "pointer" }}>
+                         <span style={{ fontSize: 22, fontWeight: 700, color: d.count > 0 ? "#0369a1" : "#64748b" }}>{d.name}</span>
+                         <span style={{ fontSize: 24, fontWeight: 800, color: d.count > 0 ? "#2563eb" : "#94a3b8" }}>{d.count} <span style={{fontSize: 18}}>回</span></span>
+                       </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -2424,14 +2435,14 @@ export default function App() {
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15, 23, 42, 0.5)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedStaffForStats(null)}>
           <div className="modal-animate" style={{ background: "#fff", padding: 40, borderRadius: 24, width: "90%", maxWidth: 600, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, paddingBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
-              <h3 style={{ margin: 0, fontSize: 32, color: "#0f172a", fontWeight: 800 }}>👤 {selectedStaffForStats} さんの稼働詳細</h3>
+              <h3 style={{ margin: 0, fontSize: 32, color: "#0f172a", fontWeight: 800 }}>👤 {selectedStaffForStats} さんの稼働詳細（月間）</h3>
               <button onClick={() => setSelectedStaffForStats(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 56, height: 56, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 28 }}>✖</button>
             </div>
             
-            {days.every(d => d.isPublicHoliday) ? (
-              <p style={{ textAlign: "center", color: "#64748b", fontSize: 26 }}>今週はすべて休診日です。</p>
+            {Object.keys(allDays).filter(d => d.startsWith(targetMonday.substring(0, 7))).length === 0 ? (
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 26 }}>データがありません。</p>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 26 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 24 }}>
                 <thead>
                   <tr style={{ borderBottom: "3px solid #e2e8f0" }}>
                     <th style={{ padding: "16px 12px", textAlign: "left", color: "#475569" }}>日付</th>
@@ -2439,27 +2450,33 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {days.map(d => {
-                    if (d.isPublicHoliday) return null;
-                    const assigns: string[] = [];
-                    Object.entries(d.cells).forEach(([sec, val]) => {
-                      if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
-                      const members = split(val as string);
-                      const myAssign = members.find(m => extractStaffName(m) === selectedStaffForStats);
-                      if (myAssign) {
-                         const timeStr = myAssign.substring(selectedStaffForStats.length);
-                         assigns.push(`${sec}${timeStr}`);
-                      }
-                    });
-                    
-                    return (
-                      <tr key={d.id} style={{ borderBottom: "2px solid #f1f5f9" }}>
-                        <td style={{ padding: "20px 12px", fontWeight: 600, color: "#334155", verticalAlign: "top", width: "40%" }}>{d.label}</td>
-                        <td style={{ padding: "20px 12px", color: assigns.length > 0 ? "#0ea5e9" : "#94a3b8", fontWeight: 700 }}>
-                          {assigns.length > 0 ? assigns.join(" / ") : "なし（または休務）"}
-                        </td>
-                      </tr>
-                    )
+                  {Object.entries(allDays)
+                    .filter(([dateStr]) => dateStr.startsWith(targetMonday.substring(0, 7)))
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([dateStr, cells]) => {
+                      const assigns: string[] = [];
+                      Object.entries(cells).forEach(([sec, val]) => {
+                        if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
+                        const members = split(val as string);
+                        const myAssign = members.find(m => extractStaffName(m) === selectedStaffForStats);
+                        if (myAssign) {
+                           const timeStr = myAssign.substring(selectedStaffForStats.length);
+                           assigns.push(`${sec}${timeStr}`);
+                        }
+                      });
+                      
+                      const dObj = new Date(dateStr);
+                      const YOUBI = ["日", "月", "火", "水", "木", "金", "土"];
+                      const label = `${dObj.getMonth() + 1}/${dObj.getDate()}(${YOUBI[dObj.getDay()]})`;
+
+                      return (
+                        <tr key={dateStr} style={{ borderBottom: "2px solid #f1f5f9" }}>
+                          <td style={{ padding: "16px 12px", fontWeight: 600, color: "#334155", verticalAlign: "top", width: "40%" }}>{label}</td>
+                          <td style={{ padding: "16px 12px", color: assigns.length > 0 ? "#0ea5e9" : "#94a3b8", fontWeight: 700 }}>
+                            {assigns.length > 0 ? assigns.join(" / ") : "なし（または休務）"}
+                          </td>
+                        </tr>
+                      )
                   })}
                 </tbody>
               </table>
