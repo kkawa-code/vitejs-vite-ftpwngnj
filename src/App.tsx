@@ -592,7 +592,7 @@ class AutoAssigner {
       }).filter(Boolean) as string[];
       this.dayCells[sec] = join(members);
 
-      if (!REST_SECTIONS.includes(sec) && sec !== "昼当番") {
+     if (!REST_SECTIONS.includes(sec) && sec !== "昼当番") {
           split(this.dayCells[sec]).forEach(name => { 
               const c = extractStaffName(name); 
               if (ROLE_PLACEHOLDERS.includes(c)) return; 
@@ -602,6 +602,16 @@ class AutoAssigner {
     });
   }
 
+  // 🌟 ここから追加
+  getForbiddenCount(staffName: string): number {
+    const rules = this.ctx.customRules.forbidden || [];
+    const rule = rules.find((r: any) => r.staff === staffName);
+    return rule ? split(rule.sections).length : 0;
+  }
+  // 🌟 ここまで追加
+
+  prepareAvailability() {
+    const supportStaffList = split(this.ctx.customRules.supportStaffList || "");
   prepareAvailability() {
     const supportStaffList = split(this.ctx.customRules.supportStaffList || "");
     const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
