@@ -1629,7 +1629,6 @@ export default function App() {
     }
   };
 
-  // 🌟変更点：週間メーターを「月間モダリティ残数メーター」に進化！
   const monthlyModalityStats = useMemo(() => {
     const targetMonth = targetMonday.substring(0, 7); // 例: "2026-03"
     const stats: { room: string, data: { name: string, count: number }[] }[] = [];
@@ -1790,8 +1789,8 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const res = worker.execute();
+      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const res: DayData = worker.execute();
       
       nextAll[res.id] = res.cells;
       return nextAll;
@@ -1807,8 +1806,8 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const res = worker.execute();
+        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const res: DayData = worker.execute();
         nextAll[res.id] = res.cells;
         prevDayObj = res;
         tempDays.push(res);
@@ -1976,7 +1975,6 @@ export default function App() {
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
                     <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
                   </div>
-                  {/* 🌟 変更点：連日禁止部屋のUI追加 */}
                   <div style={{ flex: 1, minWidth: "360px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
                     <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? "MMG,ポータブル"} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
