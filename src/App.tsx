@@ -143,9 +143,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v120"; 
-const KEY_MONTHLY = "shifto_monthly_v120"; 
-const KEY_RULES = "shifto_rules_v120";
+const KEY_ALL_DAYS = "shifto_alldays_v122"; 
+const KEY_MONTHLY = "shifto_monthly_v122"; 
+const KEY_RULES = "shifto_rules_v122";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -747,6 +747,12 @@ class AutoAssigner {
              }
 
              if (scoreA !== scoreB) return scoreB - scoreA;
+             
+             // 🌟追加：担当不可の部屋が多い（汎用性が低い）スタッフを最優先で埋める！
+             const forbidA = this.getForbiddenCount(a);
+             const forbidB = this.getForbiddenCount(b);
+             if (forbidA !== forbidB) return forbidB - forbidA; // 降順（NGが多い人が先）
+
              if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0);
              if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
              return a.localeCompare(b, 'ja');
@@ -1041,13 +1047,6 @@ class AutoAssigner {
     const availGeneral = this.initialAvailGeneral;
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
 
-    let helpMembers: string[] = [];
-    const tempAvailCountForHelp = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length;
-    if (tempAvailCountForHelp <= (this.ctx.customRules.helpThreshold ?? 17)) {
-      helpMembers = [...split(this.dayCells["RI"]).map(extractStaffName)];
-      if (split(this.dayCells["CT"]).length >= 4) { helpMembers.push(extractStaffName(split(this.dayCells["CT"])[split(this.dayCells["CT"]).length - 1])); }
-    }
-
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
       if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
       if (this.skipSections.includes(rule.section)) return;
@@ -1073,14 +1072,21 @@ class AutoAssigner {
             return true;
           });
           if (cand.length > 0) {
-            cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0));
+            // 🌟 修正：当日の負担（assignCounts）とこれまでの負担（counts）を見て満遍なく割り当てる
+            cand.sort((a, b) => {
+              if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
+              return (this.counts[a] || 0) - (this.counts[b] || 0);
+            });
             return cand[0];
           }
           return null;
         };
 
-        let picked = getCandidate(helpMembers, false, false) || getCandidate(availGeneral, false, true);
-        if (!picked) picked = getCandidate(helpMembers, true, false) || getCandidate(availGeneral, true, true);
+        // 🌟 修正：RIやヘルプ要員の優先を廃止し、一般スタッフから満遍なく選ぶ
+        let picked = getCandidate(availGeneral, false, true); // 1. 連続なし・今日まだ空いてる人
+        if (!picked) picked = getCandidate(availGeneral, false, false); // 2. 連続なし・今日すでに入ってる人（やむを得ず）
+        if (!picked) picked = getCandidate(availGeneral, true, true); // 3. 連続あり・今日空いてる人
+        if (!picked) picked = getCandidate(availGeneral, true, false); // 4. 連続あり・今日すでに入ってる人
 
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
@@ -1810,7 +1816,7 @@ export default function App() {
                         <option value="(AM)">AM</option>
                         <option value="(PM)">PM</option>
                       </select>
-                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", e.target.value)} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
+                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", Number(e.target.value))} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
                       <span className="rule-label" style={{ color: "#0369a1" }}>人追加する</span>
                       <button onClick={() => removeRule("dailyAdditions", idx)} className="rule-del">✖</button>
                     </div>
@@ -1921,7 +1927,7 @@ export default function App() {
                           {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
                         </select>
                         <span className="rule-label">は</span>
-                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", e.target.value)} className="rule-num" />
+                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", Number(e.target.value))} className="rule-num" />
                         <button onClick={() => removeRule("lunchSpecialDays", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
@@ -1934,9 +1940,9 @@ export default function App() {
                         <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} className="rule-sel">
                           <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", e.target.value)} className="rule-num" />
+                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", Number(e.target.value))} className="rule-num" />
                         <span className="rule-label">人以上➔</span>
-                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", e.target.value)} className="rule-num" />
+                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", Number(e.target.value))} className="rule-num" />
                         <button onClick={() => removeRule("lunchConditional", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
@@ -2382,7 +2388,7 @@ export default function App() {
                 </tbody>
               </table>
             )}
-            <div style={{ marginTop: 40, textAlign: "center" }}>
+            <div style={{ textAlign: "center", marginTop: 40 }}>
               <button className="btn-hover" onClick={() => setSelectedStaffForStats(null)} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "20px 48px", borderRadius: 12, fontWeight: 800, cursor: "pointer", fontSize: 26 }}>閉じる</button>
             </div>
           </div>
