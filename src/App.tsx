@@ -143,9 +143,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v122"; 
-const KEY_MONTHLY = "shifto_monthly_v122"; 
-const KEY_RULES = "shifto_rules_v122";
+const KEY_ALL_DAYS = "shifto_alldays_v124"; 
+const KEY_MONTHLY = "shifto_monthly_v124"; 
+const KEY_RULES = "shifto_rules_v124";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -612,11 +612,12 @@ class AutoAssigner {
     const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
 
     this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => {
+      // 🌟変更点：初期出勤メンバーも「当日・今週の負担」を優先してソートする（NG数はタイブレーク）
+      if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0); 
+      if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0); 
       const aForbidCount = this.getForbiddenCount(a);
       const bForbidCount = this.getForbiddenCount(b);
       if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount;
-      if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0); 
-      if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0); 
       return a.localeCompare(b, 'ja');
     });
 
@@ -747,14 +748,15 @@ class AutoAssigner {
              }
 
              if (scoreA !== scoreB) return scoreB - scoreA;
+
+             // 🌟変更点：当日負担 → 今週負担 → NG数の順番で評価し、満遍ないローテーションを復活
+             if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
+             if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0);
              
-             // 🌟追加：担当不可の部屋が多い（汎用性が低い）スタッフを最優先で埋める！
              const forbidA = this.getForbiddenCount(a);
              const forbidB = this.getForbiddenCount(b);
-             if (forbidA !== forbidB) return forbidB - forbidA; // 降順（NGが多い人が先）
-
-             if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0);
-             if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
+             if (forbidA !== forbidB) return forbidB - forbidA; 
+             
              return a.localeCompare(b, 'ja');
          });
       };
@@ -1047,6 +1049,13 @@ class AutoAssigner {
     const availGeneral = this.initialAvailGeneral;
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
 
+    let helpMembers: string[] = [];
+    const tempAvailCountForHelp = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length;
+    if (tempAvailCountForHelp <= (this.ctx.customRules.helpThreshold ?? 17)) {
+      helpMembers = [...split(this.dayCells["RI"]).map(extractStaffName)];
+      if (split(this.dayCells["CT"]).length >= 4) { helpMembers.push(extractStaffName(split(this.dayCells["CT"])[split(this.dayCells["CT"]).length - 1])); }
+    }
+
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
       if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
       if (this.skipSections.includes(rule.section)) return;
@@ -1072,21 +1081,16 @@ class AutoAssigner {
             return true;
           });
           if (cand.length > 0) {
-            // 🌟 修正：当日の負担（assignCounts）とこれまでの負担（counts）を見て満遍なく割り当てる
-            cand.sort((a, b) => {
-              if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
-              return (this.counts[a] || 0) - (this.counts[b] || 0);
-            });
+            cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0));
             return cand[0];
           }
           return null;
         };
 
-        // 🌟 修正：RIやヘルプ要員の優先を廃止し、一般スタッフから満遍なく選ぶ
-        let picked = getCandidate(availGeneral, false, true); // 1. 連続なし・今日まだ空いてる人
-        if (!picked) picked = getCandidate(availGeneral, false, false); // 2. 連続なし・今日すでに入ってる人（やむを得ず）
-        if (!picked) picked = getCandidate(availGeneral, true, true); // 3. 連続あり・今日空いてる人
-        if (!picked) picked = getCandidate(availGeneral, true, false); // 4. 連続あり・今日すでに入ってる人
+        let picked = getCandidate(availGeneral, false, true); 
+        if (!picked) picked = getCandidate(availGeneral, false, false); 
+        if (!picked) picked = getCandidate(availGeneral, true, true); 
+        if (!picked) picked = getCandidate(availGeneral, true, false);
 
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
