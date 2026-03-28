@@ -109,20 +109,6 @@ const ROOM_SECTIONS: Section[] = SECTIONS.filter(
 const WORK_SECTIONS: Section[] = SECTIONS.filter(
   (s) => !["明け", "入り", "土日休日代休", "不在", "待機", "昼当番"].includes(s),
 ) as Section[];
-const GENERAL_ROOMS: Section[] = [
-  "1号室",
-  "2号室",
-  "3号室",
-  "5号室",
-  "透視（6号）",
-  "透視（11号）",
-  "骨塩",
-  "パノラマCT",
-  "ポータブル",
-  "DSA",
-  "透析後胸部",
-  "検像",
-];
 const MONTHLY_CATEGORIES = [
   "CT",
   "MRI",
@@ -606,7 +592,7 @@ function applyFixedRules(day: DayData, ctx: AssignmentEngineContext, used: Set<s
   }
 }
 
-function cleanupUnavailable(day: DayData, ctx: AssignmentEngineContext) {
+function cleanupUnavailable(day: DayData) {
   const absent = new Set(
     unique([
       ...split(day.cells["明け"]).map(extractStaffName),
@@ -638,7 +624,7 @@ function autoAssignDay(baseDay: DayData, prevDay: DayData | null, pastDays: DayD
     return { ...day, cells: emptyCells() };
   }
 
-  cleanupUnavailable(day, ctx);
+  cleanupUnavailable(day);
 
   const used = new Set<string>();
   for (const section of WORK_SECTIONS) {
