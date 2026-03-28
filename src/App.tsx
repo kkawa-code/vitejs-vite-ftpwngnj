@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   
+  /* 🌟 Viteのデフォルトの壁（横幅制限）を強制的に破壊！ */
   html, body, #root { 
     max-width: 100% !important; 
     width: 100% !important; 
@@ -10,6 +11,7 @@ const globalStyle = `
     padding: 0 !important; 
   }
 
+  /* 🌟 全体の横スクロールは防止しつつ、固定ヘッダー（sticky）を殺さない設定 */
   body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
   
   * { box-sizing: border-box; }
@@ -169,6 +171,7 @@ function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim(
 function join(a: string[]) { return a.filter(Boolean).join("、"); }
 function formatDayForDisplay(d: Date) { const YOUBI = ["日", "月", "火", "水", "木", "金", "土"]; return `${d.getMonth() + 1}/${d.getDate()}(${YOUBI[d.getDay()]})`; }
 
+// 🌟 責務の分離：名前のみを抽出する関数
 function extractStaffName(fullName: string) { 
   return fullName.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim(); 
 }
@@ -433,6 +436,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   );
 };
 
+
 // ===================== 🌟 巨大関数をクラス化してリファクタリング =====================
 
 type AutoAssignContext = {
@@ -461,6 +465,11 @@ class AutoAssigner {
   maxAssigns: Record<string, number> = {};
   counts: Record<string, number> = {};
 
+  initialAvailAll: string[] = [];
+  initialAvailGeneral: string[] = [];
+  initialAvailSupport: string[] = [];
+  initialAvailReception: string[] = [];
+
   constructor(day: DayData, prevDay: DayData | null, pastDays: DayData[], ctx: AutoAssignContext) {
     this.day = { ...day };
     this.prevDay = prevDay;
@@ -486,6 +495,8 @@ class AutoAssigner {
     this.evaluateEmergencies();
     this.initCounts();
     this.cleanUpDayCells();
+    
+    this.prepareAvailability();
     
     this.assignRooms();
     this.processPostTasks();
@@ -589,6 +600,24 @@ class AutoAssigner {
           }); 
       }
     });
+  }
+
+  prepareAvailability() {
+    const supportStaffList = split(this.ctx.customRules.supportStaffList || "");
+    const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
+
+    this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => {
+      const aForbidCount = this.getForbiddenCount(a);
+      const bForbidCount = this.getForbiddenCount(b);
+      if (aForbidCount !== bForbidCount) return bForbidCount - aForbidCount;
+      if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0); 
+      if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0); 
+      return a.localeCompare(b, 'ja');
+    });
+
+    this.initialAvailSupport = this.initialAvailAll.filter(s => supportStaffList.includes(s));
+    this.initialAvailGeneral = this.initialAvailAll.filter(s => this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s));
+    this.initialAvailReception = this.initialAvailAll.filter(s => effectiveReceptionStaff.includes(s) && !supportStaffList.includes(s));
   }
 
   isUsed(name: string): boolean {
@@ -751,10 +780,9 @@ class AutoAssigner {
   }
 
   assignRooms() {
-    const availAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL');
-    const availGeneral = availAll.filter(s => this.ctx.activeGeneralStaff.includes(s));
-    const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
-    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s));
+    const availAll = this.initialAvailAll;
+    const availGeneral = this.initialAvailGeneral;
+    const availReception = this.initialAvailReception;
     const fullDayOnlyList = split(this.ctx.customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT");
 
     (this.ctx.customRules.fixed || []).forEach((rule: any) => {
@@ -888,18 +916,34 @@ class AutoAssigner {
         const uketsukeMonthly = split(this.ctx.monthlyAssign.受付 || "");
         for (const name of uketsukeMonthly) {
           if (availAll.includes(name) && !this.isUsed(name) && !currentUketsuke.map(extractStaffName).includes(name)) { 
-            currentUketsuke.push(name); this.addU(name, 1); 
+            // 🌟 修正点：月間受付スタッフのAM/PMブロックを考慮
+            const b = this.blockMap.get(name);
+            if (b === 'ALL') continue;
+            let tag = ""; 
+            let f = 1;
+            if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(name, 'ALL'); }
+            else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(name, 'ALL'); }
+            else { this.blockMap.set(name, 'ALL'); }
+            currentUketsuke.push(`${name}${tag}`); 
+            this.addU(name, f); 
           }
         }
         
-        // 🌟変更点：受付の人数も0.5人単位で正確に計算
         const currentUketsukeAmount = currentUketsuke.reduce((sum, m) => sum + getStaffAmount(m), 0);
         let neededUketsuke = targetCount - currentUketsukeAmount;
         
         if (neededUketsuke > 0) {
           const pickedUketsuke = this.pick(availReception, availReception, Math.ceil(neededUketsuke), "受付", currentUketsuke);
-          pickedUketsuke.forEach((name: string) => this.addU(name, 1)); 
-          currentUketsuke = [...currentUketsuke, ...pickedUketsuke];
+          // 🌟 修正点：追加で選ばれた受付スタッフもAM/PMを考慮
+          pickedUketsuke.forEach((name: string) => {
+            const b = this.blockMap.get(name);
+            let tag = ""; let f = 1;
+            if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(name, 'ALL'); }
+            else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(name, 'ALL'); }
+            else { this.blockMap.set(name, 'ALL'); }
+            currentUketsuke.push(`${name}${tag}`);
+            this.addU(name, f);
+          });
         }
         this.dayCells["受付"] = join(currentUketsuke);
       } else {
@@ -958,7 +1002,6 @@ class AutoAssigner {
           targetMems.push(m);
           targetCores.push(core);
           
-          // 🌟変更点：兼務処理内での二重アサイン防止（addU呼び出し）と正確な人数カウント
           const amount = getStaffAmount(m);
           currentAmount += amount;
           this.addU(core, amount);
@@ -991,9 +1034,9 @@ class AutoAssigner {
   }
 
   processPostTasks() {
-    const availAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL');
-    const availSupport = availAll.filter(s => split(this.ctx.customRules.supportStaffList || "").includes(s));
-    const availGeneral = availAll.filter(s => this.ctx.activeGeneralStaff.includes(s) && !split(this.ctx.customRules.supportStaffList || "").includes(s));
+    const availAll = this.initialAvailAll;
+    const availSupport = this.initialAvailSupport;
+    const availGeneral = this.initialAvailGeneral;
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
 
     let helpMembers: string[] = [];
@@ -1024,7 +1067,6 @@ class AutoAssigner {
             if (b === 'PM') return false; 
             if (this.isForbidden(name, rule.section)) return false;
             if (!allowConsecutive && prevLateStaff.includes(name)) return false; 
-            // 🌟 変更点：過労防止のため isUsed をチェック（ヘルプ要員以外）
             if (checkIsUsed && this.isUsed(name)) return false;
             return true;
           });
@@ -1035,8 +1077,6 @@ class AutoAssigner {
           return null;
         };
 
-        // 緊急ヘルプ要員は isUsed を無視してアサイン可能にする（緊急なので）
-        // 一般スタッフは isUsed をチェックして過労を防ぐ
         let picked = getCandidate(helpMembers, false, false) || getCandidate(availGeneral, false, true);
         if (!picked) picked = getCandidate(helpMembers, true, false) || getCandidate(availGeneral, true, true);
 
@@ -1156,7 +1196,7 @@ class AutoAssigner {
       this.dayCells["昼当番"] = join(currentLunch.slice(0, lunchTarget));
 
       const uTarget = this.dynamicCapacity.受付 !== undefined ? this.dynamicCapacity.受付 : 2;
-      const currentUketsukeCount = split(this.dayCells["受付"]).reduce((sum, m) => sum + getStaffAmount(m), 0); // 🌟受付の人数カウントを修正
+      const currentUketsukeCount = split(this.dayCells["受付"]).reduce((sum, m) => sum + getStaffAmount(m), 0);
       const needsUketsukeHelp = currentUketsukeCount < uTarget;
 
       if (needsUketsukeHelp && !this.skipSections.includes("受付ヘルプ")) {
@@ -1328,7 +1368,6 @@ export default function App() {
   
   const updateMonthly = (category: string, value: string) => { setMonthlyAssign(prev => ({ ...prev, [category]: value })); };
   
-  // 🌟変更点：Genericsを活用して型を厳格化した更新関数群
   const addRule = <K extends keyof CustomRules>(type: K, defaultObj: any) => {
     setCustomRules((r) => {
       const arrayValue = Array.isArray(r[type]) ? r[type] : [];
@@ -1547,8 +1586,8 @@ export default function App() {
       const target = dynamicCapacityW[room];
 
       if (room === "受付ヘルプ") {
-        const uketsukeCount = split(cells["受付"]).length;
-        if (uketsukeCount === 1 && count === 0) {
+        const uketsukeCount = split(cells["受付"]).reduce((sum, m) => sum + getStaffAmount(m), 0);
+        if (uketsukeCount <= 1.5 && count === 0) { 
           w.push({type: 'alert', msg: `💡【受付ヘルプ】受付が1名のためヘルプの配置を推奨します`});
         }
         return; 
@@ -1594,13 +1633,6 @@ export default function App() {
       w.push({type: 'info', msg: `💡【昼当番】が不足（現在 ${lunchCount}人 / 目安 ${lunchTarget}人）`});
     }
     
-    (customRules.lateShifts || []).forEach((rule: any) => {
-       const m = split(cells[rule.section]);
-       if (m.length > 0 && !m.some(x => x.includes(rule.lateTime))) {
-         w.push({type: 'alert', msg: `🌇【${rule.section}】${rule.lateTime}の担当がいません`});
-       }
-    });
-
     const curIndex = days.findIndex(d => d.id === cur.id);
     if (curIndex > 0) {
       const prevDay = days[curIndex - 1];
@@ -1776,7 +1808,7 @@ export default function App() {
                         <option value="(AM)">AM</option>
                         <option value="(PM)">PM</option>
                       </select>
-                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", e.target.value)} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
+                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", Number(e.target.value))} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
                       <span className="rule-label" style={{ color: "#0369a1" }}>人追加する</span>
                       <button onClick={() => removeRule("dailyAdditions", idx)} className="rule-del">✖</button>
                     </div>
@@ -1887,7 +1919,7 @@ export default function App() {
                           {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
                         </select>
                         <span className="rule-label">は</span>
-                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", e.target.value)} className="rule-num" />
+                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", Number(e.target.value))} className="rule-num" />
                         <button onClick={() => removeRule("lunchSpecialDays", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
@@ -1900,9 +1932,9 @@ export default function App() {
                         <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} className="rule-sel">
                           <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", e.target.value)} className="rule-num" />
+                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", Number(e.target.value))} className="rule-num" />
                         <span className="rule-label">人以上➔</span>
-                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", e.target.value)} className="rule-num" />
+                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", Number(e.target.value))} className="rule-num" />
                         <button onClick={() => removeRule("lunchConditional", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
