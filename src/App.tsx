@@ -23,12 +23,12 @@ const globalStyle = `
     appearance: none; 
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
     background-repeat: no-repeat; 
-    background-position: right 12px center; 
+    background-position: right 16px center; 
     background-size: 1.5em; 
     text-overflow: ellipsis; 
     white-space: nowrap; 
     overflow: hidden; 
-    padding-right: 56px !important; 
+    padding-right: 64px !important; 
   }
   
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
@@ -245,7 +245,7 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
           {sec} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
         </div>
       ))}
-      <select className="rule-sel" style={{ padding: "12px 48px 12px 16px", fontSize: 22, minWidth: 200, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "12px 64px 12px 16px", fontSize: 22, minWidth: 240, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
         <option value="">＋追加</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -253,7 +253,7 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
-const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
+const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋スタッフを選択" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
@@ -265,7 +265,7 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
           {name} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
         </div>
       ))}
-      <select className="rule-sel" style={{ padding: "12px 48px 12px 16px", fontSize: 22, minWidth: 200, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "12px 64px 12px 16px", fontSize: 22, minWidth: 260, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
         <option value="">{placeholder}</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -480,7 +480,6 @@ class AutoAssigner {
   maxAssigns: Record<string, number> = {};
   counts: Record<string, number> = {};
   
-  // 🌟 追加：各部屋ごとのこれまでのアサイン回数（ローテーション用）
   roomCounts: Record<string, Record<string, number>> = {};
 
   initialAvailAll: string[] = [];
@@ -592,7 +591,7 @@ class AutoAssigner {
           const c = extractStaffName(m); 
           if (this.counts[c] !== undefined) {
              this.counts[c]++; 
-             this.roomCounts[c][sec] = (this.roomCounts[c][sec] || 0) + 1; // 🌟 部屋ごとの回数をカウント
+             this.roomCounts[c][sec] = (this.roomCounts[c][sec] || 0) + 1;
           }
         }); 
       }); 
@@ -760,8 +759,6 @@ class AutoAssigner {
              if (mainStaff.includes(a)) scoreA += 10000;
              if (mainStaff.includes(b)) scoreB += 10000;
 
-             // 🌟追加：同一部屋の連続・偏り防止（この部屋に今週何回入ったか）
-             // 1回入るごとにマイナス100点（月間担当者の中でもローテーションさせるため）
              scoreA -= (this.roomCounts[a]?.[section] || 0) * 100;
              scoreB -= (this.roomCounts[b]?.[section] || 0) * 100;
 
@@ -951,6 +948,8 @@ class AutoAssigner {
 
     PRIORITY_LIST.forEach((room: string) => {
       if (this.skipSections.includes(room)) return;
+      // 🌟 追加：受付ヘルプ等の後処理専用部屋はメインループで処理しない
+      if (["受付ヘルプ", "昼当番", "待機"].includes(room)) return;
 
       let targetCount = this.dynamicCapacity[room] !== undefined ? this.dynamicCapacity[room] : (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
 
@@ -1925,6 +1924,7 @@ export default function App() {
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
                     <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
                   </div>
+                  {/* 🌟 変更点：連日禁止部屋のUI追加 */}
                   <div style={{ flex: 1, minWidth: "360px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
                     <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? "MMG,ポータブル"} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
@@ -2102,6 +2102,7 @@ export default function App() {
                 <button className="rule-add" style={{color:"#c2410c", borderColor:"#fdba74"}} onClick={() => addRule("substitutes", { target: "", subs: "", section: "" })}>＋ 代打ルールを追加</button>
               </div>
 
+              {/* 🌟 変更点：UIの分離 */}
               <div style={{ background: "#fdf4ff", padding: 32, borderRadius: 16, border: "2px solid #f5d0fe", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#86198f", fontSize: 28, fontWeight: 800 }}>🏠 遅番不可スタッフ（17:00以降の枠に入れない）</h4>
                 <p style={{ fontSize: 22, color: "#a21caf", marginBottom: 24, fontWeight: 600 }}>ここに登録されたスタッフは、どれだけ人が足りなくても17時以降の枠（遅番、夕方の受付ヘルプなど）には割り当てられません。</p>
