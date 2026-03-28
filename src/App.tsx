@@ -592,7 +592,7 @@ class AutoAssigner {
       }).filter(Boolean) as string[];
       this.dayCells[sec] = join(members);
 
-     if (!REST_SECTIONS.includes(sec) && sec !== "昼当番") {
+      if (!REST_SECTIONS.includes(sec) && sec !== "昼当番") {
           split(this.dayCells[sec]).forEach(name => { 
               const c = extractStaffName(name); 
               if (ROLE_PLACEHOLDERS.includes(c)) return; 
@@ -602,16 +602,13 @@ class AutoAssigner {
     });
   }
 
-  // 🌟 ここから追加
+  // 🌟 追加：NGの数をカウントするヘルパー
   getForbiddenCount(staffName: string): number {
     const rules = this.ctx.customRules.forbidden || [];
     const rule = rules.find((r: any) => r.staff === staffName);
     return rule ? split(rule.sections).length : 0;
   }
-  // 🌟 ここまで追加
 
-  prepareAvailability() {
-    const supportStaffList = split(this.ctx.customRules.supportStaffList || "");
   prepareAvailability() {
     const supportStaffList = split(this.ctx.customRules.supportStaffList || "");
     const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
@@ -1014,6 +1011,7 @@ class AutoAssigner {
           
           const amount = getStaffAmount(m);
           currentAmount += amount;
+          // 🌟 修正点：兼務処理内で addU を呼び、二重アサインを防止
           this.addU(core, amount);
        }
        return targetMems;
@@ -1044,12 +1042,12 @@ class AutoAssigner {
   }
 
   processPostTasks() {
-    const availAll = this.initialAvailAll;
     const availSupport = this.initialAvailSupport;
     const availGeneral = this.initialAvailGeneral;
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
 
     let helpMembers: string[] = [];
+    // ヘルプ要員判定は、"ALL"で埋まっていない人（余裕がある人）の数で緊急事態かを判定
     const tempAvailCountForHelp = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length;
     if (tempAvailCountForHelp <= (this.ctx.customRules.helpThreshold ?? 17)) {
       helpMembers = [...split(this.dayCells["RI"]).map(extractStaffName)];
@@ -1070,6 +1068,7 @@ class AutoAssigner {
         const currentCore = current.map(extractStaffName);
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter(m => m.includes(rule.lateTime)).map(extractStaffName) : [];
 
+        // 🌟修正点：checkIsUsed フラグを追加し、過労防止
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean, checkIsUsed: boolean) => {
           let cand = candidatesList.filter(name => {
             if (currentCore.includes(name)) return false;
@@ -1087,6 +1086,7 @@ class AutoAssigner {
           return null;
         };
 
+        // 緊急ヘルプは isUsed 無視、一般は isUsed 考慮
         let picked = getCandidate(helpMembers, false, false) || getCandidate(availGeneral, false, true);
         if (!picked) picked = getCandidate(helpMembers, true, false) || getCandidate(availGeneral, true, true);
 
@@ -1679,8 +1679,8 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const updatedDay: DayData = assigner.execute();
+      const assigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const updatedDay = assigner.execute();
       
       nextAll[updatedDay.id] = updatedDay.cells;
       return nextAll;
@@ -1696,8 +1696,8 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const updatedDay: DayData = assigner.execute();
+        const assigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const updatedDay = assigner.execute();
         nextAll[updatedDay.id] = updatedDay.cells;
         prevDayObj = updatedDay;
         tempDays.push(updatedDay);
@@ -1818,7 +1818,7 @@ export default function App() {
                         <option value="(AM)">AM</option>
                         <option value="(PM)">PM</option>
                       </select>
-                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", Number(e.target.value))} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
+                      <input type="number" min="1" value={rule.count} onChange={e => updateRule("dailyAdditions", idx, "count", e.target.value)} className="rule-num" style={{ borderColor: "#7dd3fc" }} />
                       <span className="rule-label" style={{ color: "#0369a1" }}>人追加する</span>
                       <button onClick={() => removeRule("dailyAdditions", idx)} className="rule-del">✖</button>
                     </div>
@@ -1929,7 +1929,7 @@ export default function App() {
                           {["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}
                         </select>
                         <span className="rule-label">は</span>
-                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", Number(e.target.value))} className="rule-num" />
+                        <input type="number" value={rule.count} onChange={e => updateRule("lunchSpecialDays", idx, "count", e.target.value)} className="rule-num" />
                         <button onClick={() => removeRule("lunchSpecialDays", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
@@ -1942,9 +1942,9 @@ export default function App() {
                         <select value={rule.section} onChange={e => updateRule("lunchConditional", idx, "section", e.target.value)} className="rule-sel">
                           <option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", Number(e.target.value))} className="rule-num" />
+                        <input type="number" value={rule.min} onChange={e => updateRule("lunchConditional", idx, "min", e.target.value)} className="rule-num" />
                         <span className="rule-label">人以上➔</span>
-                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", Number(e.target.value))} className="rule-num" />
+                        <input type="number" value={rule.out} onChange={e => updateRule("lunchConditional", idx, "out", e.target.value)} className="rule-num" />
                         <button onClick={() => removeRule("lunchConditional", idx)} className="rule-del">✖</button>
                       </div>
                     ))}
