@@ -85,6 +85,8 @@ interface CustomRules {
   dailyAdditions: RuleDailyAddition[];
   priorityRooms: string[];
   fullDayOnlyRooms: string;
+  noConsecutiveRooms: string; // 🌟 追加：連日禁止部屋
+  noLateShiftStaff: string;   // 🌟 追加：遅番不可スタッフ
   ngPairs: RuleNgPair[];
   fixed: RuleFixed[];
   forbidden: RuleForbidden[];
@@ -137,15 +139,17 @@ const DEFAULT_RULES: CustomRules = {
   dailyCapacities: [], dailyAdditions: [], 
   priorityRooms: DEFAULT_PRIORITY_ROOMS, 
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
+  noConsecutiveRooms: "MMG,ポータブル", // 🌟 初期値
+  noLateShiftStaff: "", // 🌟 初期値
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
   kenmuPairs: [], lateShifts: [], 
   helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v124"; 
-const KEY_MONTHLY = "shifto_monthly_v124"; 
-const KEY_RULES = "shifto_rules_v124";
+const KEY_ALL_DAYS = "shifto_alldays_v123"; 
+const KEY_MONTHLY = "shifto_monthly_v123"; 
+const KEY_RULES = "shifto_rules_v123";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -612,7 +616,6 @@ class AutoAssigner {
     const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
 
     this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => {
-      // 🌟変更点：初期出勤メンバーも「当日・今週の負担」を優先してソートする（NG数はタイブレーク）
       if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0); 
       if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0); 
       const aForbidCount = this.getForbiddenCount(a);
@@ -652,8 +655,16 @@ class AutoAssigner {
     const result: string[] = [];
     const uniqueList = Array.from(new Set(list.filter(Boolean)));
     
+    // 🌟変更点：指定された「連日禁止部屋」かどうかをチェックし、前日担当者をブロックする
+    const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
+    const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
+
     const filterFn = (name: string, checkSoftNg: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
+      
+      // 連日禁止のチェック
+      if (prevDayMembers.includes(name)) return false;
+
       const isFixed = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || (section ? isMonthlyMainStaff(section, name, this.ctx.monthlyAssign) : false);
       if (!allowRepeatFromPrev && this.prevDay && section && !isFixed) {
         if (split(this.prevDay.cells[section] || "").map(extractStaffName).includes(name)) return false;
@@ -667,6 +678,7 @@ class AutoAssigner {
     
     const lastResort = uniqueList.filter(name => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
+      if (prevDayMembers.includes(name)) return false; // 連日禁止はラストリゾートでも守る
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), false)) return false;
       return true;
     });
@@ -749,7 +761,6 @@ class AutoAssigner {
 
              if (scoreA !== scoreB) return scoreB - scoreA;
 
-             // 🌟変更点：当日負担 → 今週負担 → NG数の順番で評価し、満遍ないローテーションを復活
              if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
              if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0);
              
@@ -1048,6 +1059,9 @@ class AutoAssigner {
     const availSupport = this.initialAvailSupport;
     const availGeneral = this.initialAvailGeneral;
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
+    
+    // 🌟 追加：遅番不可スタッフの取得
+    const noLateShiftStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
 
     let helpMembers: string[] = [];
     const tempAvailCountForHelp = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length;
@@ -1072,6 +1086,8 @@ class AutoAssigner {
 
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean, checkIsUsed: boolean) => {
           let cand = candidatesList.filter(name => {
+            // 🌟 修正：遅番不可スタッフは絶対に選ばない
+            if (noLateShiftStaffList.includes(name)) return false;
             if (currentCore.includes(name)) return false;
             const b = this.blockMap.get(name);
             if (b === 'PM') return false; 
@@ -1216,7 +1232,14 @@ class AutoAssigner {
         const lunchCores = split(this.dayCells["昼当番"]).map(extractStaffName);
 
         const getHelp = (exclude: string[]) => {
-          let cand = availGeneral.filter(n => !exclude.includes(n) && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ"));
+          let cand = availGeneral.filter(n => {
+            if (exclude.includes(n)) return false;
+            if (helpMems.map(extractStaffName).includes(n)) return false;
+            if (this.isForbidden(n, "受付ヘルプ")) return false;
+            // 🌟 修正：受付ヘルプも17時以降のものは遅番不可スタッフを避ける
+            if (noLateShiftStaffList.includes(n)) return false; 
+            return true;
+          });
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
           return null; 
         };
@@ -1227,13 +1250,13 @@ class AutoAssigner {
         }
 
         const kenzoCores = split(this.dayCells["検像"]).map(extractStaffName);
-        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ"));
+        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !noLateShiftStaffList.includes(n));
 
         let picked16 = validKenzo.length > 0 ? validKenzo[0] : null;
 
         if (!picked16) {
           const excl = lunchHelpCandidate ? [lunchHelpCandidate] : [];
-          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ"));
+          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !noLateShiftStaffList.includes(n));
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); picked16 = cand[0]; }
         }
 
@@ -1650,11 +1673,15 @@ export default function App() {
       const prevDay = days[curIndex - 1];
       if (!prevDay.isPublicHoliday) {
         
-        const prevPortable = split(prevDay.cells["ポータブル"]).map(extractStaffName);
-        const curPortable = split(cells["ポータブル"]).map(extractStaffName);
-        const consecutive = curPortable.filter(n => prevPortable.includes(n));
-        consecutive.forEach(n => {
-          w.push({ type: 'error', msg: `🚨【ポータブル連続】${n}さんが昨日と連続で入っています！` });
+        // 🌟変更点：連日禁止部屋のアラート対応
+        const noConsecutiveRooms = split(customRules.noConsecutiveRooms || "");
+        noConsecutiveRooms.forEach(room => {
+          const prevMembers = split(prevDay.cells[room]).map(extractStaffName);
+          const curMembers = split(cells[room]).map(extractStaffName);
+          const consecutive = curMembers.filter(n => prevMembers.includes(n));
+          consecutive.forEach(n => {
+            w.push({ type: 'error', msg: `🚨【連日担当禁止】${n}さんが昨日と連続で ${room} に入っています！` });
+          });
         });
 
         (customRules.lateShifts || []).forEach((rule: any) => {
@@ -1681,8 +1708,8 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const updatedDay: DayData = assigner.execute();
+      const assigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const updatedDay = assigner.execute();
       
       nextAll[updatedDay.id] = updatedDay.cells;
       return nextAll;
@@ -1698,8 +1725,8 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const updatedDay: DayData = assigner.execute();
+        const assigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const updatedDay = assigner.execute();
         nextAll[updatedDay.id] = updatedDay.cells;
         prevDayObj = updatedDay;
         tempDays.push(updatedDay);
@@ -1861,11 +1888,16 @@ export default function App() {
               </div>
 
               <div style={{ background: "#f8fafc", padding: 32, borderRadius: 16, border: "2px solid #cbd5e1", gridColumn: "1 / -1" }}>
-                <h4 style={{ margin: "0 0 16px 0", color: "#334155", fontSize: 28, fontWeight: 800 }}>🕒 終日専任（半休・AM/PM不可）の部屋</h4>
-                <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>検査数が少ない部屋や、半休の人をわざわざアサインする意味がない部屋を指定します。ここには「1日通しで入れる人」しか配置されません。</p>
+                <h4 style={{ margin: "0 0 16px 0", color: "#334155", fontSize: 28, fontWeight: 800 }}>🕒 終日専任・連日禁止ルール</h4>
                 <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
                   <div style={{ flex: 1, minWidth: "360px" }}>
+                    <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
                     <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT"} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
+                  </div>
+                  {/* 🌟 変更点：連日禁止部屋のUI追加 */}
+                  <div style={{ flex: 1, minWidth: "360px" }}>
+                    <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
+                    <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? "MMG,ポータブル"} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
                   </div>
                 </div>
               </div>
@@ -1994,7 +2026,7 @@ export default function App() {
 
               <div style={{ background: "#e0f2fe", padding: 32, borderRadius: 16, border: "2px solid #bae6fd", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 20px 0", color: "#0369a1", fontSize: 28, fontWeight: 800 }}>🎱 玉突き・同室回避ルール</h4>
-                <p style={{ fontSize: 22, color: "#0284c7", marginBottom: 24, fontWeight: 600 }}>「AさんとBさんが同じ部屋になりそうな時、Bさんを別の部屋に押し出す」ルールです。</p>
+                <p style={{ fontSize: 22, color: "#0284c7", marginBottom: 24, fontWeight: 600 }}>「A বললোBさんが同じ部屋になりそうな時、Bさんを別の部屋に押し出す」ルールです。</p>
                 {(customRules.pushOuts || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 28, borderBottom: "2px solid #bae6fd", paddingBottom: 28 }}>
                     <div className="rule-row">
@@ -2041,7 +2073,13 @@ export default function App() {
               </div>
 
               <div style={{ background: "#fef2f2", padding: 32, borderRadius: 16, border: "2px solid #fecaca", gridColumn: "1 / -1" }}>
-                <h4 style={{ margin: "0 0 20px 0", color: "#b91c1c", fontSize: 28, fontWeight: 800 }}>🚫 NGペア</h4>
+                <h4 style={{ margin: "0 0 20px 0", color: "#b91c1c", fontSize: 28, fontWeight: 800 }}>🚫 NGペア＆遅番不可</h4>
+                <div style={{ marginBottom: 24, borderBottom: "2px solid #fecaca", paddingBottom: 24 }}>
+                  <label style={{ fontSize: 22, fontWeight: 700, color: "#b91c1c", display: "block", marginBottom: 12 }}>🏠 遅番不可（17:00以降の枠に入れないスタッフ）</label>
+                  <div style={{ background: "#fff", padding: "14px", borderRadius: 12, border: "2px solid #fca5a5", minHeight: "56px", display: "flex", alignItems: "center" }}>
+                    <MultiStaffPicker selected={customRules.noLateShiftStaff || ""} onChange={v => setCustomRules({...customRules, noLateShiftStaff: v})} options={allStaff} placeholder="＋スタッフを選択" />
+                  </div>
+                </div>
                 {(customRules.ngPairs || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row">
                     <select value={rule.s1} onChange={e => updateRule("ngPairs", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
@@ -2053,7 +2091,7 @@ export default function App() {
                     <button onClick={() => removeRule("ngPairs", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}} onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })}>＋ 追加</button>
+                <button className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}} onClick={() => addRule("ngPairs", { s1: "", s2: "", level: "hard" })}>＋ NGペアを追加</button>
               </div>
 
               <div style={{ background: "#f0fdf4", padding: 32, borderRadius: 16, border: "2px solid #bbf7d0", gridColumn: "1 / -1" }}>
