@@ -756,9 +756,10 @@ class AutoAssigner {
 
   assignRooms() {
     const availAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL');
-    const availGeneral = availAll.filter(s => this.ctx.activeGeneralStaff.includes(s));
+    const supportStaffList = split(this.ctx.customRules.supportStaffList || ""); // 🌟追加：サポートリストを取得
+    const availGeneral = availAll.filter(s => this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s)); // 🌟修正：メイン候補からサポートを除外
     const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
-    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s));
+    const availReception = availAll.filter(s => effectiveReceptionStaff.includes(s) && !supportStaffList.includes(s)); // 🌟修正：受付候補からも除外
     const fullDayOnlyList = split(this.ctx.customRules.fullDayOnlyRooms ?? "DSA,検像,骨塩,パノラマCT");
 
     (this.ctx.customRules.fixed || []).forEach((rule: any) => {
