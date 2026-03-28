@@ -1092,7 +1092,6 @@ class AutoAssigner {
       .map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
-    // 🌟 空室救済（お助け兼務）ロジック
     ROOM_SECTIONS.forEach(targetRoom => {
       if (this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
       if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
@@ -1789,10 +1788,10 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const res: DayData = worker.execute();
+      const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const updatedDay: DayData = assigner.execute();
       
-      nextAll[res.id] = res.cells;
+      nextAll[updatedDay.id] = updatedDay.cells;
       return nextAll;
     });
   };
@@ -1806,11 +1805,11 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const res: DayData = worker.execute();
-        nextAll[res.id] = res.cells;
-        prevDayObj = res;
-        tempDays.push(res);
+        const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const updatedDay: DayData = assigner.execute();
+        nextAll[updatedDay.id] = updatedDay.cells;
+        prevDayObj = updatedDay;
+        tempDays.push(updatedDay);
       }
       return nextAll;
     });
@@ -2084,16 +2083,16 @@ export default function App() {
                 <p style={{ fontSize: 22, color: "#7c3aed", marginBottom: 24, fontWeight: 600 }}>「17時以降も稼働する部屋」を指定できます。日勤者には自動で終了時間が付き、遅番が1名追加されます。</p>
                 {(customRules.lateShifts || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row" style={{background:"#fff", padding:"18px 24px", border:"2px solid #ddd6fe", borderRadius:12}}>
-                    <select value={rule.section} onChange={e => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe"}}>
+                    <select value={rule.section} onChange={e => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", minWidth: "180px", flex: "1 1 auto"}}>
                       <option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <span className="rule-label" style={{color:"#6d28d9"}}>に</span>
-                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 160px"}}>
+                    <select value={rule.lateTime} onChange={e => updateRule("lateShifts", idx, "lateTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", minWidth: "220px", flex: "1 1 auto"}}>
                       <option value="">遅番の時間</option>
                       {TIME_OPTIONS.filter(t => t.includes("〜)")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                     </select>
                     <span className="rule-label" style={{color:"#6d28d9"}}>の担当を追加する（日勤は</span>
-                    <select value={rule.dayEndTime} onChange={e => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", flex: "0 0 160px"}}>
+                    <select value={rule.dayEndTime} onChange={e => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", minWidth: "220px", flex: "1 1 auto"}}>
                       <option value="">終了時間</option>
                       {TIME_OPTIONS.filter(t => t.includes("(〜")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
                     </select>
@@ -2525,12 +2524,4 @@ export default function App() {
               </table>
             )}
             <div style={{ textAlign: "center", marginTop: 40 }}>
-              <button className="btn-hover" onClick={() => setSelectedStaffForStats(null)} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "20px 48px", borderRadius: 12, fontWeight: 800, cursor: "pointer", fontSize: 26 }}>閉じる</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
+              <button className="btn-hover" onClick={() => setSelectedStaffForStats(null)} style={{ background: "#2563eb", color: "#fff", border: "none", padding: "20px 48px", borderRadius: 12, fontWeight: 800, cursor: "pointer", fontSize:
