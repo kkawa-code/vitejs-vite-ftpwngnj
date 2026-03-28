@@ -1701,10 +1701,10 @@ export default function App() {
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const res = worker.execute();
+      const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const updatedDay: DayData = assigner.execute();
       
-      nextAll[res.id] = res.cells;
+      nextAll[updatedDay.id] = updatedDay.cells;
       return nextAll;
     });
   };
@@ -1718,11 +1718,11 @@ export default function App() {
 
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const res = worker.execute();
-        nextAll[res.id] = res.cells;
-        prevDayObj = res;
-        tempDays.push(res);
+        const assigner: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const updatedDay: DayData = assigner.execute();
+        nextAll[updatedDay.id] = updatedDay.cells;
+        prevDayObj = updatedDay;
+        tempDays.push(updatedDay);
       }
       return nextAll;
     });
