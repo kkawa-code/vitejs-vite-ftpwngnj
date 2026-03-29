@@ -157,14 +157,13 @@ const DEFAULT_RULES: CustomRules = {
   noConsecutiveRooms: "MMG,ポータブル,透視（6号）,透視（11号）",
   noLateShiftStaff: "",
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
-  kenmuPairs: [
-    { s1: "5号室", s2: "DSA" },
-    { s1: "3号室", s2: "ポータブル" },
-    { s1: "骨塩", s2: "検像" },
-    { s1: "パノラマCT", s2: "透視（6号）" },
-    { s1: "2号室", s2: "パノラマCT" }
+  kenmuPairs: [], 
+  linkedRooms: [
+    { target: "DSA", sources: "5号室" },
+    { target: "ポータブル", sources: "3号室" },
+    { target: "検像", sources: "骨塩" },
+    { target: "パノラマCT", sources: "透視（6号）,2号室" }
   ], 
-  linkedRooms: [], 
   rescueRules: [],
   lateShifts: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療",
@@ -172,9 +171,9 @@ const DEFAULT_RULES: CustomRules = {
   alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v147"; 
-const KEY_MONTHLY = "shifto_monthly_v147"; 
-const KEY_RULES = "shifto_rules_v147";
+const KEY_ALL_DAYS = "shifto_alldays_v149"; 
+const KEY_MONTHLY = "shifto_monthly_v149"; 
+const KEY_RULES = "shifto_rules_v149";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -554,18 +553,18 @@ class AutoAssigner {
   isForbidden(staff: string, section: string): boolean { return (this.ctx.customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section)); }
   hasNGPair(candidate: string, members: string[], checkSoft: boolean): boolean { return members.some(member => (this.ctx.customRules.ngPairs || []).some((ng: any) => { const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate); if (!match) return false; if ((ng.level || "hard") === "hard") return true; if ((ng.level || "hard") === "soft" && checkSoft) return true; return false; })); }
 
-  pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = [], allowRepeatFromPrev = false): string[] {
+  pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = []): string[] {
     const result: string[] = []; const uniqueList = Array.from(new Set(list.filter(Boolean)));
     const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
     const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
+    
     const filterFn = (name: string, checkSoftNg: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
       if (prevDayMembers.includes(name)) return false;
-      const isFixed = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || (section ? isMonthlyMainStaff(section, name, this.ctx.monthlyAssign) : false);
-      if (!allowRepeatFromPrev && this.prevDay && section && !isFixed) { if (split(this.prevDay.cells[section] || "").map(extractStaffName).includes(name)) return false; }
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false;
       return true;
     };
+    
     for (const name of uniqueList.filter(n => filterFn(n, true))) { result.push(name); if (result.length >= n) return result; }
     for (const name of uniqueList.filter(n => filterFn(n, false))) { result.push(name); if (result.length >= n) return result; }
     const lastResort = uniqueList.filter(name => {
@@ -609,14 +608,10 @@ class AutoAssigner {
          if (needTag === "(PM)" && b === 'PM') return "PMブロック";
          if (fullDayOnlyList.includes(section) && b !== 'NONE') return "終日専任室だが半休";
          
+         // 🌟 修正：連日担当禁止ルールは、ユーザーが指定した部屋にだけ適用する
          const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
          const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
          if (prevDayMembers.includes(name)) return "連日担当禁止ルール";
-         
-         const isFixed = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === name && r.section === section) || isMonthlyMainStaff(section, name, this.ctx.monthlyAssign);
-         if (this.prevDay && section && !isFixed) {
-             if (split(this.prevDay.cells[section] || "").map(extractStaffName).includes(name)) return "前日からの連続（非専従）";
-         }
          
          if (this.hasNGPair(name, current.map(extractStaffName), true)) return "NGペア抵触";
          
@@ -635,7 +630,6 @@ class AutoAssigner {
       const candidatesWithReason = availList.map(name => ({ name, reason: getFilterReason(name) }));
       const validNames = candidatesWithReason.filter(c => !c.reason).map(c => c.name);
       
-      // 🌟 修正：「同室に配置済」の月間担当者は警告ログから除外
       const rejectedPref = candidatesWithReason.filter(c => c.reason && preferredList.includes(c.name) && c.reason !== "同室に配置済");
       if (rejectedPref.length > 0) {
           this.log(`🚫 [除外] 本来の月間担当者が外れた理由: ${rejectedPref.map(c => `${c.name}(${c.reason})`).join(", ")}`);
@@ -651,7 +645,6 @@ class AutoAssigner {
       const validAvail = validNames.filter(n => !preferredList.includes(n));
 
       const sortCandidates = (candidates: string[]) => {
-         // 🌟 修正：治療のメイン・サブ優先・サブを区別してスコアリング
          let mainStaff: string[] = []; let subPrioStaff: string[] = []; let subStaff: string[] = [];
          if (section === "治療") {
              mainStaff = split(this.ctx.monthlyAssign.治療 || "").map(extractStaffName);
@@ -691,7 +684,7 @@ class AutoAssigner {
       const allSorted = [...sortedPreferred, ...sortedAvail];
       this.log(`💡 [上位候補] ${allSorted.slice(0, 3).map(name => `${name}(${logCandidateInfo(name)})`).join(" ＞ ")}`);
       
-      const pickedCoreList = this.pick(validNames, allSorted, 1, section, current.map(extractStaffName), false);
+      const pickedCoreList = this.pick(validNames, allSorted, 1, section, current.map(extractStaffName));
       if (pickedCoreList.length === 0) {
          this.log(`⛔ [配置不可] 候補者はいましたが、最終的な調整（NGペア等）で全員除外されました。`);
          break;
@@ -721,6 +714,8 @@ class AutoAssigner {
 
     const basePriorityList = this.ctx.customRules.priorityRooms && this.ctx.customRules.priorityRooms.length > 0 ? this.ctx.customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
     const PRIORITY_LIST = ["治療", ...basePriorityList.filter((r: string) => r !== "治療")];
+
+    // 🌟 LinkedRooms は完全に撤廃し、通常配置に戻しました。
 
     PRIORITY_LIST.forEach((room: string) => {
       if (this.skipSections.includes(room)) return;
@@ -801,6 +796,7 @@ class AutoAssigner {
       this.dayCells[pair.s2] = join(processKenmu(m1, m2, pair.s2));
       m2 = split(this.dayCells[pair.s2]); this.dayCells[pair.s1] = join(processKenmu(m2, m1, pair.s1));
     });
+
   }
 
   processPostTasks() {
@@ -1012,7 +1008,7 @@ class AutoAssigner {
       this.dayCells["受付ヘルプ"] = join(helpMems);
     }
     
-    // 🌟 修正：サポート（部長など）を全てのパズルの最後に配置
+    // 🌟 サポート（部長など）を全てのパズルの最後に配置
     const assignSupportStaff = () => {
       const unassignedSupport = availSupport.filter(s => !this.isUsed(s));
       unassignedSupport.forEach(staff => {
@@ -1566,12 +1562,12 @@ export default function App() {
                   <div style={{ flex: 1, minWidth: "320px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#166534", display: "block", marginBottom: 12 }}>対象スタッフ名（複数可）</label>
                     <div style={{ background: "#fff", padding: "14px", borderRadius: 12, border: "2px solid #86efac", minHeight: "56px", display: "flex", alignItems: "center" }}>
-                      <MultiStaffPicker selected={customRules.supportStaffList || ""} onChange={v => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" hasArrows={true} />
+                      <MultiStaffPicker selected={customRules.supportStaffList || ""} onChange={v => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" hasArrows={false} />
                     </div>
                   </div>
                   <div style={{ flex: 2, minWidth: "400px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#166534", display: "block", marginBottom: 12 }}>優先する対象部屋</label>
-                    <MultiSectionPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={v => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} hasArrows={true} />
+                    <MultiSectionPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={v => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
                   </div>
                 </div>
               </div>
@@ -1612,7 +1608,7 @@ export default function App() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 24, marginTop: 24 }}>
                   <div style={{ flex: 1, background: "#fff", padding: 28, borderRadius: 12, border: "2px solid #e0e7ff", minWidth: "400px" }}>
                     <h5 style={{ margin: "0 0 14px 0", fontSize: 24, color: "#4f46e5", fontWeight: 800 }}>🎯 優先的に選出する部屋</h5>
-                    <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={v => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} hasArrows={true} />
+                    <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={v => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} hasArrows={false} />
                   </div>
                   <div style={{ flex: 1, background: "#fff", padding: 28, borderRadius: 12, border: "2px solid #e0e7ff", minWidth: "400px" }}>
                     <h5 style={{ margin: "0 0 14px 0", fontSize: 24, color: "#4f46e5", fontWeight: 800 }}>⚠️ 緊急時のみ選出する部屋（なるべく除外）</h5>
@@ -1721,6 +1717,7 @@ export default function App() {
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} className="rule-del">✖</button>
                     </div>
+                    {/* 🌟 担当不可の部屋の順序は関係ないので矢印を出さない */}
                     <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} hasArrows={false} />
                   </div>
                 ))}
@@ -1740,7 +1737,7 @@ export default function App() {
                     <span className="rule-label" style={{color:"#854d0e"}}>出勤</span>
                     <input type="number" value={rule.threshold} onChange={e => updateRule("emergencies", idx, "threshold", Number(e.target.value))} className="rule-num" style={{borderColor:"#fde047"}} />
                     <span className="rule-label" style={{color:"#854d0e"}}>人以下➔</span>
-                    <select value={["clear", "role_assign", "change_capacity", "kenmu"].includes(rule.type) ? rule.type : "change_capacity"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"180px", borderColor:"#fde047"}}>
+                    <select value={["clear", "role_assign", "change_capacity"].includes(rule.type) ? rule.type : "change_capacity"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"180px", borderColor:"#fde047"}}>
                       <option value="role_assign">担当配置</option>
                       <option value="change_capacity">定員変更</option>
                       <option value="clear">配置なし</option>
@@ -1777,7 +1774,7 @@ export default function App() {
             <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>
               ※表示中の月（{targetMonday.substring(0, 7)}）の全員の配置回数です。青色が濃いほど回数が多く、<strong style={{color:"#854d0e"}}>黄背景</strong>のセルは「月間担当者なのにまだ0回」の要注意箇所です。
             </p>
-            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
+            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "60vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
               <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
                 <thead>
                   <tr>
@@ -2008,7 +2005,7 @@ export default function App() {
             
             <div style={{ background: "#f8fafc", padding: "24px", borderRadius: "12px", border: "2px solid #e2e8f0", fontSize: "20px", color: "#334155", lineHeight: "1.8", flex: 1, overflowY: "auto" }}>
                {assignLogs[selectedLogDay].length === 0 ? (
-                 <p style={{ color: "#94a3b8", textAlign: "center" }}>ログがありません（手手動入力のみの可能性があります）</p>
+                 <p style={{ color: "#94a3b8", textAlign: "center" }}>ログがありません（手動入力のみの可能性があります）</p>
                ) : (
                  <ul style={{ listStyleType: "none", padding: 0, margin: 0 }}>
                    {assignLogs[selectedLogDay].map((log, i) => (
