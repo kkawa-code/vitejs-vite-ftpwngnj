@@ -157,13 +157,14 @@ const DEFAULT_RULES: CustomRules = {
   noConsecutiveRooms: "MMG,ポータブル,透視（6号）,透視（11号）",
   noLateShiftStaff: "",
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
-  kenmuPairs: [], 
-  linkedRooms: [
-    { target: "DSA", sources: "5号室" },
-    { target: "ポータブル", sources: "3号室" },
-    { target: "検像", sources: "骨塩" },
-    { target: "パノラマCT", sources: "透視（6号）,2号室" }
+  kenmuPairs: [
+    { s1: "5号室", s2: "DSA" },
+    { s1: "3号室", s2: "ポータブル" },
+    { s1: "骨塩", s2: "検像" },
+    { s1: "パノラマCT", s2: "透視（6号）" },
+    { s1: "2号室", s2: "パノラマCT" }
   ], 
+  linkedRooms: [], 
   rescueRules: [],
   lateShifts: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療",
@@ -171,9 +172,9 @@ const DEFAULT_RULES: CustomRules = {
   alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v146"; 
-const KEY_MONTHLY = "shifto_monthly_v146"; 
-const KEY_RULES = "shifto_rules_v146";
+const KEY_ALL_DAYS = "shifto_alldays_v147"; 
+const KEY_MONTHLY = "shifto_monthly_v147"; 
+const KEY_RULES = "shifto_rules_v147";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -599,9 +600,9 @@ class AutoAssigner {
       this.log(`📋 [候補選考] ${section} の枠を補充します（残り ${remaining}人分${needTag ? ` / 要求: ${needTag}` : ''}）`);
 
       const getFilterReason = (name: string) => {
-         if (this.isUsed(name)) return "本日枠上限";
+         if (current.map(extractStaffName).includes(name)) return "同室に配置済";
+         if (this.isUsed(name)) return "他業務で配置済";
          if (this.isForbidden(name, section)) return "担当不可設定";
-         if (current.map(extractStaffName).includes(name)) return "既に配置済";
          const b = this.blockMap.get(name);
          if (b === 'ALL') return "全日ブロック";
          if (needTag === "(AM)" && b === 'AM') return "AMブロック";
@@ -634,7 +635,8 @@ class AutoAssigner {
       const candidatesWithReason = availList.map(name => ({ name, reason: getFilterReason(name) }));
       const validNames = candidatesWithReason.filter(c => !c.reason).map(c => c.name);
       
-      const rejectedPref = candidatesWithReason.filter(c => c.reason && preferredList.includes(c.name));
+      // 🌟 修正：「同室に配置済」の月間担当者は警告ログから除外
+      const rejectedPref = candidatesWithReason.filter(c => c.reason && preferredList.includes(c.name) && c.reason !== "同室に配置済");
       if (rejectedPref.length > 0) {
           this.log(`🚫 [除外] 本来の月間担当者が外れた理由: ${rejectedPref.map(c => `${c.name}(${c.reason})`).join(", ")}`);
       }
@@ -649,14 +651,28 @@ class AutoAssigner {
       const validAvail = validNames.filter(n => !preferredList.includes(n));
 
       const sortCandidates = (candidates: string[]) => {
-         const mainStaff = split(this.ctx.monthlyAssign[section] || "").map(extractStaffName);
+         // 🌟 修正：治療のメイン・サブ優先・サブを区別してスコアリング
+         let mainStaff: string[] = []; let subPrioStaff: string[] = []; let subStaff: string[] = [];
+         if (section === "治療") {
+             mainStaff = split(this.ctx.monthlyAssign.治療 || "").map(extractStaffName);
+             subPrioStaff = split(this.ctx.monthlyAssign.治療サブ優先 || "").map(extractStaffName);
+             subStaff = split(this.ctx.monthlyAssign.治療サブ || "").map(extractStaffName);
+         } else if (section === "RI") {
+             mainStaff = split(this.ctx.monthlyAssign.RI || "").map(extractStaffName);
+             subStaff = split(this.ctx.monthlyAssign.RIサブ || "").map(extractStaffName);
+         } else {
+             mainStaff = split(this.ctx.monthlyAssign[section] || "").map(extractStaffName);
+         }
+
          const hasAmFree = validNames.some(s => this.blockMap.get(s) === 'PM');
          const hasPmFree = validNames.some(s => this.blockMap.get(s) === 'AM');
 
          return [...candidates].sort((a, b) => {
              const bA = this.blockMap.get(a); const bB = this.blockMap.get(b);
              let scoreA = 0; let scoreB = 0;
-             if (mainStaff.includes(a)) scoreA += 10000; if (mainStaff.includes(b)) scoreB += 10000;
+             if (mainStaff.includes(a)) scoreA += 10000; else if (subPrioStaff.includes(a)) scoreA += 5000; else if (subStaff.includes(a)) scoreA += 2000;
+             if (mainStaff.includes(b)) scoreB += 10000; else if (subPrioStaff.includes(b)) scoreB += 5000; else if (subStaff.includes(b)) scoreB += 2000;
+             
              scoreA -= (this.roomCounts[a]?.[section] || 0) * 100; scoreB -= (this.roomCounts[b]?.[section] || 0) * 100;
              if (needTag === "") { if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; else if (bA === 'AM' || bA === 'PM') scoreA += 150; else if (bA === 'NONE') scoreA += 100; } else { if (needTag === "(AM)" && bA === 'PM') scoreA += 200; if (needTag === "(PM)" && bA === 'AM') scoreA += 200; if (bA === 'NONE') scoreA += 100; }
              if (needTag === "") { if (hasAmFree && hasPmFree && (bB === 'AM' || bB === 'PM')) scoreB += 200; else if (bB === 'AM' || bB === 'PM') scoreB += 150; else if (bB === 'NONE') scoreB += 100; } else { if (needTag === "(AM)" && bB === 'PM') scoreB += 200; if (needTag === "(PM)" && bB === 'AM') scoreB += 200; if (bB === 'NONE') scoreB += 100; }
@@ -706,9 +722,6 @@ class AutoAssigner {
     const basePriorityList = this.ctx.customRules.priorityRooms && this.ctx.customRules.priorityRooms.length > 0 ? this.ctx.customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
     const PRIORITY_LIST = ["治療", ...basePriorityList.filter((r: string) => r !== "治療")];
 
-    // 🌟 修正：「基本兼務（セット配置）」の対象になっている部屋は、一般配置の前にリストアップしておく
-    const linkedTargetRooms = (this.ctx.customRules.linkedRooms || []).map((r: any) => r.target);
-
     PRIORITY_LIST.forEach((room: string) => {
       if (this.skipSections.includes(room)) return;
       if (["受付ヘルプ", "昼当番", "待機"].includes(room)) return;
@@ -732,7 +745,7 @@ class AutoAssigner {
         }
         const currentUketsukeAmount = currentUketsuke.reduce((sum, m) => sum + getStaffAmount(m), 0);
         let neededUketsuke = targetCount - currentUketsukeAmount;
-        if (neededUketsuke > 0 && !linkedTargetRooms.includes(room)) { 
+        if (neededUketsuke > 0) { 
           const pickedUketsuke = this.pick(availReception, availReception, Math.ceil(neededUketsuke), "受付", currentUketsuke);
           pickedUketsuke.forEach((name: string) => {
             const b = this.blockMap.get(name); let tag = ""; let f = 1;
@@ -749,16 +762,10 @@ class AutoAssigner {
         const strictRooms = ["治療", "RI", "MMG"];
         if (strictRooms.includes(room)) { candidates = preferredList.length > 0 ? preferredList : availGeneral; }
         
-        // 基本兼務ルールの対象部屋（パノラマCTなど）は、専任配置を行わない
-        if (!linkedTargetRooms.includes(room)) {
-           this.fill(candidates, room, preferredList, targetCount);
-        } else {
-           this.log(`⏭️ [専任スキップ] ${room} は基本兼務ルール（セット配置）の対象のため、専任スタッフの自動割当をスキップしました`);
-        }
+        this.fill(candidates, room, preferredList, targetCount);
       }
     });
 
-    // 常時兼務ルール
     const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
        const targetCap = this.dynamicCapacity[targetRoom] || 1; const targetCores = targetMems.map(extractStaffName);
        const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
@@ -803,63 +810,6 @@ class AutoAssigner {
     const absentAll = [...split(this.dayCells["明け"]), ...split(this.dayCells["入り"]), ...split(this.dayCells["土日休日代休"])].map(extractStaffName);
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
-
-    // 基本兼務（セット配置）
-    (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
-      const targetRoom = rule.target;
-      if (!targetRoom || this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
-      
-      const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
-      let currentMems = split(this.dayCells[targetRoom]);
-      
-      let curAm = 0; let curPm = 0;
-      currentMems.forEach(x => {
-         if (x.includes("(AM)")) curAm += 1;
-         else if (x.includes("(PM)")) curPm += 1;
-         else { curAm += 1; curPm += 1; }
-      });
-      
-      const sourceRooms = split(rule.sources);
-      
-      for (const srcRoom of sourceRooms) {
-        if (curAm >= targetCap && curPm >= targetCap) break; 
-
-        split(this.dayCells[srcRoom]).forEach(m => {
-          if (curAm >= targetCap && curPm >= targetCap) return;
-          
-          const core = extractStaffName(m);
-          // 専従スタッフは兼務させない処理を追加
-          const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
-          if (isFixedToSource) {
-              this.log(`🔒 [兼務ブロック] ${core} さんは専従のため、${targetRoom} への兼務は行いません`);
-              return;
-          }
-
-          if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
-            if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
-               
-               let pushStr = m;
-               if (curAm < targetCap && curPm >= targetCap) {
-                  if (m.includes("(PM)")) return; 
-                  pushStr = `${core}(AM)`;
-               } else if (curAm >= targetCap && curPm < targetCap) {
-                  if (m.includes("(AM)")) return; 
-                  pushStr = `${core}(PM)`;
-               }
-               
-               currentMems.push(pushStr);
-               if (pushStr.includes("(AM)")) curAm += 1;
-               else if (pushStr.includes("(PM)")) curPm += 1;
-               else { curAm += 1; curPm += 1; }
-               
-               this.addU(core, getStaffAmount(pushStr));
-               this.log(`🔗 [基本兼務] ${srcRoom} 担当の ${pushStr} を ${targetRoom} にセット配置しました`);
-            }
-          }
-        });
-      }
-      this.dayCells[targetRoom] = join(currentMems);
-    });
 
     ROOM_SECTIONS.forEach(targetRoom => {
       if (this.clearSections.includes(targetRoom)) return;
@@ -1062,7 +1012,7 @@ class AutoAssigner {
       this.dayCells["受付ヘルプ"] = join(helpMems);
     }
     
-    // 🌟 サポート（部長など）を全てのパズルの最後に配置
+    // 🌟 修正：サポート（部長など）を全てのパズルの最後に配置
     const assignSupportStaff = () => {
       const unassignedSupport = availSupport.filter(s => !this.isUsed(s));
       unassignedSupport.forEach(staff => {
@@ -1558,36 +1508,6 @@ export default function App() {
                 <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("kenmuPairs", { s1: "", s2: "" })}>＋ ペアを追加</button>
               </div>
 
-              <div style={{ background: "#ecfdf5", padding: 32, borderRadius: 16, border: "2px solid #a7f3d0", gridColumn: "1 / -1" }}>
-                <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 28, fontWeight: 800 }}>🔗 基本兼務（セット配置）ルール</h4>
-                <p style={{ fontSize: 22, color: "#047857", marginBottom: 24, fontWeight: 600 }}>パノラマCTなど、「専任スタッフを置かず、特定の部屋の担当者に兼務させたい部屋」を指定します。（上のルールから順番に発動します）<br/><strong style={{ color: "#064e3b" }}>💡 兼務候補の優先順位は、青いタグの中の「◀」「▶」ボタンで横に入れ替えてください。右端の▲▼はルール自体の順序です。</strong></p>
-                {(customRules.linkedRooms || []).map((rule: any, idx: number, arr: any[]) => (
-                  <div key={idx} style={{ background: "#fff", padding: "20px 24px", border: "2px solid #a7f3d0", borderRadius: 12, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>[</span>
-                        <select value={rule.target} onChange={e => updateRule("linkedRooms", idx, "target", e.target.value)} className="rule-sel" style={{ borderColor: "#6ee7b7", minWidth: 200, padding: "10px 40px 10px 12px" }}>
-                          <option value="">兼務専用にする部屋</option>
-                          {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                        <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>] には専任を置かず、[</span>
-                      </div>
-                      <div style={{ marginLeft: 24, marginTop: 8, marginBottom: 8 }}>
-                        <MultiSectionPicker selected={rule.sources} onChange={v => updateRule("linkedRooms", idx, "sources", v)} options={ROOM_SECTIONS} hasArrows={true} />
-                      </div>
-                      <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>] の担当者をセットで配置する</span>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignItems: "center" }}>
-                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#d1fae5", cursor: idx === 0 ? "default" : "pointer", fontSize: 20, padding: "8px 16px", borderRadius: 8, color: "#065f46" }}>▲</button>
-                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#d1fae5", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 20, padding: "8px 16px", borderRadius: 8, color: "#065f46" }}>▼</button>
-                      <button onClick={() => removeRule("linkedRooms", idx)} className="rule-del" style={{ marginTop: 4 }}>✖</button>
-                    </div>
-                  </div>
-                ))}
-                <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("linkedRooms", { target: "", sources: "" })}>＋ 基本兼務ルールを追加</button>
-              </div>
-
               <div style={{ background: "#fefce8", padding: 32, borderRadius: 16, border: "2px solid #fde047", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#854d0e", fontSize: 28, fontWeight: 800 }}>🆘 空室（人数不足）救済ルール</h4>
                 <p style={{ fontSize: 22, color: "#a16207", marginBottom: 24, fontWeight: 600 }}>
@@ -1801,7 +1721,6 @@ export default function App() {
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} className="rule-del">✖</button>
                     </div>
-                    {/* 🌟 修正：担当不可の部屋の順序は関係ないので矢印を出さない */}
                     <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} hasArrows={false} />
                   </div>
                 ))}
@@ -1824,10 +1743,9 @@ export default function App() {
                     <select value={["clear", "role_assign", "change_capacity", "kenmu"].includes(rule.type) ? rule.type : "change_capacity"} onChange={e => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"180px", borderColor:"#fde047"}}>
                       <option value="role_assign">担当配置</option>
                       <option value="change_capacity">定員変更</option>
-                      <option value="kenmu">兼務（非推奨）</option>
                       <option value="clear">配置なし</option>
                     </select>
-                    {rule.type === "role_assign" ? (<><select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>を</span><select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></>) : rule.type === "kenmu" ? (<><span className="rule-label" style={{color:"#854d0e"}}>[</span><select value={rule.s1} onChange={e => updateRule("emergencies", idx, "s1", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所1</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>] の担当が [</span><div style={{ flex: 1, minWidth: "220px" }}><MultiSectionPicker selected={rule.s2 || ""} onChange={v => updateRule("emergencies", idx, "s2", v)} options={ROOM_SECTIONS} /></div><span className="rule-label" style={{color:"#854d0e"}}>] も兼務</span></>) : rule.type === "change_capacity" ? (<><select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>の定員を</span><input type="number" value={rule.newCapacity ?? 3} onChange={e => updateRule("emergencies", idx, "newCapacity", Number(e.target.value))} className="rule-num" style={{borderColor:"#fde047"}} /><span className="rule-label" style={{color:"#854d0e"}}>人にする</span></>) : (<><select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>を空にする</span></>)}
+                    {rule.type === "role_assign" ? (<><select value={rule.role} onChange={e => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>を</span><select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></>) : rule.type === "change_capacity" ? (<><select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>の定員を</span><input type="number" value={rule.newCapacity ?? 3} onChange={e => updateRule("emergencies", idx, "newCapacity", Number(e.target.value))} className="rule-num" style={{borderColor:"#fde047"}} /><span className="rule-label" style={{color:"#854d0e"}}>人にする</span></>) : (<><select value={rule.section} onChange={e => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>を空にする</span></>)}
                     <button onClick={() => removeRule("emergencies", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
@@ -2090,7 +2008,7 @@ export default function App() {
             
             <div style={{ background: "#f8fafc", padding: "24px", borderRadius: "12px", border: "2px solid #e2e8f0", fontSize: "20px", color: "#334155", lineHeight: "1.8", flex: 1, overflowY: "auto" }}>
                {assignLogs[selectedLogDay].length === 0 ? (
-                 <p style={{ color: "#94a3b8", textAlign: "center" }}>ログがありません（手動入力のみの可能性があります）</p>
+                 <p style={{ color: "#94a3b8", textAlign: "center" }}>ログがありません（手手動入力のみの可能性があります）</p>
                ) : (
                  <ul style={{ listStyleType: "none", padding: 0, margin: 0 }}>
                    {assignLogs[selectedLogDay].map((log, i) => (
