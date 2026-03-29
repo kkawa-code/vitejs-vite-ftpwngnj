@@ -161,9 +161,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v132"; 
-const KEY_MONTHLY = "shifto_monthly_v132"; 
-const KEY_RULES = "shifto_rules_v132";
+const KEY_ALL_DAYS = "shifto_alldays_v133"; 
+const KEY_MONTHLY = "shifto_monthly_v133"; 
+const KEY_RULES = "shifto_rules_v133";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -688,9 +688,9 @@ class AutoAssigner {
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
-    // 🌟 修正：空室救済の「終日専任ブロック」を解除！
+    // 🌟 新機能：空室救済ルール（ユーザー設定可能）
     ROOM_SECTIONS.forEach(targetRoom => {
-      if (this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
+      if (this.clearSections.includes(targetRoom)) return;
       if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
       
       const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
@@ -698,23 +698,29 @@ class AutoAssigner {
       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
       let currentAmount = getCurrentAmount(currentMems);
       
-      if (currentAmount >= targetCap) return;
+      if (currentAmount >= targetCap) return; // 埋まっているなら何もしない
       
+      // 救済ルールから、この部屋が空室（または定員割れ）になった時に頼るべき「情報源の部屋」を取得
       const rescueRule = (this.ctx.customRules.rescueRules || []).find((r: any) => r.targetRoom === targetRoom);
       if (rescueRule && rescueRule.sourceRooms) {
          const sourceRooms = split(rescueRule.sourceRooms);
          let candidates: { core: string, fullStr: string }[] = [];
          
+         // 順番に候補部屋を見に行く
          for (const srcRoom of sourceRooms) {
             if (srcRoom === targetRoom) continue;
             split(this.dayCells[srcRoom]).forEach(m => {
                const core = extractStaffName(m);
                if (!ROLE_PLACEHOLDERS.includes(core) && !candidates.some(c => c.core === core) && !this.isForbidden(core, targetRoom)) {
-                  // 🌟 ここで「m.includes("(AM)")」等の半休縛りを撤廃！空室時は誰でも連れてくる！
-                  if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) candidates.push({ core, fullStr: m });
+                  // 🌟 修正：半休縛りを撤廃し、夕方以降の人以外はすべて救済候補に入れる
+                  if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
+                      candidates.push({ core, fullStr: m });
+                  }
                }
             });
-            if (candidates.length > 0) break;
+            // 🌟 修正：候補者の合計補充量が目標に達したら探索終了（AMだけならPMも探す）
+            const candAmount = candidates.reduce((s, c) => s + getStaffAmount(c.fullStr), 0);
+            if (currentAmount + candAmount >= targetCap) break;
          }
 
          const currentCores = currentMems.map(extractStaffName); 
