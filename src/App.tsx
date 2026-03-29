@@ -2,35 +2,63 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', sans-serif; font-size: 24px; overflow-x: clip; }
+  
+  /* 🌟 Viteのデフォルトの壁（横幅制限）を強制的に破壊！ */
+  html, body, #root { 
+    max-width: 100% !important; 
+    width: 100% !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+  }
+
+  /* 🌟 全体の横スクロールは防止しつつ、固定ヘッダー（sticky）を殺さない設定 */
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
+  
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 1.5em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 64px !important; }
+  
+  /* 🌟 文字被り防止のため padding-right を極端に広く設定 */
+  select { 
+    appearance: none; 
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
+    background-repeat: no-repeat; 
+    background-position: right 16px center; 
+    background-size: 1.5em; 
+    text-overflow: ellipsis; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    padding-right: 64px !important; 
+  }
+  
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+  
   .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 20px; margin-top: -20px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
+
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1) !important; }
+  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .rule-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; align-items: center; width: 100%; }
-  .rule-sel { padding: 14px 44px 14px 18px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 160px; min-width: 160px; font-size: 24px; }
-  .rule-num { width: 90px; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 24px; text-align: center; flex-shrink: 0; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 28px; flex-shrink: 0; padding: 0 12px; }
+  .rule-sel { padding: 14px 44px 14px 18px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 160px; min-width: 160px; font-size: 24px; transition: border-color 0.2s; }
+  .rule-num { width: 90px; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 24px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 28px; flex-shrink: 0; padding: 0 12px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
-  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 16px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; }
+  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 16px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; transition: all 0.2s; }
+  .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 24px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
+
   @media print {
     body { background: #fff; overflow: visible; font-size: 16pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
@@ -40,6 +68,7 @@ const globalStyle = `
   }
 `;
 
+// ===================== 🌟 型定義の厳密化 =====================
 type RenderGroup = { title: string; color: string; sections: string[] };
 type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
 
@@ -59,13 +88,33 @@ interface RuleLunchSpecial { day: string; count: number; }
 interface RuleLunchCond { section: string; min: number; out: number; }
 
 interface CustomRules {
-  staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; customHolidays: string;
-  capacity: RuleCapacity; dailyCapacities: RuleDailyCapacity[]; dailyAdditions: RuleDailyAddition[]; priorityRooms: string[];
-  fullDayOnlyRooms: string; noConsecutiveRooms: string; noLateShiftStaff: string; ngPairs: RuleNgPair[]; fixed: RuleFixed[];
-  forbidden: RuleForbidden[]; substitutes: RuleSubstitute[]; pushOuts: RulePushOut[]; emergencies: RuleEmergency[]; kenmuPairs: RuleKenmuPair[];
+  staffList: string;
+  receptionStaffList: string;
+  supportStaffList: string;
+  supportTargetRooms: string;
+  customHolidays: string;
+  capacity: RuleCapacity;
+  dailyCapacities: RuleDailyCapacity[];
+  dailyAdditions: RuleDailyAddition[];
+  priorityRooms: string[];
+  fullDayOnlyRooms: string;
+  noConsecutiveRooms: string;
+  noLateShiftStaff: string;
+  ngPairs: RuleNgPair[];
+  fixed: RuleFixed[];
+  forbidden: RuleForbidden[];
+  substitutes: RuleSubstitute[];
+  pushOuts: RulePushOut[];
+  emergencies: RuleEmergency[];
+  kenmuPairs: RuleKenmuPair[];
   rescueRules: RuleRescue[];
-  lateShifts: RuleLateShift[]; helpThreshold: number; lunchBaseCount: number; lunchSpecialDays: RuleLunchSpecial[];
-  lunchConditional: RuleLunchCond[]; lunchPrioritySections: string; lunchLastResortSections: string;
+  lateShifts: RuleLateShift[];
+  helpThreshold: number;
+  lunchBaseCount: number;
+  lunchSpecialDays: RuleLunchSpecial[];
+  lunchConditional: RuleLunchCond[];
+  lunchPrioritySections: string;
+  lunchLastResortSections: string;
 }
 
 const SECTIONS = [
@@ -112,9 +161,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v131"; 
-const KEY_MONTHLY = "shifto_monthly_v131"; 
-const KEY_RULES = "shifto_rules_v131";
+const KEY_ALL_DAYS = "shifto_alldays_v132"; 
+const KEY_MONTHLY = "shifto_monthly_v132"; 
+const KEY_RULES = "shifto_rules_v132";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -639,7 +688,7 @@ class AutoAssigner {
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
-    // 🌟 新機能：空室救済ルール（ユーザー設定可能）
+    // 🌟 修正：空室救済の「終日専任ブロック」を解除！
     ROOM_SECTIONS.forEach(targetRoom => {
       if (this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
       if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
@@ -649,24 +698,22 @@ class AutoAssigner {
       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
       let currentAmount = getCurrentAmount(currentMems);
       
-      if (currentAmount >= targetCap) return; // 埋まっているなら何もしない
+      if (currentAmount >= targetCap) return;
       
-      // 救済ルールから、この部屋が空室（または定員割れ）になった時に頼るべき「情報源の部屋」を取得
       const rescueRule = (this.ctx.customRules.rescueRules || []).find((r: any) => r.targetRoom === targetRoom);
       if (rescueRule && rescueRule.sourceRooms) {
          const sourceRooms = split(rescueRule.sourceRooms);
          let candidates: { core: string, fullStr: string }[] = [];
          
-         // 順番に候補部屋を見に行く
          for (const srcRoom of sourceRooms) {
             if (srcRoom === targetRoom) continue;
             split(this.dayCells[srcRoom]).forEach(m => {
                const core = extractStaffName(m);
                if (!ROLE_PLACEHOLDERS.includes(core) && !candidates.some(c => c.core === core) && !this.isForbidden(core, targetRoom)) {
+                  // 🌟 ここで「m.includes("(AM)")」等の半休縛りを撤廃！空室時は誰でも連れてくる！
                   if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) candidates.push({ core, fullStr: m });
                }
             });
-            // もしこの部屋から候補者が見つかれば、それ以降の順位の部屋は探さない（優先順位順）
             if (candidates.length > 0) break;
          }
 
