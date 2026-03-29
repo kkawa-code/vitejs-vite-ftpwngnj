@@ -86,6 +86,7 @@ interface RuleRescue { targetRoom: string; sourceRooms: string; }
 interface RuleLateShift { section: string; lateTime: string; dayEndTime: string; }
 interface RuleLunchSpecial { day: string; count: number; }
 interface RuleLunchCond { section: string; min: number; out: number; }
+interface RuleLinked { target: string; sources: string; } 
 
 interface CustomRules {
   staffList: string;
@@ -115,6 +116,7 @@ interface CustomRules {
   lunchConditional: RuleLunchCond[];
   lunchPrioritySections: string;
   lunchLastResortSections: string;
+  linkedRooms: RuleLinked[];
 }
 
 const SECTIONS = [
@@ -159,12 +161,12 @@ const DEFAULT_RULES: CustomRules = {
   kenmuPairs: [], 
   rescueRules: [],
   lateShifts: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
-  lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
+  lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療", linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v138"; 
-const KEY_MONTHLY = "shifto_monthly_v138"; 
-const KEY_RULES = "shifto_rules_v138";
+const KEY_ALL_DAYS = "shifto_alldays_v139"; 
+const KEY_MONTHLY = "shifto_monthly_v139"; 
+const KEY_RULES = "shifto_rules_v139";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -443,7 +445,6 @@ class AutoAssigner {
         if (em.type === "role_assign" && em.role) { if (!this.roleAssignments[em.role] || em.threshold < this.roleAssignments[em.role].threshold) this.roleAssignments[em.role] = em; }
         if (em.type === "clear" && em.section) { this.skipSections.push(em.section); this.clearSections.push(em.section); this.log(`🚨 [緊急] 出勤${tempAvailCount}人: ${em.section} を空室に設定しました`); }
         if (em.type === "change_capacity" && em.section) { if (!(this.ctx.customRules.dailyAdditions || []).some((r) => r.date === this.day.id && r.section === em.section)) { this.dynamicCapacity[em.section] = Number(em.newCapacity ?? 3); this.log(`🚨 [緊急] 出勤${tempAvailCount}人: ${em.section} の定員を ${em.newCapacity}人に変更しました`); } }
-        // 🌟復活：緊急ルールの兼務
         if (em.type === "kenmu") { this.currentKenmu.push(em); if (em.s2) split(em.s2).forEach(s => this.skipSections.push(s)); this.log(`🚨 [緊急] 出勤${tempAvailCount}人: [${em.s1}] 担当者が [${em.s2}] を兼務するように設定しました`); }
       }
     });
@@ -646,7 +647,6 @@ class AutoAssigner {
       }
     });
 
-    // 🌟 復活：常時兼務ルールの処理
     const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
        const targetCap = this.dynamicCapacity[targetRoom] || 1; const targetCores = targetMems.map(extractStaffName);
        const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
@@ -657,7 +657,6 @@ class AutoAssigner {
           const core = extractStaffName(m);
           if (targetCores.includes(core)) continue; if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; if (this.isForbidden(core, targetRoom)) continue;
           
-          // 半休のスマート処理
           let pushStr = m;
           let curAm = 0; let curPm = 0;
           targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
@@ -1082,16 +1081,28 @@ export default function App() {
     } catch (err) { alert("テキストの読み込みに失敗しました。コピー漏れがないか確認してください。"); }
   };
 
-  // 🌟 修正：マトリックスの計算ロジック
+  // 🌟 修正：マトリックスの計算ロジック（遅番回数もカウント）
   const monthlyMatrixStats = useMemo(() => {
     const targetMonth = targetMonday.substring(0, 7);
-    const stats: Record<string, Record<string, number>> = {};
-    activeGeneralStaff.forEach(s => { stats[s] = {}; ROOM_SECTIONS.forEach(r => stats[s][r] = 0); });
+    const stats: Record<string, Record<string, { total: number, late: number }>> = {};
+    activeGeneralStaff.forEach(s => { 
+      stats[s] = {}; 
+      ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); 
+    });
+    
     Object.entries(allDays).forEach(([dateStr, cells]) => {
       if (dateStr.startsWith(targetMonth)) {
         ROOM_SECTIONS.forEach(room => {
-          const membersInRoom = split(cells[room] || "").map(extractStaffName);
-          membersInRoom.forEach(m => { if (stats[m] !== undefined && stats[m][room] !== undefined) stats[m][room] += 1; });
+          const membersInRoom = split(cells[room] || "");
+          membersInRoom.forEach(m => {
+            const core = extractStaffName(m);
+            if (stats[core] !== undefined && stats[core][room] !== undefined) {
+              stats[core][room].total += 1;
+              if (m.includes("17:00") || m.includes("18:00") || m.includes("19:00") || m.includes("22:00")) {
+                stats[core][room].late += 1;
+              }
+            }
+          });
         });
       }
     });
@@ -1130,6 +1141,19 @@ export default function App() {
     });
 
     if (emptyRooms.length > 0) w.push({type: 'info', msg: `💡 空室: ${emptyRooms.join(', ')}`});
+
+    // 🌟 修正：3つ以上の兼務を警告
+    const staffRoomMap: Record<string, string[]> = {};
+    ROOM_SECTIONS.forEach(room => {
+      split(cells[room]).forEach(m => {
+        const core = extractStaffName(m);
+        if (!staffRoomMap[core]) staffRoomMap[core] = [];
+        if (!staffRoomMap[core].includes(room)) staffRoomMap[core].push(room);
+      });
+    });
+    Object.entries(staffRoomMap).forEach(([staff, rooms]) => {
+      if (rooms.length >= 3) w.push({ type: 'error', msg: `⚠️【兼務過多】${staff}さんが ${rooms.length}つの部屋（${rooms.join('、')}）を兼務しています！` });
+    });
 
     (customRules.ngPairs || []).forEach((ng: any) => {
       if (ng.level === 'soft' && ng.s1 && ng.s2) {
@@ -1337,7 +1361,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 復活：常時兼務ペア */}
               <div style={{ background: "#ecfdf5", padding: 32, borderRadius: 16, border: "2px solid #a7f3d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 28, fontWeight: 800 }}>🔗 常時兼務ペア</h4>
                 <p style={{ fontSize: 22, color: "#047857", marginBottom: 24, fontWeight: 600 }}>人が足りない時に自動で兼務にする部屋のペアです。余裕がある時は独立した担当者が入ります。</p>
@@ -1584,7 +1607,6 @@ export default function App() {
         </details>
       </div>
 
-      {/* 🌟 修正点：マトリックス表を横書きに変更、赤枠を撤去 */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 32 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 28, display: "flex", alignItems: "center", gap: 12, letterSpacing: "0.02em" }}>
@@ -1594,42 +1616,53 @@ export default function App() {
             <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>
               ※表示中の月（{targetMonday.substring(0, 7)}）の全員の配置回数です。青色が濃いほど回数が多く、<strong style={{color:"#854d0e"}}>黄背景</strong>のセルは「月間担当者なのにまだ0回」の要注意箇所です。
             </p>
-            <div style={{ overflowX: "auto", border: "2px solid #cbd5e1", borderRadius: 12 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
+            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "60vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
+              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
                 <thead>
                   <tr>
-                    <th style={{ position: "sticky", left: 0, background: "#f8fafc", zIndex: 10, padding: 12, border: "1px solid #cbd5e1", color: "#1e293b", fontWeight: 800 }}>スタッフ</th>
-                    {ROOM_SECTIONS.map(r => <th key={r} style={{ padding: "12px 8px", border: "1px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 700, whiteSpace: "nowrap" }}>{r}</th>)}
+                    <th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "1px solid #cbd5e1", color: "#1e293b", fontWeight: 800 }}>スタッフ</th>
+                    {ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: "12px 8px", borderRight: "1px solid #cbd5e1", borderBottom: "1px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 700, whiteSpace: "nowrap" }}>{r}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {activeGeneralStaff.map(staff => {
                     return (
                       <tr key={staff} className="calendar-row">
-                        <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 10, padding: "12px 16px", border: "1px solid #cbd5e1", fontWeight: 800, textAlign: "left", color: "#334155" }}>{staff}</td>
+                        <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 10, padding: "12px 16px", borderRight: "1px solid #cbd5e1", borderBottom: "1px solid #cbd5e1", fontWeight: 800, textAlign: "left", color: "#334155" }}>{staff}</td>
                         {ROOM_SECTIONS.map(r => {
-                          const count = monthlyMatrixStats[staff]?.[r] || 0;
+                          const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 };
+                          const count = stat.total;
+                          const lateCount = stat.late;
                           const isMain = isMonthlyMainStaff(r, staff, monthlyAssign);
+                          const isCtMri = r === "CT" || r === "MRI";
                           
                           let bg = "transparent";
                           let color = "#334155";
-                          if (count > 0) {
-                            bg = `rgba(59, 130, 246, ${Math.min(0.1 + count * 0.15, 0.9)})`;
-                            if (count >= 3) color = "#fff";
-                          } else if (isMain) {
-                            bg = "#fef08a"; // 月間担当で0回なら黄色背景のみ
+                          
+                          if (isCtMri) {
+                            if (count > 0) {
+                              bg = `rgba(59, 130, 246, ${Math.min(0.1 + count * 0.15, 0.9)})`;
+                              if (count >= 3) color = "#fff";
+                            } else if (isMain) {
+                              bg = "#fef08a"; 
+                            }
                           }
                           
                           return (
                             <td key={r} style={{ 
-                              padding: 12, 
+                              padding: 8, 
                               background: bg, 
                               color: color,
                               fontWeight: count > 0 ? 800 : 500, 
-                              border: "1px solid #cbd5e1",
-                              transition: "background 0.2s"
+                              borderRight: "1px solid #cbd5e1",
+                              borderBottom: "1px solid #cbd5e1",
+                              transition: "background 0.2s",
+                              verticalAlign: "middle"
                             }}>
-                              {count > 0 ? count : ""}
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                                {count > 0 ? <span>{count}</span> : <span></span>}
+                                {lateCount > 0 && <span style={{ fontSize: "14px", background: "#fef08a", color: "#b45309", padding: "2px 6px", borderRadius: "12px", lineHeight: 1, fontWeight: 800 }}>遅 {lateCount}</span>}
+                              </div>
                             </td>
                           );
                         })}
