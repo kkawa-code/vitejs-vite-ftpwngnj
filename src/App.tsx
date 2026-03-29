@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v143"; 
-const KEY_MONTHLY = "shifto_monthly_v143"; 
-const KEY_RULES = "shifto_rules_v143";
+const KEY_ALL_DAYS = "shifto_alldays_v144"; 
+const KEY_MONTHLY = "shifto_monthly_v144"; 
+const KEY_RULES = "shifto_rules_v144";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -239,7 +239,6 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
   return { border: "1px solid #e2e8f0", padding: "24px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 24, minWidth: isHeader && !isSticky ? "200px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
-// 🌟 マルチセクションピッカー（矢印による順序入れ替え機能付き）
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
   const handleAdd = (sec: string) => { if (sec && !current.includes(sec)) onChange(join([...current, sec])); };
@@ -277,7 +276,6 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
-// 🌟 マルチスタッフピッカー（矢印による順序入れ替え機能付き）
 const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
@@ -1512,7 +1510,7 @@ export default function App() {
                 <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 28, fontWeight: 800 }}>🔗 基本兼務（セット配置）ルール</h4>
                 <p style={{ fontSize: 22, color: "#047857", marginBottom: 24, fontWeight: 600 }}>パノラマCTなど、「専任スタッフを置かず、特定の部屋の担当者に兼務させたい部屋」を指定します。（上のルールから順番に発動します）</p>
                 {(customRules.linkedRooms || []).map((rule: any, idx: number, arr: any[]) => (
-                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "18px 24px", border: "2px solid #a7f3d0", borderRadius: 12 }}>
+                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "18px 24px", border: "2px solid #a7f3d0", borderRadius: 12, position: "relative" }}>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>[</span>
                     <select value={rule.target} onChange={e => updateRule("linkedRooms", idx, "target", e.target.value)} className="rule-sel" style={{ borderColor: "#6ee7b7", minWidth: 220 }}>
                       <option value="">兼務専用にする部屋</option>
@@ -1523,7 +1521,12 @@ export default function App() {
                       <MultiSectionPicker selected={rule.sources} onChange={v => updateRule("linkedRooms", idx, "sources", v)} options={ROOM_SECTIONS} />
                     </div>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>] の担当者をセットで配置する</span>
-                    <button onClick={() => removeRule("linkedRooms", idx)} className="rule-del" style={{ alignSelf: "flex-start", marginTop: 4 }}>✖</button>
+                    
+                    <div style={{ position: "absolute", right: 60, top: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#d1fae5", cursor: idx === 0 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#065f46", lineHeight: 1 }}>▲</button>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#d1fae5", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#065f46", lineHeight: 1 }}>▼</button>
+                    </div>
+                    <button onClick={() => removeRule("linkedRooms", idx)} className="rule-del" style={{ position: "absolute", right: 20, top: 30 }}>✖</button>
                   </div>
                 ))}
                 <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("linkedRooms", { target: "", sources: "" })}>＋ 基本兼務ルールを追加</button>
@@ -1543,16 +1546,14 @@ export default function App() {
                       </select>
                       <span style={{ fontSize: 22, fontWeight: 700, color: "#854d0e" }}>が不足なら ➔ 以下の部屋から兼務を探す</span>
                     </div>
-                    <div style={{ width: "100%", paddingLeft: 60, display: "flex", alignItems: "center" }}>
-                      <div style={{ flex: 1 }}>
-                        <MultiSectionPicker selected={rule.sourceRooms} onChange={v => updateRule("rescueRules", idx, "sourceRooms", v)} options={ROOM_SECTIONS} />
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginLeft: 16, marginRight: 16 }}>
-                        <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.rescueRules || [])]; [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]]; return { ...prev, rescueRules: newArr }; }); }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#fef08a", cursor: idx === 0 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#a16207", lineHeight: 1 }}>▲</button>
-                        <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.rescueRules || [])]; [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]]; return { ...prev, rescueRules: newArr }; }); }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#fef08a", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#a16207", lineHeight: 1 }}>▼</button>
-                      </div>
-                      <button onClick={() => removeRule("rescueRules", idx)} className="rule-del">✖</button>
+                    <div style={{ width: "100%", paddingLeft: 60 }}>
+                      <MultiSectionPicker selected={rule.sourceRooms} onChange={v => updateRule("rescueRules", idx, "sourceRooms", v)} options={ROOM_SECTIONS} />
                     </div>
+                    <div style={{ position: "absolute", right: 60, top: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.rescueRules || [])]; [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]]; return { ...prev, rescueRules: newArr }; }); }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#fef08a", cursor: idx === 0 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#a16207", lineHeight: 1 }}>▲</button>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.rescueRules || [])]; [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]]; return { ...prev, rescueRules: newArr }; }); }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#fef08a", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#a16207", lineHeight: 1 }}>▼</button>
+                    </div>
+                    <button onClick={() => removeRule("rescueRules", idx)} className="rule-del" style={{ position: "absolute", right: 20, top: 30 }}>✖</button>
                   </div>
                 ))}
                 <button className="rule-add" style={{ color: "#854d0e", borderColor: "#fde047" }} onClick={() => addRule("rescueRules", { targetRoom: "", sourceRooms: "" })}>＋ 救済ルールを追加</button>
