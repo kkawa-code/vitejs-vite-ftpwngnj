@@ -2,63 +2,35 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  
-  /* 🌟 Viteのデフォルトの壁（横幅制限）を強制的に破壊！ */
-  html, body, #root { 
-    max-width: 100% !important; 
-    width: 100% !important; 
-    margin: 0 !important; 
-    padding: 0 !important; 
-  }
-
-  /* 🌟 全体の横スクロールは防止しつつ、固定ヘッダー（sticky）を殺さない設定 */
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
-  
+  html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', sans-serif; font-size: 24px; overflow-x: clip; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
-  
-  /* 🌟 文字被り防止のため padding-right を極端に広く設定 */
-  select { 
-    appearance: none; 
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
-    background-repeat: no-repeat; 
-    background-position: right 16px center; 
-    background-size: 1.5em; 
-    text-overflow: ellipsis; 
-    white-space: nowrap; 
-    overflow: hidden; 
-    padding-right: 64px !important; 
-  }
-  
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 1.5em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 64px !important; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
-  
   .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 20px; margin-top: -20px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
-
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
+  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .rule-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; align-items: center; width: 100%; }
-  .rule-sel { padding: 14px 44px 14px 18px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 160px; min-width: 160px; font-size: 24px; transition: border-color 0.2s; }
-  .rule-num { width: 90px; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 24px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 28px; flex-shrink: 0; padding: 0 12px; transition: 0.2s; }
+  .rule-sel { padding: 14px 44px 14px 18px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 160px; min-width: 160px; font-size: 24px; }
+  .rule-num { width: 90px; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 24px; text-align: center; flex-shrink: 0; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 28px; flex-shrink: 0; padding: 0 12px; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
-  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 16px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; transition: all 0.2s; }
-  .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
+  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 16px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; }
   .rule-label { font-size: 24px; font-weight: 700; color: #64748b; flex-shrink: 0; }
-  
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
-
   @media print {
     body { background: #fff; overflow: visible; font-size: 16pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
@@ -68,7 +40,6 @@ const globalStyle = `
   }
 `;
 
-// ===================== 🌟 型定義の厳密化 =====================
 type RenderGroup = { title: string; color: string; sections: string[] };
 type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
 
@@ -82,37 +53,19 @@ interface RuleSubstitute { target: string; subs: string; section: string; }
 interface RulePushOut { s1?: string; triggerStaff?: string; s2?: string; targetStaff?: string; triggerSection: string; targetSections: string; }
 interface RuleEmergency { threshold: number; type: string; role?: string; section?: string; s1?: string; s2?: string; newCapacity?: number; }
 interface RuleKenmuPair { s1: string; s2: string; }
+interface RuleRescue { targetRoom: string; sourceRooms: string; } // 🌟 追加：救済ルール
 interface RuleLateShift { section: string; lateTime: string; dayEndTime: string; }
 interface RuleLunchSpecial { day: string; count: number; }
 interface RuleLunchCond { section: string; min: number; out: number; }
 
 interface CustomRules {
-  staffList: string;
-  receptionStaffList: string;
-  supportStaffList: string;
-  supportTargetRooms: string;
-  customHolidays: string;
-  capacity: RuleCapacity;
-  dailyCapacities: RuleDailyCapacity[];
-  dailyAdditions: RuleDailyAddition[];
-  priorityRooms: string[];
-  fullDayOnlyRooms: string;
-  noConsecutiveRooms: string;
-  noLateShiftStaff: string;
-  ngPairs: RuleNgPair[];
-  fixed: RuleFixed[];
-  forbidden: RuleForbidden[];
-  substitutes: RuleSubstitute[];
-  pushOuts: RulePushOut[];
-  emergencies: RuleEmergency[];
-  kenmuPairs: RuleKenmuPair[];
-  lateShifts: RuleLateShift[];
-  helpThreshold: number;
-  lunchBaseCount: number;
-  lunchSpecialDays: RuleLunchSpecial[];
-  lunchConditional: RuleLunchCond[];
-  lunchPrioritySections: string;
-  lunchLastResortSections: string;
+  staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; customHolidays: string;
+  capacity: RuleCapacity; dailyCapacities: RuleDailyCapacity[]; dailyAdditions: RuleDailyAddition[]; priorityRooms: string[];
+  fullDayOnlyRooms: string; noConsecutiveRooms: string; noLateShiftStaff: string; ngPairs: RuleNgPair[]; fixed: RuleFixed[];
+  forbidden: RuleForbidden[]; substitutes: RuleSubstitute[]; pushOuts: RulePushOut[]; emergencies: RuleEmergency[]; kenmuPairs: RuleKenmuPair[];
+  rescueRules: RuleRescue[]; // 🌟 追加：救済ルール
+  lateShifts: RuleLateShift[]; helpThreshold: number; lunchBaseCount: number; lunchSpecialDays: RuleLunchSpecial[];
+  lunchConditional: RuleLunchCond[]; lunchPrioritySections: string; lunchLastResortSections: string;
 }
 
 const SECTIONS = [
@@ -153,15 +106,15 @@ const DEFAULT_RULES: CustomRules = {
   fullDayOnlyRooms: "DSA,検像,骨塩,パノラマCT", 
   noConsecutiveRooms: "MMG,ポータブル,透視（6号）,透視（11号）",
   noLateShiftStaff: "",
-  ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
-  kenmuPairs: [], lateShifts: [], 
-  helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
+  ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], 
+  rescueRules: [], // 🌟 追加
+  lateShifts: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v129"; 
-const KEY_MONTHLY = "shifto_monthly_v129"; 
-const KEY_RULES = "shifto_rules_v129";
+const KEY_ALL_DAYS = "shifto_alldays_v130"; 
+const KEY_MONTHLY = "shifto_monthly_v130"; 
+const KEY_RULES = "shifto_rules_v130";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -686,10 +639,9 @@ class AutoAssigner {
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
-    // 🌟 修正：空室救済の対象（skipSectionsでも発動するよう条件を緩和）
+    // 🌟 新機能：空室救済ルール（ユーザー設定可能）
     ROOM_SECTIONS.forEach(targetRoom => {
-      // 🌟 clearSections（意図的な空室）のみ除外し、skipSections（兼務予定で空室になった）は救済対象に含める
-      if (this.clearSections.includes(targetRoom)) return; 
+      if (this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
       if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
       
       const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
@@ -697,28 +649,38 @@ class AutoAssigner {
       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
       let currentAmount = getCurrentAmount(currentMems);
       
-      if (currentAmount >= targetCap) return;
+      if (currentAmount >= targetCap) return; // 埋まっているなら何もしない
       
-      // 🌟 一般撮影の部屋だけを救済元として指定
-      const rescueSourceRooms = ["5号室", "1号室", "2号室", "3号室", "パノラマCT", "骨塩", "ポータブル", "検像"];
-      let candidates: { core: string, fullStr: string }[] = [];
-      rescueSourceRooms.forEach(srcRoom => {
-         if (srcRoom === targetRoom) return;
-         split(this.dayCells[srcRoom]).forEach(m => {
-            const core = extractStaffName(m);
-            if (!ROLE_PLACEHOLDERS.includes(core) && !candidates.some(c => c.core === core) && !this.isForbidden(core, targetRoom)) {
-               if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) candidates.push({ core, fullStr: m });
-            }
-         });
-      });
-      const currentCores = currentMems.map(extractStaffName); candidates = candidates.filter(c => !currentCores.includes(c.core));
-      candidates.sort((a, b) => { if ((this.assignCounts[a.core] || 0) !== (this.assignCounts[b.core] || 0)) return (this.assignCounts[a.core] || 0) - (this.assignCounts[b.core] || 0); return (this.counts[a.core] || 0) - (this.counts[b.core] || 0); });
-      for (const cand of candidates) {
-         if (currentAmount >= targetCap) break;
-         currentMems.push(cand.fullStr); const amount = getStaffAmount(cand.fullStr); currentAmount += amount; this.addU(cand.core, amount);
-         this.log(`🚑 [空室救済] 空室の ${targetRoom} に、一般撮影担当の ${cand.core} を兼務で追加しました`);
+      // 救済ルールから、この部屋が空室になった時に頼るべき「情報源の部屋」を取得
+      const rescueRule = (this.ctx.customRules.rescueRules || []).find((r: any) => r.targetRoom === targetRoom);
+      if (rescueRule && rescueRule.sourceRooms) {
+         const sourceRooms = split(rescueRule.sourceRooms);
+         let candidates: { core: string, fullStr: string }[] = [];
+         
+         // 順番に候補部屋を見に行く
+         for (const srcRoom of sourceRooms) {
+            if (srcRoom === targetRoom) continue;
+            split(this.dayCells[srcRoom]).forEach(m => {
+               const core = extractStaffName(m);
+               if (!ROLE_PLACEHOLDERS.includes(core) && !candidates.some(c => c.core === core) && !this.isForbidden(core, targetRoom)) {
+                  if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) candidates.push({ core, fullStr: m });
+               }
+            });
+            // もしこの部屋から候補者が見つかれば、それ以降の順位の部屋は探さない（優先順位順）
+            if (candidates.length > 0) break;
+         }
+
+         const currentCores = currentMems.map(extractStaffName); 
+         candidates = candidates.filter(c => !currentCores.includes(c.core));
+         candidates.sort((a, b) => { if ((this.assignCounts[a.core] || 0) !== (this.assignCounts[b.core] || 0)) return (this.assignCounts[a.core] || 0) - (this.assignCounts[b.core] || 0); return (this.counts[a.core] || 0) - (this.counts[b.core] || 0); });
+         
+         for (const cand of candidates) {
+            if (currentAmount >= targetCap) break;
+            currentMems.push(cand.fullStr); const amount = getStaffAmount(cand.fullStr); currentAmount += amount; this.addU(cand.core, amount);
+            this.log(`🆘 [バックアップ発動] 空室の ${targetRoom} に、${cand.core} を兼務で追加しました`);
+         }
+         this.dayCells[targetRoom] = join(currentMems);
       }
-      this.dayCells[targetRoom] = join(currentMems);
     });
 
     let helpMembers: string[] = [];
@@ -1310,6 +1272,30 @@ export default function App() {
                 <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("kenmuPairs", { s1: "", s2: "" })}>＋ ペアを追加</button>
               </div>
 
+              {/* 🌟 追加：空室救済ルール */}
+              <div style={{ background: "#fefce8", padding: 32, borderRadius: 16, border: "2px solid #fde047", gridColumn: "1 / -1" }}>
+                <h4 style={{ margin: "0 0 16px 0", color: "#854d0e", fontSize: 28, fontWeight: 800 }}>🆘 空室救済（バックアップ）ルール</h4>
+                <p style={{ fontSize: 22, color: "#a16207", marginBottom: 24, fontWeight: 600 }}>
+                  指定した部屋が「空室」になってしまった場合、指定した他の部屋からスタッフを引っ張ってきて【兼務】させます。（左の部屋から優先して探します）
+                </p>
+                {(customRules.rescueRules || []).map((rule: any, idx: number) => (
+                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "20px 24px", border: "2px solid #fde047", borderRadius: 12, alignItems: "flex-start" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: "#854d0e" }}>もし</span>
+                      <select value={rule.targetRoom} onChange={e => updateRule("rescueRules", idx, "targetRoom", e.target.value)} className="rule-sel" style={{ borderColor: "#fef08a", minWidth: 200 }}>
+                        <option value="">（空室の部屋）</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: "#854d0e" }}>が空室なら ➔ 以下の部屋から兼務を探す</span>
+                    </div>
+                    <div style={{ width: "100%", paddingLeft: 60 }}>
+                      <MultiSectionPicker selected={rule.sourceRooms} onChange={v => updateRule("rescueRules", idx, "sourceRooms", v)} options={ROOM_SECTIONS} />
+                    </div>
+                    <button onClick={() => removeRule("rescueRules", idx)} className="rule-del" style={{ alignSelf: "center", marginLeft: "auto" }}>✖</button>
+                  </div>
+                ))}
+                <button className="rule-add" style={{ color: "#854d0e", borderColor: "#fde047" }} onClick={() => addRule("rescueRules", { targetRoom: "", sourceRooms: "" })}>＋ 救済ルールを追加</button>
+              </div>
+
               <div style={{ background: "#f0fdf4", padding: 32, borderRadius: 16, border: "2px solid #bbf7d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#15803d", fontSize: 28, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
                 <p style={{ fontSize: 22, color: "#166534", marginBottom: 24, fontWeight: 600 }}>指定したスタッフを、1人目の配置が終わった後の「対象部屋」に2人目として自動配置します。</p>
@@ -1630,7 +1616,6 @@ export default function App() {
                     <span style={{ display: "inline-block", width: 10, height: 32, background: group.color, borderRadius: 5 }}></span>
                     {group.title}
                   </h4>
-                  {/* 🌟 クリアボタンを復活！ */}
                   {group.title === "休務・夜勤" && (
                     <div style={{display: "flex", gap: 16}}>
                       <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "14px 24px", fontSize: 22, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
