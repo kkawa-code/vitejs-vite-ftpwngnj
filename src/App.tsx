@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   
+  /* 🌟 Viteのデフォルトの壁（横幅制限）を強制的に破壊！ */
   html, body, #root { 
     max-width: 100% !important; 
     width: 100% !important; 
@@ -10,12 +11,14 @@ const globalStyle = `
     padding: 0 !important; 
   }
 
+  /* 🌟 全体の横スクロールは防止しつつ、固定ヘッダー（sticky）を殺さない設定 */
   body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
   
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   
+  /* 🌟 文字被り防止のため padding-right を極端に広く設定 */
   select { 
     appearance: none; 
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
@@ -114,7 +117,6 @@ interface CustomRules {
   lunchPrioritySections: string;
   lunchLastResortSections: string;
   linkedRooms: RuleLinked[];
-  // 🌟 追加：アラート設定
   alertMaxKenmu: number;
   alertEmptyRooms: string;
 }
@@ -172,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v142"; 
-const KEY_MONTHLY = "shifto_monthly_v142"; 
-const KEY_RULES = "shifto_rules_v142";
+const KEY_ALL_DAYS = "shifto_alldays_v143"; 
+const KEY_MONTHLY = "shifto_monthly_v143"; 
+const KEY_RULES = "shifto_rules_v143";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -237,18 +239,37 @@ function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSt
   return { border: "1px solid #e2e8f0", padding: "24px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 24, minWidth: isHeader && !isSticky ? "200px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 }
 
+// 🌟 マルチセクションピッカー（矢印による順序入れ替え機能付き）
 const MultiSectionPicker = ({ selected, onChange, options }: { selected: string, onChange: (v: string) => void, options: string[] }) => {
   const current = split(selected);
   const handleAdd = (sec: string) => { if (sec && !current.includes(sec)) onChange(join([...current, sec])); };
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
+  
+  const handleMoveLeft = (idx: number) => {
+    if (idx === 0) return;
+    const next = [...current];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    onChange(join(next));
+  };
+  
+  const handleMoveRight = (idx: number) => {
+    if (idx === current.length - 1) return;
+    const next = [...current];
+    [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+    onChange(join(next));
+  };
+
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16, alignItems: "center" }}>
       {current.map((sec, i) => (
-        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 20, padding: "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: 12, border: "2px solid #bae6fd" }}>
-          {sec} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.6 }}>✖</span>
+        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 20, padding: "8px 16px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, border: "2px solid #bae6fd" }}>
+          {i > 0 ? <span onClick={() => handleMoveLeft(i)} style={{ cursor: "pointer", color: "#0284c7", padding: "0 4px" }}>◀</span> : <span style={{ width: 22 }}></span>}
+          <span style={{ userSelect: "none" }}>{sec}</span>
+          {i < current.length - 1 ? <span onClick={() => handleMoveRight(i)} style={{ cursor: "pointer", color: "#0284c7", padding: "0 4px" }}>▶</span> : <span style={{ width: 22 }}></span>}
+          <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: 4 }}>✖</span>
         </div>
       ))}
-      <select className="rule-sel" style={{ padding: "12px 64px 12px 16px", fontSize: 22, minWidth: 240, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "12px 64px 12px 16px", fontSize: 22, minWidth: 240, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => { handleAdd(e.target.value); e.target.value = ""; }} value="">
         <option value="">＋追加</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -256,18 +277,37 @@ const MultiSectionPicker = ({ selected, onChange, options }: { selected: string,
   );
 };
 
+// 🌟 マルチスタッフピッカー（矢印による順序入れ替え機能付き）
 const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追加" }: { selected: string, onChange: (v: string) => void, options: string[], placeholder?: string }) => {
   const current = split(selected);
   const handleAdd = (name: string) => { if (name && !current.includes(name)) onChange(join([...current, name])); };
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
+  
+  const handleMoveLeft = (idx: number) => {
+    if (idx === 0) return;
+    const next = [...current];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    onChange(join(next));
+  };
+  
+  const handleMoveRight = (idx: number) => {
+    if (idx === current.length - 1) return;
+    const next = [...current];
+    [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+    onChange(join(next));
+  };
+
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
       {current.map((name, i) => (
-        <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 20, padding: "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: 12, border: "2px solid #cbd5e1" }}>
-          {name} <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
+        <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 20, padding: "8px 16px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: 8, border: "2px solid #cbd5e1" }}>
+          {i > 0 ? <span onClick={() => handleMoveLeft(i)} style={{ cursor: "pointer", color: "#475569", padding: "0 4px" }}>◀</span> : <span style={{ width: 22 }}></span>}
+          <span style={{ userSelect: "none" }}>{name}</span>
+          {i < current.length - 1 ? <span onClick={() => handleMoveRight(i)} style={{ cursor: "pointer", color: "#475569", padding: "0 4px" }}>▶</span> : <span style={{ width: 22 }}></span>}
+          <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: 4 }}>✖</span>
         </div>
       ))}
-      <select className="rule-sel" style={{ padding: "12px 64px 12px 16px", fontSize: 22, minWidth: 260, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => handleAdd(e.target.value)} value="">
+      <select className="rule-sel" style={{ padding: "12px 64px 12px 16px", fontSize: 22, minWidth: 260, maxWidth: "100%", height: 56, textOverflow: "ellipsis" }} onChange={(e) => { handleAdd(e.target.value); e.target.value = ""; }} value="">
         <option value="">{placeholder}</option>
         {options.filter(s => !current.includes(s)).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -562,10 +602,6 @@ class AutoAssigner {
       }
 
       this.log(`📋 [候補選考] ${section} の枠を補充します（残り ${remaining}人分${needTag ? ` / 要求: ${needTag}` : ''}）`);
-
-      const isValidBlock = (name: string) => {
-         const b = this.blockMap.get(name); if (b === 'ALL') return false; if (needTag === "(AM)" && b === 'AM') return false; if (needTag === "(PM)" && b === 'PM') return false; if (fullDayOnlyList.includes(section) && b !== 'NONE') return false; return true;
-      };
 
       const getFilterReason = (name: string) => {
          if (this.isUsed(name)) return "本日枠上限";
@@ -1232,7 +1268,6 @@ export default function App() {
       } else { if (count === 0) emptyRooms.push(room); }
     });
 
-    // 🌟 修正：ユーザーが設定した部屋だけ空室アラートを出す
     const targetEmptyRooms = split(customRules.alertEmptyRooms ?? ROOM_SECTIONS.join(','));
     emptyRooms.forEach(room => {
       if (targetEmptyRooms.includes(room)) {
@@ -1240,7 +1275,6 @@ export default function App() {
       }
     });
 
-    // 🌟 修正：ユーザーが設定した上限数以上の兼務を警告
     const maxKenmu = customRules.alertMaxKenmu ?? 3;
     const staffRoomMap: Record<string, string[]> = {};
     ROOM_SECTIONS.forEach(room => {
@@ -1480,7 +1514,7 @@ export default function App() {
                 {(customRules.linkedRooms || []).map((rule: any, idx: number, arr: any[]) => (
                   <div key={idx} className="rule-row" style={{ background: "#fff", padding: "18px 24px", border: "2px solid #a7f3d0", borderRadius: 12 }}>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>[</span>
-                    <select value={rule.target} onChange={e => updateRule("linkedRooms", idx, "target", e.target.value)} className="rule-sel" style={{ borderColor: "#6ee7b7" }}>
+                    <select value={rule.target} onChange={e => updateRule("linkedRooms", idx, "target", e.target.value)} className="rule-sel" style={{ borderColor: "#6ee7b7", minWidth: 220 }}>
                       <option value="">兼務専用にする部屋</option>
                       {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -1489,12 +1523,7 @@ export default function App() {
                       <MultiSectionPicker selected={rule.sources} onChange={v => updateRule("linkedRooms", idx, "sources", v)} options={ROOM_SECTIONS} />
                     </div>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>] の担当者をセットで配置する</span>
-                    
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginLeft: "auto", marginRight: 16 }}>
-                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#d1fae5", cursor: idx === 0 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#065f46", lineHeight: 1 }}>▲</button>
-                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#d1fae5", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#065f46", lineHeight: 1 }}>▼</button>
-                    </div>
-                    <button onClick={() => removeRule("linkedRooms", idx)} className="rule-del">✖</button>
+                    <button onClick={() => removeRule("linkedRooms", idx)} className="rule-del" style={{ alignSelf: "flex-start", marginTop: 4 }}>✖</button>
                   </div>
                 ))}
                 <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("linkedRooms", { target: "", sources: "" })}>＋ 基本兼務ルールを追加</button>
@@ -1506,7 +1535,7 @@ export default function App() {
                   指定した部屋が「空室」や「定員割れ（半日しか人がいない等）」になった場合、指定した他の部屋からスタッフを引っ張ってきて【兼務】させます。（上のルールから順番に発動します）
                 </p>
                 {(customRules.rescueRules || []).map((rule: any, idx: number, arr: any[]) => (
-                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "20px 24px", border: "2px solid #fde047", borderRadius: 12 }}>
+                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "20px 24px", border: "2px solid #fde047", borderRadius: 12, alignItems: "flex-start", position: "relative" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", width: "100%" }}>
                       <span style={{ fontSize: 22, fontWeight: 700, color: "#854d0e" }}>もし</span>
                       <select value={rule.targetRoom} onChange={e => updateRule("rescueRules", idx, "targetRoom", e.target.value)} className="rule-sel" style={{ borderColor: "#fef08a", minWidth: 200 }}>
@@ -1529,7 +1558,7 @@ export default function App() {
                 <button className="rule-add" style={{ color: "#854d0e", borderColor: "#fde047" }} onClick={() => addRule("rescueRules", { targetRoom: "", sourceRooms: "" })}>＋ 救済ルールを追加</button>
               </div>
 
-              {/* 🌟 復活・追加：アラートルール設定 */}
+              {/* 🌟 アラートルール設定 */}
               <div style={{ background: "#fff1f2", padding: 32, borderRadius: 16, border: "2px solid #fecaca", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 28, fontWeight: 800 }}>⚠️ アラート（警告）ルールの設定</h4>
                 <p style={{ fontSize: 22, color: "#9f1239", marginBottom: 24, fontWeight: 600 }}>カレンダーの下に出る「💡 配置のチェックリスト」の条件をカスタマイズできます。</p>
