@@ -118,11 +118,11 @@ interface CustomRules {
 const SECTIONS = [
   "明け","入り","土日休日代休","不在","待機","CT","MRI","RI",
   "1号室","2号室","3号室","5号室","透視（6号）","透視（11号）",
-  "MMG","骨塩","パノラマCT","ポータブル","DSA","透析後胸部","治療","検像","昼当番","受付","受付ヘルプ"
+  "MMG","骨塩","パノラマCT","ポータブル","DSA","治療","検像","昼当番","受付","受付ヘルプ" 
 ];
 
 const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在"].includes(s));
-const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番","透析後胸部"].includes(s));
+const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番"].includes(s));
 const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "検像"];
@@ -159,9 +159,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v127"; 
-const KEY_MONTHLY = "shifto_monthly_v127"; 
-const KEY_RULES = "shifto_rules_v127";
+const KEY_ALL_DAYS = "shifto_alldays_v128"; 
+const KEY_MONTHLY = "shifto_monthly_v128"; 
+const KEY_RULES = "shifto_rules_v128";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -178,7 +178,7 @@ const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
   { title: "モダリティ", color: "#3b82f6", sections: ["CT","MRI","RI","治療"] },
   { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","検像","受付","受付ヘルプ","昼当番"] },
-  { title: "待機・その他", color: "#f59e0b", sections: ["待機","透析後胸部"] } 
+  { title: "待機・その他", color: "#f59e0b", sections: ["待機"] } 
 ];
 
 function split(v: string) { return (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean); }
@@ -342,7 +342,7 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
 
 const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [] }: { section: string, value: string, activeStaff: string[], onChange: (v: string) => void, noTime?: boolean, customOptions?: string[] }) => {
   const members = split(value);
-  const isTaiki = section === "待機" || section === "透析後胸部";
+  const isTaiki = section === "待機";
   const handleAdd = (name: string) => { if (name) { const newName = isTaiki ? `${name}(17:00〜19:00)` : name; onChange(join([...members, newName])); } };
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
   const handleTimeChange = (idx: number, newTime: string) => { if (noTime) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
@@ -686,6 +686,7 @@ class AutoAssigner {
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
+    // 🌟 修正：空室救済の対象を「一般撮影」に限定！（6号, 11号, CT, MRIなどは除外）
     ROOM_SECTIONS.forEach(targetRoom => {
       if (this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
       if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
@@ -694,7 +695,9 @@ class AutoAssigner {
       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
       let currentAmount = getCurrentAmount(currentMems);
       if (currentAmount >= targetCap) return;
-      const rescueSourceRooms = ["1号室", "2号室", "3号室", "5号室", "パノラマCT", "骨塩", "透視（6号）", "透視（11号）", "MMG", "ポータブル", "CT", "MRI", "RI", "治療"];
+      
+      // 🌟 一般撮影の部屋だけを救済元として指定
+      const rescueSourceRooms = ["5号室", "1号室", "2号室", "3号室", "パノラマCT", "骨塩", "ポータブル", "検像"];
       let candidates: { core: string, fullStr: string }[] = [];
       rescueSourceRooms.forEach(srcRoom => {
          if (srcRoom === targetRoom) return;
@@ -710,7 +713,7 @@ class AutoAssigner {
       for (const cand of candidates) {
          if (currentAmount >= targetCap) break;
          currentMems.push(cand.fullStr); const amount = getStaffAmount(cand.fullStr); currentAmount += amount; this.addU(cand.core, amount);
-         this.log(`🚑 [空室救済] 空室の ${targetRoom} に、手が空いている ${cand.core} を兼務で追加しました`);
+         this.log(`🚑 [空室救済] 空室の ${targetRoom} に、一般撮影担当の ${cand.core} を兼務で追加しました`);
       }
       this.dayCells[targetRoom] = join(currentMems);
     });
@@ -1624,7 +1627,6 @@ export default function App() {
                     <span style={{ display: "inline-block", width: 10, height: 32, background: group.color, borderRadius: 5 }}></span>
                     {group.title}
                   </h4>
-                  {/* 🌟 クリアボタンを復活！ */}
                   {group.title === "休務・夜勤" && (
                     <div style={{display: "flex", gap: 16}}>
                       <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "14px 24px", fontSize: 22, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
