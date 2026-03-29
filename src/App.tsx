@@ -2,35 +2,63 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', sans-serif; font-size: 24px; overflow-x: clip; }
+  
+  /* 🌟 Viteのデフォルトの壁（横幅制限）を強制的に破壊！ */
+  html, body, #root { 
+    max-width: 100% !important; 
+    width: 100% !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+  }
+
+  /* 🌟 全体の横スクロールは防止しつつ、固定ヘッダー（sticky）を殺さない設定 */
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
+  
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 1.5em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 64px !important; }
+  
+  /* 🌟 文字被り防止のため padding-right を極端に広く設定 */
+  select { 
+    appearance: none; 
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
+    background-repeat: no-repeat; 
+    background-position: right 16px center; 
+    background-size: 1.5em; 
+    text-overflow: ellipsis; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    padding-right: 64px !important; 
+  }
+  
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+  
   .sticky-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 20px; margin-top: -20px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
+
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1) !important; }
+  .btn-hover:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .rule-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; align-items: center; width: 100%; }
-  .rule-sel { padding: 14px 44px 14px 18px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 160px; min-width: 160px; font-size: 24px; }
-  .rule-num { width: 90px; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 24px; text-align: center; flex-shrink: 0; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 28px; flex-shrink: 0; padding: 0 12px; }
+  .rule-sel { padding: 14px 44px 14px 18px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 160px; min-width: 160px; font-size: 24px; transition: border-color 0.2s; }
+  .rule-num { width: 90px; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 24px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 28px; flex-shrink: 0; padding: 0 12px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
-  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 16px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; }
+  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 16px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; transition: all 0.2s; }
+  .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 24px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
+
   @media print {
     body { background: #fff; overflow: visible; font-size: 16pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
@@ -40,6 +68,7 @@ const globalStyle = `
   }
 `;
 
+// ===================== 🌟 型定義の厳密化 =====================
 type RenderGroup = { title: string; color: string; sections: string[] };
 type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
 
@@ -59,13 +88,33 @@ interface RuleLunchSpecial { day: string; count: number; }
 interface RuleLunchCond { section: string; min: number; out: number; }
 
 interface CustomRules {
-  staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; customHolidays: string;
-  capacity: RuleCapacity; dailyCapacities: RuleDailyCapacity[]; dailyAdditions: RuleDailyAddition[]; priorityRooms: string[];
-  fullDayOnlyRooms: string; noConsecutiveRooms: string; noLateShiftStaff: string; ngPairs: RuleNgPair[]; fixed: RuleFixed[];
-  forbidden: RuleForbidden[]; substitutes: RuleSubstitute[]; pushOuts: RulePushOut[]; emergencies: RuleEmergency[]; kenmuPairs: RuleKenmuPair[];
+  staffList: string;
+  receptionStaffList: string;
+  supportStaffList: string;
+  supportTargetRooms: string;
+  customHolidays: string;
+  capacity: RuleCapacity;
+  dailyCapacities: RuleDailyCapacity[];
+  dailyAdditions: RuleDailyAddition[];
+  priorityRooms: string[];
+  fullDayOnlyRooms: string;
+  noConsecutiveRooms: string;
+  noLateShiftStaff: string;
+  ngPairs: RuleNgPair[];
+  fixed: RuleFixed[];
+  forbidden: RuleForbidden[];
+  substitutes: RuleSubstitute[];
+  pushOuts: RulePushOut[];
+  emergencies: RuleEmergency[];
+  kenmuPairs: RuleKenmuPair[];
   rescueRules: RuleRescue[];
-  lateShifts: RuleLateShift[]; helpThreshold: number; lunchBaseCount: number; lunchSpecialDays: RuleLunchSpecial[];
-  lunchConditional: RuleLunchCond[]; lunchPrioritySections: string; lunchLastResortSections: string;
+  lateShifts: RuleLateShift[];
+  helpThreshold: number;
+  lunchBaseCount: number;
+  lunchSpecialDays: RuleLunchSpecial[];
+  lunchConditional: RuleLunchCond[];
+  lunchPrioritySections: string;
+  lunchLastResortSections: string;
 }
 
 const SECTIONS = [
@@ -112,9 +161,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v134"; 
-const KEY_MONTHLY = "shifto_monthly_v134"; 
-const KEY_RULES = "shifto_rules_v134";
+const KEY_ALL_DAYS = "shifto_alldays_v136"; 
+const KEY_MONTHLY = "shifto_monthly_v136"; 
+const KEY_RULES = "shifto_rules_v136";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -519,7 +568,7 @@ class AutoAssigner {
       const core = pickedCoreList[0]; const block = this.blockMap.get(core); let tag = ""; let f = 1;
       if (block === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(core, 'ALL'); } else if (block === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(core, 'ALL'); } else { if (needTag) { tag = needTag; f = 0.5; this.blockMap.set(core, needTag === "(AM)" ? 'AM' : 'PM'); } else { tag = ""; f = 1; this.blockMap.set(core, 'ALL'); } }
       current.push(`${core}${tag}`); this.addU(core, f);
-      this.log(`🎯 [通常配置] ${section} に ${core}${tag} を配置しました`);
+      this.log(`🎯 [通常配置] ${section} に ${core}${tag} を配置しました（今月 ${(this.roomCounts[core]?.[section] || 0) + 1} 回目）`);
     }
     this.dayCells[section] = join(current);
   }
@@ -1048,24 +1097,29 @@ export default function App() {
     } catch (err) { alert("テキストの読み込みに失敗しました。コピー漏れがないか確認してください。"); }
   };
 
-  const monthlyModalityStats = useMemo(() => {
+  // 🌟 変更点：クロス集計表（マトリックス）用のデータを計算
+  const monthlyMatrixStats = useMemo(() => {
     const targetMonth = targetMonday.substring(0, 7);
-    const stats: { room: string, data: { name: string, count: number }[] }[] = [];
-    const targetRooms = ["CT", "MRI", "治療", "RI", "MMG"];
-    targetRooms.forEach(room => {
-      const assignedStaff = getMonthlyStaffForSection(room, monthlyAssign);
-      if (assignedStaff.length === 0) return;
-      const counts: Record<string, number> = {}; assignedStaff.forEach(s => counts[s] = 0);
-      Object.entries(allDays).forEach(([dateStr, cells]) => {
-        if (dateStr.startsWith(targetMonth)) {
+    const stats: Record<string, Record<string, number>> = {};
+    activeGeneralStaff.forEach(s => { 
+      stats[s] = {}; 
+      ROOM_SECTIONS.forEach(r => stats[s][r] = 0); 
+    });
+    
+    Object.entries(allDays).forEach(([dateStr, cells]) => {
+      if (dateStr.startsWith(targetMonth)) {
+        ROOM_SECTIONS.forEach(room => {
           const membersInRoom = split(cells[room] || "").map(extractStaffName);
-          membersInRoom.forEach(m => { if (counts[m] !== undefined) counts[m] += 1; });
-        }
-      });
-      stats.push({ room, data: Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count) });
+          membersInRoom.forEach(m => {
+            if (stats[m] !== undefined && stats[m][room] !== undefined) {
+              stats[m][room] += 1;
+            }
+          });
+        });
+      }
     });
     return stats;
-  }, [targetMonday, allDays, monthlyAssign]);
+  }, [targetMonday, allDays, activeGeneralStaff]);
 
   const priorityRoomsList = useMemo(() => {
     const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
@@ -1554,27 +1608,60 @@ export default function App() {
         </details>
       </div>
 
+      {/* 🌟 変更点：全モダリティの「月間クロス集計表（マトリックス）」を表示 */}
       <div className="no-print" style={{ ...panelStyle(), marginBottom: 32 }}>
         <details>
           <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 28, display: "flex", alignItems: "center", gap: 12, letterSpacing: "0.02em" }}>
-            <span>📊</span> 今月のモダリティ配置バランス（月間担当者の消化回数）を開く
+            <span>📊</span> 今月のモダリティ配置マトリックス（全員の配置回数を俯瞰）を開く
           </summary>
           <div style={{ marginTop: 24, borderTop: "2px dashed #cbd5e1", paddingTop: 24 }}>
-            <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>※表示中の月（{targetMonday.substring(0, 7)}）において、各モダリティの「月間担当者」が、実際に何回その部屋に割り当てられているかを集計します。システムに保存されているデータのみカウントされます。</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-              {monthlyModalityStats.map((stat) => (
-                <div key={stat.room} style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 12, padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)" }}>
-                  <h4 style={{ margin: "0 0 16px 0", fontSize: 24, color: "#1e293b", borderBottom: "2px solid #f1f5f9", paddingBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}><span>{stat.room}</span><span style={{ fontSize: 16, color: "#94a3b8", fontWeight: 600 }}>月間担当</span></h4>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {stat.data.map(d => (
-                       <div key={d.name} className="card-hover btn-hover" onClick={() => setSelectedStaffForStats(d.name)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: d.count > 0 ? "#f0f9ff" : "#f8fafc", border: `1px solid ${d.count > 0 ? "#bae6fd" : "#e2e8f0"}`, padding: "12px 16px", borderRadius: 8, cursor: "pointer" }}>
-                         <span style={{ fontSize: 22, fontWeight: 700, color: d.count > 0 ? "#0369a1" : "#64748b" }}>{d.name}</span>
-                         <span style={{ fontSize: 24, fontWeight: 800, color: d.count > 0 ? "#2563eb" : "#94a3b8" }}>{d.count} <span style={{fontSize: 18}}>回</span></span>
-                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>
+              ※表示中の月（{targetMonday.substring(0, 7)}）の全員の配置回数です。青色が濃いほど回数が多く、<strong style={{color:"#ef4444"}}>赤枠・黄背景</strong>のセルは「月間担当者なのにまだ0回」の要注意箇所です。
+            </p>
+            <div style={{ overflowX: "auto", border: "2px solid #cbd5e1", borderRadius: 12 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
+                <thead>
+                  <tr>
+                    <th style={{ position: "sticky", left: 0, background: "#f8fafc", zIndex: 10, padding: 12, border: "1px solid #cbd5e1", color: "#1e293b", fontWeight: 800 }}>スタッフ</th>
+                    {ROOM_SECTIONS.map(r => <th key={r} style={{ padding: "12px 8px", border: "1px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 700, writingMode: "vertical-rl", textOrientation: "mixed", height: 140 }}>{r}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeGeneralStaff.map(staff => {
+                    return (
+                      <tr key={staff} className="calendar-row">
+                        <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 10, padding: "12px 16px", border: "1px solid #cbd5e1", fontWeight: 800, textAlign: "left", color: "#334155" }}>{staff}</td>
+                        {ROOM_SECTIONS.map(r => {
+                          const count = monthlyMatrixStats[staff]?.[r] || 0;
+                          const isMain = isMonthlyMainStaff(r, staff, monthlyAssign);
+                          
+                          let bg = "transparent";
+                          let color = "#334155";
+                          if (count > 0) {
+                            bg = `rgba(59, 130, 246, ${Math.min(0.1 + count * 0.15, 0.9)})`;
+                            if (count >= 3) color = "#fff";
+                          } else if (isMain) {
+                            bg = "#fef08a"; // 注意色（担当なのに0回）
+                          }
+                          
+                          return (
+                            <td key={r} style={{ 
+                              padding: 12, 
+                              background: bg, 
+                              color: color,
+                              fontWeight: count > 0 ? 800 : 500, 
+                              border: isMain ? "3px solid #ef4444" : "1px solid #cbd5e1",
+                              transition: "background 0.2s"
+                            }}>
+                              {count > 0 ? count : ""}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </details>
