@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v173"; 
-const KEY_MONTHLY = "shifto_monthly_v173"; 
-const KEY_RULES = "shifto_rules_v173";
+const KEY_ALL_DAYS = "shifto_alldays_v180"; 
+const KEY_MONTHLY = "shifto_monthly_v180"; 
+const KEY_RULES = "shifto_rules_v180";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -310,17 +310,19 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
   const handleWeekClick = (weekObj: (number|null)[]) => {
     const validDay = weekObj.find(d => d !== null);
     if (!validDay) return;
-    const dObj = new Date(year, month - 1, validDay);
+    // 🌟 時差バグ修正：12:00:00を指定して、前日の23時にズレるのを防ぐ
+    const dObj = new Date(year, month - 1, validDay, 12, 0, 0);
     const day = dObj.getDay();
     const diff = dObj.getDate() - day + (day === 0 ? -6 : 1);
-    const mon = new Date(new Date(dObj).setDate(diff));
+    const mon = new Date(dObj.getTime());
+    mon.setDate(diff);
     onChange(`${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`);
     setIsOpen(false);
   };
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe", padding: "18px 28px", fontSize: 24 }}>
-        📅 {targetMonday} の週 ▼
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe", padding: "14px 20px", fontSize: 22 }}>
+        📅 {targetMonday} 週 ▼
       </button>
       {isOpen && (
         <>
@@ -337,9 +339,11 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
                 {weeks.map((w, wIdx) => {
                   const isSelectedWeek = w.some(d => {
                     if(!d) return false;
-                    const dObj = new Date(year, month - 1, d); const day = dObj.getDay();
+                    const dObj = new Date(year, month - 1, d, 12, 0, 0); 
+                    const day = dObj.getDay();
                     const diff = dObj.getDate() - day + (day === 0 ? -6 : 1);
-                    return `${new Date(dObj.setDate(diff)).getFullYear()}-${pad(new Date(dObj.setDate(diff)).getMonth()+1)}-${pad(new Date(dObj.setDate(diff)).getDate())}` === targetMonday;
+                    const checkMon = new Date(dObj.getTime()); checkMon.setDate(diff);
+                    return `${checkMon.getFullYear()}-${pad(checkMon.getMonth()+1)}-${pad(checkMon.getDate())}` === targetMonday;
                   });
                   return (
                     <tr key={wIdx} onClick={() => handleWeekClick(w)} className="calendar-row" style={{ background: isSelectedWeek ? "#eff6ff" : "transparent" }}>
@@ -787,6 +791,8 @@ class AutoAssigner {
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
+    const isFixedToAny = (staffName: string) => (this.ctx.customRules.fixed || []).some((r:any) => r.staff === staffName);
+
     (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
       const targetRoom = rule.target;
       if (!targetRoom || this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
@@ -810,8 +816,7 @@ class AutoAssigner {
           if (curAm >= targetCap && curPm >= targetCap) return;
           
           const core = extractStaffName(m);
-          const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
-          if (isFixedToSource) return;
+          if (isFixedToAny(core)) return;
 
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
             if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
@@ -864,8 +869,7 @@ class AutoAssigner {
             if (srcRoom === targetRoom) return;
             split(this.dayCells[srcRoom]).forEach(m => {
                const core = extractStaffName(m);
-               const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
-               if (isFixedToSource) return;
+               if (isFixedToAny(core)) return;
 
                if (!ROLE_PLACEHOLDERS.includes(core) && !candidates.some(c => c.core === core) && !this.isForbidden(core, targetRoom)) {
                   if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
@@ -1016,6 +1020,7 @@ class AutoAssigner {
         const getHelp = (exclude: string[]) => {
           let cand = availGeneral.filter(n => {
             if (exclude.includes(n)) return false; if (helpMems.map(extractStaffName).includes(n)) return false; if (this.isForbidden(n, "受付ヘルプ")) return false; if (cannotLateShift.includes(n)) return false; 
+            if (isFixedToAny(n)) return false; // 🌟 修正：専従スタッフは受付ヘルプに行かない
             return true;
           });
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
@@ -1026,12 +1031,12 @@ class AutoAssigner {
         if (lunchHelpCandidate) { helpMems.push(`${lunchHelpCandidate}(12:15〜13:00)`); this.log(`🛎️ [受付ヘルプ] 昼枠(12:15〜)に ${lunchHelpCandidate} をアサインしました`); }
 
         const kenzoCores = split(this.dayCells["検像"]).map(extractStaffName);
-        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n));
+        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n));
         let picked16 = validKenzo.length > 0 ? validKenzo[0] : null;
 
         if (!picked16) {
           const excl = lunchHelpCandidate ? [lunchHelpCandidate] : [];
-          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n));
+          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n));
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); picked16 = cand[0]; }
         }
         if (picked16) { helpMems.push(`${picked16}(16:00〜)`); this.log(`🛎️ [受付ヘルプ] 夕枠(16:00〜)に ${picked16} をアサインしました`); }
@@ -1493,7 +1498,7 @@ export default function App() {
             </div>
 
             <div style={{ background: "#fff1f2", padding: 32, borderRadius: 16, border: "2px solid #fecaca" }}>
-              <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 26, fontWeight: 800 }}>⚠️ アラート設定</h4>
+              <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 28, fontWeight: 800 }}>⚠️ アラート設定</h4>
               <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 320, background: "#fff", padding: 24, borderRadius: 12, border: "2px solid #fca5a5" }}>
                   <label style={{ display: "block", marginBottom: 12, fontWeight: 700, color: "#9f1239" }}>兼務の上限</label>
@@ -1755,7 +1760,10 @@ export default function App() {
       </div>
 
       <div className="print-area" style={{ ...panelStyle(), marginBottom: 32, padding: "36px 24px" }}>
-        <h3 style={{ marginTop: 0, marginBottom: 24, fontSize: 32, fontWeight: 800 }}>週間一覧</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <h3 style={{ margin: 0, fontSize: 32, fontWeight: 800 }}>週間一覧</h3>
+          <div className="no-print"><WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} /></div>
+        </div>
         <div className="scroll-container" style={{ borderRadius: 12, border: "2px solid #e2e8f0" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400, background: "#fff" }}>
             <thead style={{ position: "sticky", top: 0, zIndex: 20 }}>
@@ -1767,12 +1775,13 @@ export default function App() {
                   const alertCount = dayWarnings.filter(w => w.type === 'alert').length;
                   return (
                     <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
-                      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                         {day.label}
-                        {errorCount > 0 && <div style={{ background: "#ef4444", color: "#fff", borderRadius: "50%", width: 32, height: 32, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>!!{errorCount}</div>}
-                        {errorCount === 0 && alertCount > 0 && <div style={{ background: "#f59e0b", color: "#fff", borderRadius: "50%", width: 32, height: 32, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>!{alertCount}</div>}
+                        {/* 🌟 週間一覧のアラートバッジ */}
+                        {errorCount > 0 && <div style={{ background: "#fef2f2", border: "2px solid #ef4444", color: "#ef4444", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>🚨 エラー {errorCount}</div>}
+                        {errorCount === 0 && alertCount > 0 && <div style={{ background: "#fffbeb", border: "2px solid #f59e0b", color: "#b45309", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>⚠️ 注意 {alertCount}</div>}
                         {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && (
-                          <button className="no-print" onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "4px 8px", fontSize: 16, color: "#0369a1", fontWeight: "bold" }}>根拠</button>
+                          <button className="no-print" onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "4px 8px", fontSize: 16, color: "#0369a1", fontWeight: "bold" }}>🤔 根拠</button>
                         )}
                       </div>
                       {day.isPublicHoliday && <div style={{ fontSize: 18, color: "#ef4444", marginTop: 4 }}>🎌 {day.holidayName}</div>}
