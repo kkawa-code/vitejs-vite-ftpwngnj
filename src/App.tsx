@@ -81,7 +81,7 @@ interface RuleForbidden { staff: string; sections: string; }
 interface RuleSubstitute { target: string; subs: string; section: string; }
 interface RulePushOut { s1?: string; triggerStaff?: string; s2?: string; targetStaff?: string; triggerSection: string; targetSections: string; }
 interface RuleEmergency { threshold: number; type: string; role?: string; section?: string; s1?: string; s2?: string; newCapacity?: number; }
-interface RuleLinked { target: string; sources: string; } // 🌟 復活＆進化：兼務専用ルール
+interface RuleLinked { target: string; sources: string; } 
 interface RuleRescue { targetRoom: string; sourceRooms: string; }
 interface RuleLateShift { section: string; lateTime: string; dayEndTime: string; }
 interface RuleLunchSpecial { day: string; count: number; }
@@ -106,7 +106,7 @@ interface CustomRules {
   substitutes: RuleSubstitute[];
   pushOuts: RulePushOut[];
   emergencies: RuleEmergency[];
-  linkedRooms: RuleLinked[]; // 🌟 復活＆進化：兼務専用ルール
+  linkedRooms: RuleLinked[]; 
   rescueRules: RuleRescue[];
   lateShifts: RuleLateShift[];
   helpThreshold: number;
@@ -167,9 +167,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v136"; 
-const KEY_MONTHLY = "shifto_monthly_v136"; 
-const KEY_RULES = "shifto_rules_v136";
+const KEY_ALL_DAYS = "shifto_alldays_v137"; 
+const KEY_MONTHLY = "shifto_monthly_v137"; 
+const KEY_RULES = "shifto_rules_v137";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -603,7 +603,6 @@ class AutoAssigner {
       const placeholders = currentMembersForTarget.filter(m => ROLE_PLACEHOLDERS.includes(extractStaffName(m)));
       if (placeholders.length > 0) { targetCount += placeholders.length; this.dayCells[room] = join(currentMembersForTarget.filter(m => !ROLE_PLACEHOLDERS.includes(extractStaffName(m)))); }
 
-      // 🌟 追加：🔗 基本兼務（セット配置）ルールの判定
       const isLinkedTarget = (this.ctx.customRules.linkedRooms || []).some((r: any) => r.target === room);
 
       if (room === "受付") {
@@ -619,7 +618,7 @@ class AutoAssigner {
         }
         const currentUketsukeAmount = currentUketsuke.reduce((sum, m) => sum + getStaffAmount(m), 0);
         let neededUketsuke = targetCount - currentUketsukeAmount;
-        if (neededUketsuke > 0 && !isLinkedTarget) { // 連動部屋なら専任補充をスキップ
+        if (neededUketsuke > 0 && !isLinkedTarget) { 
           const pickedUketsuke = this.pick(availReception, availReception, Math.ceil(neededUketsuke), "受付", currentUketsuke);
           pickedUketsuke.forEach((name: string) => {
             const b = this.blockMap.get(name); let tag = ""; let f = 1;
@@ -653,27 +652,53 @@ class AutoAssigner {
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
-    // 🌟 新機能：🔗 基本兼務（セット配置）ルールの適用
+    // 🌟 🔗 基本兼務（セット配置）ルールの適用（定員オーバー防止つき）
     (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
       const targetRoom = rule.target;
       if (!targetRoom || this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
       
+      const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
       let currentMems = split(this.dayCells[targetRoom]);
+      
+      let curAm = 0; let curPm = 0;
+      currentMems.forEach(x => {
+         if (x.includes("(AM)")) curAm += 1;
+         else if (x.includes("(PM)")) curPm += 1;
+         else { curAm += 1; curPm += 1; }
+      });
+      
       const sourceRooms = split(rule.sources);
       
-      sourceRooms.forEach(srcRoom => {
+      for (const srcRoom of sourceRooms) {
+        if (curAm >= targetCap && curPm >= targetCap) break; 
+
         split(this.dayCells[srcRoom]).forEach(m => {
+          if (curAm >= targetCap && curPm >= targetCap) return;
+          
           const core = extractStaffName(m);
-          // ターゲット部屋がNGでなく、かつ、夕方以降の時間帯ではない場合のみコピー
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
             if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
-               currentMems.push(m);
-               this.addU(core, getStaffAmount(m));
-               this.log(`🔗 [基本兼務] ${srcRoom} 担当の ${core} を ${targetRoom} にセット配置しました`);
+               
+               let pushStr = m;
+               if (curAm < targetCap && curPm >= targetCap) {
+                  if (m.includes("(PM)")) return; 
+                  pushStr = `${core}(AM)`;
+               } else if (curAm >= targetCap && curPm < targetCap) {
+                  if (m.includes("(AM)")) return; 
+                  pushStr = `${core}(PM)`;
+               }
+               
+               currentMems.push(pushStr);
+               if (pushStr.includes("(AM)")) curAm += 1;
+               else if (pushStr.includes("(PM)")) curPm += 1;
+               else { curAm += 1; curPm += 1; }
+               
+               this.addU(core, getStaffAmount(pushStr));
+               this.log(`🔗 [基本兼務] ${srcRoom} 担当の ${pushStr} を ${targetRoom} にセット配置しました`);
             }
           }
         });
-      });
+      }
       this.dayCells[targetRoom] = join(currentMems);
     });
 
@@ -1314,12 +1339,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🌟 復活：🔗 基本兼務（セット配置）ルール */}
+              {/* 🌟 修正：🔗 基本兼務（セット配置）ルール */}
               <div style={{ background: "#ecfdf5", padding: 32, borderRadius: 16, border: "2px solid #a7f3d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 28, fontWeight: 800 }}>🔗 基本兼務（セット配置）ルール</h4>
-                <p style={{ fontSize: 22, color: "#047857", marginBottom: 24, fontWeight: 600 }}>パノラマCTなど、「専任スタッフを置かず、特定の部屋の担当者に兼務させたい部屋」を指定します。</p>
-                {(customRules.linkedRooms || []).map((rule: any, idx: number) => (
-                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "18px 24px", border: "2px solid #a7f3d0", borderRadius: 12 }}>
+                <p style={{ fontSize: 22, color: "#047857", marginBottom: 24, fontWeight: 600 }}>パノラマCTなど、「専任スタッフを置かず、特定の部屋の担当者に兼務させたい部屋」を指定します。（上のルールから順番に発動します）</p>
+                {(customRules.linkedRooms || []).map((rule: any, idx: number, arr: any[]) => (
+                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "18px 24px", border: "2px solid #a7f3d0", borderRadius: 12, position: "relative" }}>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>[</span>
                     <select value={rule.target} onChange={e => updateRule("linkedRooms", idx, "target", e.target.value)} className="rule-sel" style={{ borderColor: "#6ee7b7" }}>
                       <option value="">兼務専用にする部屋</option>
@@ -1330,7 +1355,13 @@ export default function App() {
                       <MultiSectionPicker selected={rule.sources} onChange={v => updateRule("linkedRooms", idx, "sources", v)} options={ROOM_SECTIONS} />
                     </div>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#065f46" }}>] の担当者をセットで配置する</span>
-                    <button onClick={() => removeRule("linkedRooms", idx)} className="rule-del" style={{ alignSelf: "flex-start", marginTop: 4 }}>✖</button>
+                    
+                    {/* 🌟 上下移動ボタンを追加 */}
+                    <div style={{ position: "absolute", right: 60, top: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#d1fae5", cursor: idx === 0 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#065f46", lineHeight: 1 }}>▲</button>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.linkedRooms || [])]; [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]]; return { ...prev, linkedRooms: newArr }; }); }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#d1fae5", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#065f46", lineHeight: 1 }}>▼</button>
+                    </div>
+                    <button onClick={() => removeRule("linkedRooms", idx)} className="rule-del" style={{ position: "absolute", right: 20, top: 30 }}>✖</button>
                   </div>
                 ))}
                 <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("linkedRooms", { target: "", sources: "" })}>＋ 基本兼務ルールを追加</button>
