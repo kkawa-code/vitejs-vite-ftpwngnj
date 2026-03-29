@@ -157,13 +157,14 @@ const DEFAULT_RULES: CustomRules = {
   noConsecutiveRooms: "MMG,ポータブル,透視（6号）,透視（11号）",
   noLateShiftStaff: "",
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
-  kenmuPairs: [], 
-  linkedRooms: [
-    { target: "DSA", sources: "5号室" },
-    { target: "ポータブル", sources: "3号室" },
-    { target: "検像", sources: "骨塩" },
-    { target: "パノラマCT", sources: "透視（6号）,2号室" }
+  kenmuPairs: [
+    { s1: "5号室", s2: "DSA" },
+    { s1: "3号室", s2: "ポータブル" },
+    { s1: "骨塩", s2: "検像" },
+    { s1: "パノラマCT", s2: "透視（6号）" },
+    { s1: "2号室", s2: "パノラマCT" }
   ], 
+  linkedRooms: [], 
   rescueRules: [],
   lateShifts: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療",
@@ -171,9 +172,9 @@ const DEFAULT_RULES: CustomRules = {
   alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v149"; 
-const KEY_MONTHLY = "shifto_monthly_v149"; 
-const KEY_RULES = "shifto_rules_v149";
+const KEY_ALL_DAYS = "shifto_alldays_v150"; 
+const KEY_MONTHLY = "shifto_monthly_v150"; 
+const KEY_RULES = "shifto_rules_v150";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -560,6 +561,7 @@ class AutoAssigner {
     
     const filterFn = (name: string, checkSoftNg: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
+      // 🌟 修正：連日担当禁止ルールはユーザーが指定した部屋のみ適用
       if (prevDayMembers.includes(name)) return false;
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false;
       return true;
@@ -608,7 +610,6 @@ class AutoAssigner {
          if (needTag === "(PM)" && b === 'PM') return "PMブロック";
          if (fullDayOnlyList.includes(section) && b !== 'NONE') return "終日専任室だが半休";
          
-         // 🌟 修正：連日担当禁止ルールは、ユーザーが指定した部屋にだけ適用する
          const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
          const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
          if (prevDayMembers.includes(name)) return "連日担当禁止ルール";
@@ -715,8 +716,6 @@ class AutoAssigner {
     const basePriorityList = this.ctx.customRules.priorityRooms && this.ctx.customRules.priorityRooms.length > 0 ? this.ctx.customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
     const PRIORITY_LIST = ["治療", ...basePriorityList.filter((r: string) => r !== "治療")];
 
-    // 🌟 LinkedRooms は完全に撤廃し、通常配置に戻しました。
-
     PRIORITY_LIST.forEach((room: string) => {
       if (this.skipSections.includes(room)) return;
       if (["受付ヘルプ", "昼当番", "待機"].includes(room)) return;
@@ -769,7 +768,6 @@ class AutoAssigner {
        for (const m of sourceMems) {
           if (currentAmount >= targetCap) break;
           const core = extractStaffName(m);
-          // 専従スタッフは兼務させない処理を追加
           const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
           if (isFixedToSource) {
               this.log(`🔒 [兼務ブロック] ${core} さんは専従のため、${targetRoom} への兼務は行いません`);
@@ -796,7 +794,6 @@ class AutoAssigner {
       this.dayCells[pair.s2] = join(processKenmu(m1, m2, pair.s2));
       m2 = split(this.dayCells[pair.s2]); this.dayCells[pair.s1] = join(processKenmu(m2, m1, pair.s1));
     });
-
   }
 
   processPostTasks() {
@@ -832,7 +829,6 @@ class AutoAssigner {
             if (srcRoom === targetRoom) return;
             split(this.dayCells[srcRoom]).forEach(m => {
                const core = extractStaffName(m);
-               // 専従スタッフは救済（兼務）に出さない処理を追加
                const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
                if (isFixedToSource) return;
 
@@ -1021,7 +1017,6 @@ class AutoAssigner {
           const currentCores = current.map(extractStaffName);
           const currentAmount = current.reduce((sum, m) => sum + getStaffAmount(m), 0);
           
-          // 0人の空室には入れない。必ず誰かがいる部屋のサポートとして追加
           if (currentAmount > 0 && !currentCores.includes(staff) && !this.hasNGPair(staff, currentCores, false)) {
             let tag = ""; let f = 1;
             if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); }
@@ -1490,6 +1485,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* 🌟 修正：基本兼務ルールの矢印を削除し、救済ルールの矢印は維持 */}
               <div style={{ background: "#ecfdf5", padding: 32, borderRadius: 16, border: "2px solid #a7f3d0", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 28, fontWeight: 800 }}>🔗 常時兼務ペア</h4>
                 <p style={{ fontSize: 22, color: "#047857", marginBottom: 24, fontWeight: 600 }}>人が足りない時に自動で兼務にする部屋のペアです。余裕がある時は独立した担当者が入ります。</p>
@@ -1536,7 +1532,6 @@ export default function App() {
                 <button className="rule-add" style={{ color: "#854d0e", borderColor: "#fde047" }} onClick={() => addRule("rescueRules", { targetRoom: "", sourceRooms: "" })}>＋ 救済ルールを追加</button>
               </div>
 
-              {/* 🌟 アラートルール設定 */}
               <div style={{ background: "#fff1f2", padding: 32, borderRadius: 16, border: "2px solid #fecaca", gridColumn: "1 / -1" }}>
                 <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 28, fontWeight: 800 }}>⚠️ アラート（警告）ルールの設定</h4>
                 <p style={{ fontSize: 22, color: "#9f1239", marginBottom: 24, fontWeight: 600 }}>カレンダーの下に出る「💡 配置のチェックリスト」の条件をカスタマイズできます。</p>
@@ -1717,7 +1712,6 @@ export default function App() {
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} className="rule-del">✖</button>
                     </div>
-                    {/* 🌟 担当不可の部屋の順序は関係ないので矢印を出さない */}
                     <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} hasArrows={false} />
                   </div>
                 ))}
@@ -1774,7 +1768,7 @@ export default function App() {
             <p style={{ fontSize: 22, color: "#64748b", marginBottom: 24, fontWeight: 600 }}>
               ※表示中の月（{targetMonday.substring(0, 7)}）の全員の配置回数です。青色が濃いほど回数が多く、<strong style={{color:"#854d0e"}}>黄背景</strong>のセルは「月間担当者なのにまだ0回」の要注意箇所です。
             </p>
-            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "60vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
+            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
               <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
                 <thead>
                   <tr>
@@ -1845,12 +1839,12 @@ export default function App() {
               <tr>
                 <th style={{...cellStyle(true, false, false, true, false), position: "sticky", top: 0, left: 0, zIndex: 30, minWidth: "180px", borderRight: "3px solid #e2e8f0", borderBottom: "3px solid #e2e8f0"}}>区分</th>
                 {days.map(day => (
-                  <th key={day.id} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel, false, false), position: "sticky", top: 0, zIndex: 20, borderBottom: "3px solid #e2e8f0"}}>
+                  <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel, false, false), position: "sticky", top: 0, zIndex: 20, borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
                     <div style={{ fontSize: 26, letterSpacing: "0.02em", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
                       {day.label}
                       {/* 🌟 ログボタン */}
                       {!day.isPublicHoliday && assignLogs[day.id] && assignLogs[day.id].length > 0 && (
-                        <button className="no-print btn-hover" onClick={() => setSelectedLogDay(day.id)} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "4px 8px", cursor: "pointer", fontSize: "16px", color: "#0369a1", fontWeight: "bold" }}>🤔 根拠</button>
+                        <button className="no-print btn-hover" onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "4px 8px", cursor: "pointer", fontSize: "16px", color: "#0369a1", fontWeight: "bold" }}>🤔 根拠</button>
                       )}
                     </div>
                     {day.isPublicHoliday && <div style={{ fontSize: 20, color: "#ef4444", marginTop: 8, fontWeight: 600 }}>🎌 {day.holidayName}</div>}
