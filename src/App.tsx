@@ -159,9 +159,9 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v128"; 
-const KEY_MONTHLY = "shifto_monthly_v128"; 
-const KEY_RULES = "shifto_rules_v128";
+const KEY_ALL_DAYS = "shifto_alldays_v129"; 
+const KEY_MONTHLY = "shifto_monthly_v129"; 
+const KEY_RULES = "shifto_rules_v129";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -686,14 +686,17 @@ class AutoAssigner {
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList];
 
-    // 🌟 修正：空室救済の対象を「一般撮影」に限定！（6号, 11号, CT, MRIなどは除外）
+    // 🌟 修正：空室救済の対象（skipSectionsでも発動するよう条件を緩和）
     ROOM_SECTIONS.forEach(targetRoom => {
-      if (this.clearSections.includes(targetRoom) || this.skipSections.includes(targetRoom)) return;
+      // 🌟 clearSections（意図的な空室）のみ除外し、skipSections（兼務予定で空室になった）は救済対象に含める
+      if (this.clearSections.includes(targetRoom)) return; 
       if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
+      
       const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
       let currentMems = split(this.dayCells[targetRoom]);
       const getCurrentAmount = (arr: string[]) => arr.reduce((sum, m) => sum + getStaffAmount(m), 0);
       let currentAmount = getCurrentAmount(currentMems);
+      
       if (currentAmount >= targetCap) return;
       
       // 🌟 一般撮影の部屋だけを救済元として指定
@@ -1627,6 +1630,7 @@ export default function App() {
                     <span style={{ display: "inline-block", width: 10, height: 32, background: group.color, borderRadius: 5 }}></span>
                     {group.title}
                   </h4>
+                  {/* 🌟 クリアボタンを復活！ */}
                   {group.title === "休務・夜勤" && (
                     <div style={{display: "flex", gap: 16}}>
                       <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "14px 24px", fontSize: 22, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
