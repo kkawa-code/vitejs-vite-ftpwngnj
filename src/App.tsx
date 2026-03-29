@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v170"; 
-const KEY_MONTHLY = "shifto_monthly_v170"; 
-const KEY_RULES = "shifto_rules_v170";
+const KEY_ALL_DAYS = "shifto_alldays_v164"; 
+const KEY_MONTHLY = "shifto_monthly_v164"; 
+const KEY_RULES = "shifto_rules_v164";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -222,7 +222,7 @@ function getStaffAmount(name: string) {
   return (name.includes("(AM)") || name.includes("(PM)") || name.match(/\(〜/) || name.match(/〜\)/)) ? 0.5 : 1;
 }
 
-function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { return { background: bg, color: color, border: "none", borderRadius: "12px", padding: "20px 32px", cursor: "pointer", fontWeight: 800, fontSize: 24, whiteSpace: "nowrap", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 10 }; }
+function btnStyle(bg: string, color: string = "#fff"): React.CSSProperties { return { background: bg, color: color, border: "none", borderRadius: "12px", padding: "16px 24px", cursor: "pointer", fontWeight: 800, fontSize: 22, whiteSpace: "nowrap", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 10 }; }
 function panelStyle(): React.CSSProperties { return { background: "#fff", border: "1px solid #e2e8f0", borderRadius: "24px", padding: "40px", boxShadow: "0 6px 12px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" }; }
 function cellStyle(isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
@@ -418,14 +418,6 @@ class AutoAssigner {
   logInfo: string[] = [];
   
   private log(msg: string) { this.logInfo.push(`・${msg}`); }
-
-  getMonthlyStaffList(section: string): string[] {
-    let staff: string[] = [];
-    if (section === "治療") staff = [...split(this.ctx.monthlyAssign.治療), ...split(this.ctx.monthlyAssign.治療サブ優先), ...split(this.ctx.monthlyAssign.治療サブ)];
-    else if (section === "RI") staff = [...split(this.ctx.monthlyAssign.RI), ...split(this.ctx.monthlyAssign.RIサブ)];
-    else if (this.ctx.monthlyAssign[section] !== undefined) staff = split(this.ctx.monthlyAssign[section]);
-    return staff.map(extractStaffName);
-  }
 
   getTodayRoomCount(staff: string) {
     let count = 0;
@@ -694,7 +686,7 @@ class AutoAssigner {
 
     Object.values(this.roleAssignments).forEach((ra: any) => { if (this.skipSections.includes(ra.section)) return; const candidates = split(this.ctx.monthlyAssign[ra.role] || ""); const targetAvail = ["受付"].includes(ra.role) ? availReception : availGeneral; const staff = candidates.find(s => targetAvail.includes(s) && !this.isUsed(s) && !this.isForbidden(s, ra.section)); if (staff && !split(this.dayCells[ra.section]).map(extractStaffName).includes(staff)) { const b = this.blockMap.get(staff); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); } this.dayCells[ra.section] = join([...split(this.dayCells[ra.section]), `${staff}${tag}`]); this.addU(staff, f); this.log(`📌 [緊急役割] ${staff} を ${ra.section} に配置しました`); } });
 
-    (this.ctx.customRules.substitutes || []).forEach((sub: any) => { const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; const trigger = targets.every(t => !availAll.includes(t) || this.isUsed(t)); if (trigger) { const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); if (fallbackStaff.length > 0) { const currentSec = split(this.dayCells[sub.section]); for (const f of fallbackStaff) { if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; if (!this.hasNGPair(f, currentSec.map(extractStaffName), false) && currentSec.length < 6) { const b = this.blockMap.get(f); let tag = ""; let fr = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } this.dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); this.addU(f, fr); this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); break; } } } } });
+    (this.ctx.customRules.substitutes || []).forEach((sub: any) => { const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; const trigger = targets.every(t => !availAll.includes(t) || this.isUsed(t)); if (trigger) { const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); if (fallbackStaff.length > 0) { const currentSec = split(this.dayCells[sub.section]); for (const f of fallbackStaff) { if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; if (!this.hasNGPair(f, currentSec.map(extractStaffName), false) && currentSec.length < 6) { const b = this.blockMap.get(f); let tag = ""; let fr = 1; if (b === 'AM') { tag = "(PM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } this.dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); this.addU(f, fr); this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); break; } } } } });
 
     (this.ctx.customRules.pushOuts || []).forEach((po: any) => { const s1 = po.s1 || po.triggerStaff; const s2 = po.s2 || po.targetStaff; const tSec = po.triggerSection; if (!s1 || !s2 || !tSec || !po.targetSections) return; if (availGeneral.includes(s1) && availGeneral.includes(s2) && !this.isUsed(s2)) { const s1In = split(this.dayCells[tSec]).map(extractStaffName).includes(s1) || isMonthlyMainStaff(tSec, s1, this.ctx.monthlyAssign); const s2In = split(this.dayCells[tSec]).map(extractStaffName).includes(s2) || isMonthlyMainStaff(tSec, s2, this.ctx.monthlyAssign); if (s1In && s2In) { const allowedRooms = split(po.targetSections).filter(s => !this.skipSections.includes(s)); for (const room of allowedRooms) { if (this.isForbidden(s2, room)) continue; if (fullDayOnlyList.includes(room) && this.blockMap.get(s2) !== 'NONE') continue; const current = split(this.dayCells[room]); if (this.hasNGPair(s2, current.map(extractStaffName), false)) continue; const actualCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); if (current.length < actualCap) { const b = this.blockMap.get(s2); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(s2, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(s2, 'ALL'); } else { this.blockMap.set(s2, 'ALL'); } this.dayCells[room] = join([...current, `${s2}${tag}`]); this.addU(s2, f); this.dayCells[tSec] = join(split(this.dayCells[tSec]).filter(m => extractStaffName(m) !== s2)); this.log(`🎱 [玉突き] ${s1} と被ったため、${s2} を ${room} に移動しました`); break; } } } } });
 
@@ -1406,12 +1398,12 @@ export default function App() {
             <div style={{ background: "#fffbeb", padding: 32, borderRadius: 16, border: "2px solid #fde68a" }}>
               <h4 style={{ margin: "0 0 16px 0", color: "#b45309", fontSize: 28, fontWeight: 800 }}>👑 部屋の割り当て優先順位</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-                {priorityRoomsList.map((room, idx, arr) => (
+                {priorityRoomsList.map((room: string, idx: number, arr: string[]) => (
                   <div key={room} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", padding: "12px 16px", borderRadius: 10, border: "2px solid #fcd34d" }}>
-                    <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 20, fontWeight: 800, color: "#92400e", marginRight: 12 }}>{idx + 1}.</span><span style={{ fontWeight: 700 }}>{room}</span></div>
+                    <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 20, fontWeight: 800, color: "#92400e", marginRight: 12 }}>{idx + 1}.</span><span style={{ fontSize: 24, fontWeight: 700, color: "#b45309" }}>{room}</span></div>
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={() => { const n = [...arr]; [n[idx-1], n[idx]] = [n[idx], n[idx-1]]; setCustomRules({...customRules, priorityRooms: n}); }} disabled={idx === 0} style={{ border: "none", background: "#fef3c7", borderRadius: 6, padding: "4px 8px" }}>▲</button>
-                      <button onClick={() => { const n = [...arr]; [n[idx+1], n[idx]] = [n[idx], n[idx+1]]; setCustomRules({...customRules, priorityRooms: n}); }} disabled={idx === arr.length - 1} style={{ border: "none", background: "#fef3c7", borderRadius: 6, padding: "4px 8px" }}>▼</button>
+                      <button onClick={() => { const n = [...arr]; [n[idx-1], n[idx]] = [n[idx], n[idx-1]]; setCustomRules({...customRules, priorityRooms: n}); }} disabled={idx === 0} style={{ border: "none", background: "#fef3c7", borderRadius: 6, padding: "8px 12px", fontSize: 20 }}>▲</button>
+                      <button onClick={() => { const n = [...arr]; [n[idx+1], n[idx]] = [n[idx], n[idx+1]]; setCustomRules({...customRules, priorityRooms: n}); }} disabled={idx === arr.length - 1} style={{ border: "none", background: "#fef3c7", borderRadius: 6, padding: "8px 12px", fontSize: 20 }}>▼</button>
                     </div>
                   </div>
                 ))}
@@ -1423,17 +1415,17 @@ export default function App() {
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 360 }}>
                   <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
-                  <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? ""} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
+                  <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? ""} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
                 </div>
                 <div style={{ flex: 1, minWidth: 360 }}>
                   <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
-                  <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? ""} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
+                  <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? ""} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
                 </div>
               </div>
             </div>
 
             <div style={{ background: "#ecfdf5", padding: 32, borderRadius: 16, border: "2px solid #a7f3d0" }}>
-              <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 28, fontWeight: 800 }}>🔗 兼務・セット配置ルール</h4>
+              <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 26, fontWeight: 800 }}>🔗 兼務・セット配置ルール</h4>
               
               <h5 style={{ fontSize: 24, color: "#047857", marginTop: 24, marginBottom: 12 }}>■ 常時兼務ペア</h5>
               {(customRules.kenmuPairs || []).map((rule: any, idx: number) => (
@@ -1501,7 +1493,7 @@ export default function App() {
             </div>
 
             <div style={{ background: "#fff1f2", padding: 32, borderRadius: 16, border: "2px solid #fecaca" }}>
-              <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 28, fontWeight: 800 }}>⚠️ アラート設定</h4>
+              <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 26, fontWeight: 800 }}>⚠️ アラート設定</h4>
               <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 320, background: "#fff", padding: 24, borderRadius: 12, border: "2px solid #fca5a5" }}>
                   <label style={{ display: "block", marginBottom: 12, fontWeight: 700, color: "#9f1239" }}>兼務の上限</label>
@@ -1706,12 +1698,9 @@ export default function App() {
             <div style={{ paddingTop: 32, borderTop: "2px dashed #cbd5e1" }}>
               <h4 style={{ fontSize: 28, fontWeight: 800 }}>📅 月間担当者の設定</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 24 }}>
-                {MONTHLY_CATEGORIES.map(({ key, label }) => {
-                  const opts = key === "受付ヘルプ" ? GENERAL_ROOMS : [];
-                  return (
-                    <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={key === "受付" ? activeReceptionStaff : allStaff} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
-                  );
-                })}
+                {MONTHLY_CATEGORIES.map(({ key, label }) => (
+                  <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={key === "受付" ? activeReceptionStaff : allStaff} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={key === "受付ヘルプ" ? GENERAL_ROOMS : []} />
+                ))}
               </div>
             </div>
 
@@ -1736,7 +1725,7 @@ export default function App() {
                   const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
                   return (
                     <tr key={staff} className="calendar-row">
-                      <td style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left" }}>{staff}</td>
+                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
                       {ROOM_SECTIONS.map(r => {
                         const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 };
                         let bg = rowBg; let color = "#334155";
@@ -1813,9 +1802,10 @@ export default function App() {
             ))}
           </div>
           <div style={{ display: "flex", gap: 16 }}>
-            <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
-            <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "2px solid #cbd5e1" }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
-            <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6")}>↩️ 戻る</button>
+            <button className="btn-hover" onClick={handleAutoOne} style={{...btnStyle("#10b981"), padding: "16px 24px", fontSize: 22}}>✨ 1日自動割当</button>
+            <button className="btn-hover" onClick={handleAutoAll} style={{...btnStyle("#0ea5e9"), padding: "16px 24px", fontSize: 22}}>⚡ 全日程自動割当</button>
+            <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "2px solid #cbd5e1", padding: "16px 24px", fontSize: 22 }} disabled={cur.isPublicHoliday}>📋 昨日をコピー</button>
+            <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), padding: "16px 24px", fontSize: 22}}>↩️ 戻る</button>
           </div>
         </div>
 
@@ -1870,6 +1860,43 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {selectedStaffForStats && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15, 23, 42, 0.5)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedStaffForStats(null)}>
+          <div className="modal-animate" style={{ background: "#fff", padding: 40, borderRadius: 24, width: "90%", maxWidth: 600, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, paddingBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
+              <h3 style={{ margin: 0, fontSize: 32, color: "#0f172a", fontWeight: 800 }}>👤 {selectedStaffForStats} さんの稼働詳細</h3>
+              <button onClick={() => setSelectedStaffForStats(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 56, height: 56, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 28 }}>✖</button>
+            </div>
+            {Object.keys(allDays).filter(d => d.startsWith(targetMonday.substring(0, 7))).length === 0 ? (
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 26 }}>データがありません。</p>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 24 }}>
+                <thead><tr style={{ borderBottom: "3px solid #e2e8f0" }}><th style={{ padding: "16px 12px", textAlign: "left" }}>日付</th><th style={{ padding: "16px 12px", textAlign: "left" }}>業務担当</th></tr></thead>
+                <tbody>
+                  {Object.entries(allDays).filter(([dateStr]) => dateStr.startsWith(targetMonday.substring(0, 7))).sort((a, b) => a[0].localeCompare(b[0])).map(([dateStr, cells]) => {
+                    const assigns: string[] = [];
+                    Object.entries(cells).forEach(([sec, val]) => {
+                      if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
+                      const members = split(val as string); const myAssign = members.find(m => extractStaffName(m) === selectedStaffForStats);
+                      if (myAssign) { const timeStr = myAssign.substring(selectedStaffForStats.length); assigns.push(`${sec}${timeStr}`); }
+                    });
+                    const dObj = new Date(dateStr); const YOUBI = ["日", "月", "火", "水", "木", "金", "土"];
+                    const label = `${dObj.getMonth() + 1}/${dObj.getDate()}(${YOUBI[dObj.getDay()]})`;
+                    return (
+                      <tr key={dateStr} style={{ borderBottom: "2px solid #f1f5f9" }}>
+                        <td style={{ padding: "16px 12px", fontWeight: 600 }}>{label}</td>
+                        <td style={{ padding: "16px 12px", color: assigns.length > 0 ? "#0ea5e9" : "#94a3b8", fontWeight: 700 }}>{assigns.length > 0 ? assigns.join(" / ") : "なし"}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+            <div style={{ textAlign: "center", marginTop: 32 }}><button onClick={() => setSelectedStaffForStats(null)} style={btnStyle("#2563eb")}>閉じる</button></div>
+          </div>
+        </div>
+      )}
 
       {selectedLogDay && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedLogDay(null)}>
