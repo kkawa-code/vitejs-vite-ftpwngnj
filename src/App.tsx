@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v163"; 
-const KEY_MONTHLY = "shifto_monthly_v163"; 
-const KEY_RULES = "shifto_rules_v163";
+const KEY_ALL_DAYS = "shifto_alldays_v170"; 
+const KEY_MONTHLY = "shifto_monthly_v170"; 
+const KEY_RULES = "shifto_rules_v170";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -252,7 +252,7 @@ const MultiSectionPicker = ({ selected, onChange, options, hasArrows = false }: 
       {current.map((sec, i) => (
         <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 24, padding: hasArrows ? "8px 16px" : "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: hasArrows ? 10 : 12, border: "2px solid #bae6fd", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
           {hasArrows && (i > 0 ? <button onClick={() => handleMoveLeft(i)} style={{ background: "#7dd3fc", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>◀</button> : <span style={{ width: 32 }}></span>)}
-          <span style={{ userSelect: "none", padding: hasArrows ? "0 4px" : "0" }}>{sec}</span>
+          <span style={{ userSelect: "none" }}>{sec}</span>
           {hasArrows && (i < current.length - 1 ? <button onClick={() => handleMoveRight(i)} style={{ background: "#7dd3fc", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>▶</button> : <span style={{ width: 32 }}></span>)}
           <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: hasArrows ? 8 : 4, fontSize: 24 }}>✖</span>
         </div>
@@ -277,7 +277,7 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
       {current.map((name, i) => (
         <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 24, padding: hasArrows ? "8px 16px" : "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: hasArrows ? 10 : 12, border: "2px solid #cbd5e1", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
           {hasArrows && (i > 0 ? <button onClick={() => handleMoveLeft(i)} style={{ background: "#94a3b8", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>◀</button> : <span style={{ width: 32 }}></span>)}
-          <span style={{ userSelect: "none", padding: hasArrows ? "0 4px" : "0" }}>{name}</span>
+          <span style={{ userSelect: "none" }}>{name}</span>
           {hasArrows && (i < current.length - 1 ? <button onClick={() => handleMoveRight(i)} style={{ background: "#94a3b8", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>▶</button> : <span style={{ width: 32 }}></span>)}
           <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: hasArrows ? 8 : 4, fontSize: 24 }}>✖</span>
         </div>
@@ -586,8 +586,14 @@ class AutoAssigner {
          if (needTag === "(AM)" && b === 'AM') return { hard: true, msg: "AMブロック" };
          if (needTag === "(PM)" && b === 'PM') return { hard: true, msg: "PMブロック" };
          if (fullDayOnlyList.includes(section) && b !== 'NONE') return { hard: true, msg: "終日専任室だが半休" };
+         
+         const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
+         const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
+         if (prevDayMembers.includes(name)) return { hard: false, msg: "連日担当禁止ルール" };
+         
          if (this.hasNGPair(name, current.map(extractStaffName), false)) return { hard: true, msg: "絶対NGペア" };
          if (this.hasNGPair(name, current.map(extractStaffName), true)) return { hard: false, msg: "なるべくNGペア" };
+         
          return null; 
       };
 
@@ -688,7 +694,7 @@ class AutoAssigner {
 
     Object.values(this.roleAssignments).forEach((ra: any) => { if (this.skipSections.includes(ra.section)) return; const candidates = split(this.ctx.monthlyAssign[ra.role] || ""); const targetAvail = ["受付"].includes(ra.role) ? availReception : availGeneral; const staff = candidates.find(s => targetAvail.includes(s) && !this.isUsed(s) && !this.isForbidden(s, ra.section)); if (staff && !split(this.dayCells[ra.section]).map(extractStaffName).includes(staff)) { const b = this.blockMap.get(staff); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); } this.dayCells[ra.section] = join([...split(this.dayCells[ra.section]), `${staff}${tag}`]); this.addU(staff, f); this.log(`📌 [緊急役割] ${staff} を ${ra.section} に配置しました`); } });
 
-    (this.ctx.customRules.substitutes || []).forEach((sub: any) => { const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; const trigger = targets.every(t => !availAll.includes(t) || this.isUsed(t)); if (trigger) { const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); if (fallbackStaff.length > 0) { const currentSec = split(this.dayCells[sub.section]); for (const f of fallbackStaff) { if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; if (!this.hasNGPair(f, currentSec.map(extractStaffName), false) && currentSec.length < 6) { const b = this.blockMap.get(f); let tag = ""; let fr = 1; if (b === 'AM') { tag = "(PM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } this.dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); this.addU(f, fr); this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); break; } } } } });
+    (this.ctx.customRules.substitutes || []).forEach((sub: any) => { const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; const trigger = targets.every(t => !availAll.includes(t) || this.isUsed(t)); if (trigger) { const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); if (fallbackStaff.length > 0) { const currentSec = split(this.dayCells[sub.section]); for (const f of fallbackStaff) { if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; if (!this.hasNGPair(f, currentSec.map(extractStaffName), false) && currentSec.length < 6) { const b = this.blockMap.get(f); let tag = ""; let fr = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } this.dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); this.addU(f, fr); this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); break; } } } } });
 
     (this.ctx.customRules.pushOuts || []).forEach((po: any) => { const s1 = po.s1 || po.triggerStaff; const s2 = po.s2 || po.targetStaff; const tSec = po.triggerSection; if (!s1 || !s2 || !tSec || !po.targetSections) return; if (availGeneral.includes(s1) && availGeneral.includes(s2) && !this.isUsed(s2)) { const s1In = split(this.dayCells[tSec]).map(extractStaffName).includes(s1) || isMonthlyMainStaff(tSec, s1, this.ctx.monthlyAssign); const s2In = split(this.dayCells[tSec]).map(extractStaffName).includes(s2) || isMonthlyMainStaff(tSec, s2, this.ctx.monthlyAssign); if (s1In && s2In) { const allowedRooms = split(po.targetSections).filter(s => !this.skipSections.includes(s)); for (const room of allowedRooms) { if (this.isForbidden(s2, room)) continue; if (fullDayOnlyList.includes(room) && this.blockMap.get(s2) !== 'NONE') continue; const current = split(this.dayCells[room]); if (this.hasNGPair(s2, current.map(extractStaffName), false)) continue; const actualCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); if (current.length < actualCap) { const b = this.blockMap.get(s2); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(s2, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(s2, 'ALL'); } else { this.blockMap.set(s2, 'ALL'); } this.dayCells[room] = join([...current, `${s2}${tag}`]); this.addU(s2, f); this.dayCells[tSec] = join(split(this.dayCells[tSec]).filter(m => extractStaffName(m) !== s2)); this.log(`🎱 [玉突き] ${s1} と被ったため、${s2} を ${room} に移動しました`); break; } } } } });
 
@@ -1158,6 +1164,47 @@ export default function App() {
 
   const warnings = useMemo(() => getDayWarnings(sel), [sel, days, customRules, activeGeneralStaff, allDays]);
 
+  const monthlyMatrixStats = useMemo(() => {
+    const targetMonth = targetMonday.substring(0, 7);
+    const stats: Record<string, Record<string, { total: number, late: number }>> = {};
+    activeGeneralStaff.forEach(s => { 
+      stats[s] = {}; 
+      ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); 
+    });
+    
+    Object.entries(allDays).forEach(([dateStr, cells]) => {
+      if (dateStr.startsWith(targetMonth)) {
+        ROOM_SECTIONS.forEach(room => {
+          const membersInRoom = split(cells[room] || "");
+          membersInRoom.forEach(m => {
+            const core = extractStaffName(m);
+            if (stats[core] !== undefined && stats[core][room] !== undefined) {
+              stats[core][room].total += 1;
+              if (m.includes("17:00") || m.includes("18:00") || m.includes("19:00") || m.includes("22:00")) {
+                stats[core][room].late += 1;
+              }
+            }
+          });
+        });
+      }
+    });
+    return stats;
+  }, [targetMonday, allDays, activeGeneralStaff]);
+
+  const priorityRoomsList = useMemo(() => {
+    const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
+    const list = [...base];
+    ROOM_SECTIONS.forEach(r => { if (!list.includes(r)) list.push(r); });
+    return list;
+  }, [customRules.priorityRooms]);
+
+  const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
+    const baseStaff = section === "受付" ? (activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff) : (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section) ? allStaff : activeGeneralStaff);
+    if (REST_SECTIONS.includes(section)) return baseStaff;
+    const absentStaff = [ ...split(currentDayCells["明け"]).map(extractStaffName), ...split(currentDayCells["入り"]).map(extractStaffName), ...split(currentDayCells["土日休日代休"]).map(extractStaffName), ...split(currentDayCells["不在"]).map(extractStaffName) ];
+    return baseStaff.filter(s => !absentStaff.includes(s));
+  };
+
   const setAllDaysWithHistory = (updater: any) => {
     setAllDays(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -1185,7 +1232,7 @@ export default function App() {
     setAllDaysWithHistory((prev: any) => {
       const nextAll = { ...prev };
       let prevDayObj: DayData | null = null;
-      const tempDays: any[] = [];
+      const tempDays: DayData[] = [];
       const newLogs = { ...assignLogs };
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
       for (let i = 0; i < 5; i++) {
@@ -1282,41 +1329,6 @@ export default function App() {
     } catch (err) { alert("テキストの読み込みに失敗しました。コピー漏れがないか確認してください。"); }
   };
 
-  const monthlyMatrixStats = useMemo(() => {
-    const targetMonth = targetMonday.substring(0, 7);
-    const stats: Record<string, Record<string, { total: number, late: number }>> = {};
-    activeGeneralStaff.forEach(s => { 
-      stats[s] = {}; 
-      ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); 
-    });
-    
-    Object.entries(allDays).forEach(([dateStr, cells]) => {
-      if (dateStr.startsWith(targetMonth)) {
-        ROOM_SECTIONS.forEach(room => {
-          const membersInRoom = split(cells[room] || "");
-          membersInRoom.forEach(m => {
-            const core = extractStaffName(m);
-            if (stats[core] !== undefined && stats[core][room] !== undefined) {
-              stats[core][room].total += 1;
-              if (m.includes("17:00") || m.includes("18:00") || m.includes("19:00") || m.includes("22:00")) {
-                stats[core][room].late += 1;
-              }
-            }
-          });
-        });
-      }
-    });
-    return stats;
-  }, [targetMonday, allDays, activeGeneralStaff]);
-
-  const priorityRoomsList = useMemo(() => {
-    const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
-    const list = [...base];
-    ROOM_SECTIONS.forEach(r => { if (!list.includes(r)) list.push(r); });
-    return list;
-  }, [customRules.priorityRooms]);
-
-
   return (
     <div style={{ maxWidth: "96%", margin: "0 auto", padding: "32px", width: "100%", boxSizing: "border-box" }}>
       <style>{globalStyle}</style>
@@ -1392,7 +1404,7 @@ export default function App() {
             </div>
 
             <div style={{ background: "#fffbeb", padding: 32, borderRadius: 16, border: "2px solid #fde68a" }}>
-              <h4 style={{ margin: "0 0 16px 0", color: "#b45309", fontSize: 26, fontWeight: 800 }}>👑 部屋の割り当て優先順位</h4>
+              <h4 style={{ margin: "0 0 16px 0", color: "#b45309", fontSize: 28, fontWeight: 800 }}>👑 部屋の割り当て優先順位</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
                 {priorityRoomsList.map((room, idx, arr) => (
                   <div key={room} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", padding: "12px 16px", borderRadius: 10, border: "2px solid #fcd34d" }}>
@@ -1411,17 +1423,17 @@ export default function App() {
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 360 }}>
                   <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【終日専任】半休・AM/PM不可の部屋</label>
-                  <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? ""} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} />
+                  <MultiSectionPicker selected={customRules.fullDayOnlyRooms ?? ""} onChange={v => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
                 </div>
                 <div style={{ flex: 1, minWidth: 360 }}>
                   <label style={{ fontSize: 22, fontWeight: 700, color: "#475569", display: "block", marginBottom: 12 }}>【連日禁止】2日連続で担当させない部屋</label>
-                  <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? ""} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} />
+                  <MultiSectionPicker selected={customRules.noConsecutiveRooms ?? ""} onChange={v => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
                 </div>
               </div>
             </div>
 
             <div style={{ background: "#ecfdf5", padding: 32, borderRadius: 16, border: "2px solid #a7f3d0" }}>
-              <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 26, fontWeight: 800 }}>🔗 兼務・セット配置ルール</h4>
+              <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 28, fontWeight: 800 }}>🔗 兼務・セット配置ルール</h4>
               
               <h5 style={{ fontSize: 24, color: "#047857", marginTop: 24, marginBottom: 12 }}>■ 常時兼務ペア</h5>
               {(customRules.kenmuPairs || []).map((rule: any, idx: number) => (
@@ -1489,16 +1501,18 @@ export default function App() {
             </div>
 
             <div style={{ background: "#fff1f2", padding: 32, borderRadius: 16, border: "2px solid #fecaca" }}>
-              <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 26, fontWeight: 800 }}>⚠️ アラート設定</h4>
+              <h4 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 28, fontWeight: 800 }}>⚠️ アラート設定</h4>
               <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 320, background: "#fff", padding: 24, borderRadius: 12, border: "2px solid #fca5a5" }}>
                   <label style={{ display: "block", marginBottom: 12, fontWeight: 700, color: "#9f1239" }}>兼務の上限</label>
-                  <input type="number" value={customRules.alertMaxKenmu} onChange={e => setCustomRules({...customRules, alertMaxKenmu: Number(e.target.value)})} style={{ width: 80, padding: 12, fontSize: 24, fontWeight: 800, textAlign: "center", border: "2px solid #fca5a5", borderRadius: 8 }} />
-                  <span style={{ marginLeft: 12, fontWeight: 700 }}>部屋以上で警告</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <input type="number" min="2" max="10" value={customRules.alertMaxKenmu ?? 3} onChange={e => setCustomRules({...customRules, alertMaxKenmu: Number(e.target.value)})} style={{ width: 80, padding: "12px", borderRadius: 8, border: "2px solid #fca5a5", textAlign: "center", fontWeight: 800, color: "#be185d", fontSize: 24 }} />
+                    <span style={{ fontSize: 22, fontWeight: 700, color: "#9f1239" }}>部屋以上 兼務でエラー</span>
+                  </div>
                 </div>
                 <div style={{ flex: 2, minWidth: 400, background: "#fff", padding: 24, borderRadius: 12, border: "2px solid #fca5a5" }}>
                   <label style={{ display: "block", marginBottom: 12, fontWeight: 700, color: "#9f1239" }}>空室警告を出す部屋</label>
-                  <MultiSectionPicker selected={customRules.alertEmptyRooms} onChange={v => setCustomRules({...customRules, alertEmptyRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
+                  <MultiSectionPicker selected={customRules.alertEmptyRooms ?? ROOM_SECTIONS.join(',')} onChange={v => setCustomRules({...customRules, alertEmptyRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
                 </div>
               </div>
             </div>
@@ -1509,12 +1523,12 @@ export default function App() {
                   <div style={{ flex: 1, minWidth: "320px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#166534", display: "block", marginBottom: 12 }}>対象スタッフ名（複数可）</label>
                     <div style={{ background: "#fff", padding: "14px", borderRadius: 12, border: "2px solid #86efac", minHeight: "56px", display: "flex", alignItems: "center" }}>
-                      <MultiStaffPicker selected={customRules.supportStaffList || ""} onChange={v => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" />
+                      <MultiStaffPicker selected={customRules.supportStaffList || ""} onChange={v => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" hasArrows={false} />
                     </div>
                   </div>
                   <div style={{ flex: 2, minWidth: "400px" }}>
                     <label style={{ fontSize: 22, fontWeight: 700, color: "#166534", display: "block", marginBottom: 12 }}>優先する対象部屋</label>
-                    <MultiSectionPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={v => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
+                    <MultiSectionPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={v => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} hasArrows={false} />
                   </div>
               </div>
             </div>
@@ -1555,11 +1569,11 @@ export default function App() {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 24, marginTop: 24 }}>
                   <div style={{ flex: 1, background: "#fff", padding: 28, borderRadius: 12, border: "2px solid #e0e7ff", minWidth: "400px" }}>
                     <h5 style={{ margin: "0 0 14px 0", fontSize: 24, color: "#4f46e5", fontWeight: 800 }}>🎯 優先的に選出する部屋</h5>
-                    <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={v => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} />
+                    <MultiSectionPicker selected={customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"} onChange={v => setCustomRules({...customRules, lunchPrioritySections: v})} options={ROOM_SECTIONS} hasArrows={false} />
                   </div>
                   <div style={{ flex: 1, background: "#fff", padding: 28, borderRadius: 12, border: "2px solid #e0e7ff", minWidth: "400px" }}>
                     <h5 style={{ margin: "0 0 14px 0", fontSize: 24, color: "#4f46e5", fontWeight: 800 }}>⚠️ 緊急時のみ選出する部屋（なるべく除外）</h5>
-                    <MultiSectionPicker selected={customRules.lunchLastResortSections ?? "治療"} onChange={v => setCustomRules({...customRules, lunchLastResortSections: v})} options={ROOM_SECTIONS} />
+                    <MultiSectionPicker selected={customRules.lunchLastResortSections ?? "治療"} onChange={v => setCustomRules({...customRules, lunchLastResortSections: v})} options={ROOM_SECTIONS} hasArrows={false} />
                   </div>
               </div>
             </div>
@@ -1606,7 +1620,7 @@ export default function App() {
               <h4 style={{ margin: "0 0 20px 0", color: "#c2410c", fontSize: 28, fontWeight: 800 }}>🔄 代打ルール</h4>
               {(customRules.substitutes || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ display: "flex", flexWrap: "wrap", gap: 18, marginBottom: 20, alignItems: "center", background: "#fff", padding: "24px", borderRadius: 12, border: "2px solid #fdba74", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                    <div style={{ flex: 1, minWidth: "240px" }}><MultiStaffPicker selected={rule.target} onChange={v => updateRule("substitutes", idx, "target", v)} options={activeGeneralStaff} placeholder="対象スタッフ(休)" /></div>
+                    <div style={{ flex: 1, minWidth: "240px" }}><MultiStaffPicker selected={rule.target} onChange={v => updateRule("substitutes", idx, "target", v)} options={activeGeneralStaff} placeholder="対象スタッフ(休)" hasArrows={false} /></div>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#c2410c" }}>が全員休みの時➔</span>
                     <div style={{ flex: 1, minWidth: "280px" }}><MultiStaffPicker selected={rule.subs} onChange={v => updateRule("substitutes", idx, "subs", v)} options={activeGeneralStaff} placeholder="代打スタッフを追加" hasArrows={true} /></div>
                     <span style={{ fontSize: 22, fontWeight: 700, color: "#c2410c" }}>を</span>
@@ -1620,8 +1634,8 @@ export default function App() {
 
             <div style={{ background: "#fdf4ff", padding: 32, borderRadius: 16, border: "2px solid #f5d0fe" }}>
               <h4 style={{ margin: "0 0 16px 0", color: "#86198f", fontSize: 28, fontWeight: 800 }}>🏠 遅番不可スタッフ</h4>
-              <div style={{ background: "#fff", padding: "14px", borderRadius: 12, border: "2px solid #f0abfc", minHeight: "56px" }}>
-                <MultiStaffPicker selected={customRules.noLateShiftStaff || ""} onChange={v => setCustomRules({...customRules, noLateShiftStaff: v})} options={allStaff} placeholder="＋スタッフを選択" />
+              <div style={{ background: "#fff", padding: "14px", borderRadius: 12, border: "2px solid #f0abfc", minHeight: "56px", display: "flex", alignItems: "center" }}>
+                <MultiStaffPicker selected={customRules.noLateShiftStaff || ""} onChange={v => setCustomRules({...customRules, noLateShiftStaff: v})} options={allStaff} placeholder="＋スタッフを選択" hasArrows={false} />
               </div>
             </div>
 
@@ -1659,7 +1673,7 @@ export default function App() {
                       <select value={rule.staff} onChange={e => updateRule("forbidden", idx, "staff", e.target.value)} className="rule-sel"><option value="">選択</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
                       <button onClick={() => removeRule("forbidden", idx)} className="rule-del">✖</button>
                     </div>
-                    <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} />
+                    <MultiSectionPicker selected={rule.sections} onChange={v => updateRule("forbidden", idx, "sections", v)} options={ASSIGNABLE_SECTIONS} hasArrows={false} />
                   </div>
               ))}
               <button className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}} onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
@@ -1689,13 +1703,15 @@ export default function App() {
               <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "CT", newCapacity: 3 })}>＋ 追加</button>
             </div>
 
-            {/* 🌟 復活させた月間担当者設定パネル */}
-            <div style={{ marginTop: 40, paddingTop: 32, borderTop: "2px dashed #cbd5e1" }}>
-              <h4 style={{ margin: "0 0 14px 0", color: "#1e293b", fontSize: 28, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 24 }}>
-                {MONTHLY_CATEGORIES.map(({ key, label }) => (
-                  <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={key === "受付" ? activeReceptionStaff : allStaff} onChange={v => updateMonthly(key, v)} noTime={true} />
-                ))}
+            <div style={{ paddingTop: 32, borderTop: "2px dashed #cbd5e1" }}>
+              <h4 style={{ fontSize: 28, fontWeight: 800 }}>📅 月間担当者の設定</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 24 }}>
+                {MONTHLY_CATEGORIES.map(({ key, label }) => {
+                  const opts = key === "受付ヘルプ" ? GENERAL_ROOMS : [];
+                  return (
+                    <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={key === "受付" ? activeReceptionStaff : allStaff} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                  );
+                })}
               </div>
             </div>
 
@@ -1710,7 +1726,7 @@ export default function App() {
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
               <thead>
                 <tr>
-                  <th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", fontWeight: 800 }}>スタッフ</th>
+                  <th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 800 }}>スタッフ</th>
                   {ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 800 }}>{r}</th>)}
                 </tr>
               </thead>
@@ -1720,7 +1736,7 @@ export default function App() {
                   const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
                   return (
                     <tr key={staff} className="calendar-row">
-                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
+                      <td style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left" }}>{staff}</td>
                       {ROOM_SECTIONS.map(r => {
                         const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 };
                         let bg = rowBg; let color = "#334155";
@@ -1797,8 +1813,8 @@ export default function App() {
             ))}
           </div>
           <div style={{ display: "flex", gap: 16 }}>
-            <button className="btn-hover" onClick={handleAutoOne} style={btnStyle("#10b981")}>✨ 表示日を自動割当</button>
             <button className="btn-hover" onClick={handleAutoAll} style={btnStyle("#0ea5e9")}>⚡ 全日程を自動割当</button>
+            <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "2px solid #cbd5e1" }} disabled={cur.isPublicHoliday}>📋 昨日の入力をコピー</button>
             <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6")}>↩️ 戻る</button>
           </div>
         </div>
@@ -1822,45 +1838,38 @@ export default function App() {
             
             {RENDER_GROUPS.map(group => (
               <div key={group.title} style={{ marginBottom: 48 }}>
-                <h4 style={{ fontSize: 30, fontWeight: 800, borderLeft: `10px solid ${group.color}`, paddingLeft: 16, marginBottom: 24 }}>{group.title}</h4>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 16, borderBottom: "3px solid #e2e8f0" }}>
+                  <h4 style={{ fontSize: 30, fontWeight: 800, borderLeft: `10px solid ${group.color}`, paddingLeft: 16, margin: 0 }}>{group.title}</h4>
+                  {group.title === "休務・夜勤" && (
+                    <div style={{display: "flex", gap: 16}}>
+                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
+                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                    </div>
+                  )}
+                  {group.title === "モダリティ" && (
+                    <div style={{display: "flex", gap: 16}}>
+                      <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務1日クリア</button>
+                      <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務週間クリア</button>
+                    </div>
+                  )}
+                  {group.title === "待機・その他" && (
+                    <div style={{display: "flex", gap: 16}}>
+                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
+                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 24 }}>
-                  {group.sections.map(s => <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={allStaff} onChange={v => updateDay(s, v)} noTime={["明け","入り","不在","土日休日代休","昼当番"].includes(s)} />)}
+                  {group.sections.map(s => {
+                    const noTimeSections = ["明け","入り","不在","土日休日代休","昼当番"];
+                    return <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getAvailableStaffForDay(s, cur.cells)} onChange={v => updateDay(s, v)} noTime={noTimeSections.includes(s)} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} />
+                  })}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {selectedStaffForStats && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedStaffForStats(null)}>
-          <div className="modal-animate" style={{ background: "#fff", padding: 40, borderRadius: 24, width: "90%", maxWidth: 600, maxHeight: "80vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 32, borderBottom: "3px solid #e2e8f0", paddingBottom: 16, marginBottom: 24 }}>👤 {selectedStaffForStats} さんの稼働詳細</h3>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 24 }}>
-              <thead><tr style={{ borderBottom: "3px solid #e2e8f0" }}><th style={{ padding: "16px 12px", textAlign: "left" }}>日付</th><th style={{ padding: "16px 12px", textAlign: "left" }}>業務担当</th></tr></thead>
-              <tbody>
-                {Object.entries(allDays).filter(([dateStr]) => dateStr.startsWith(targetMonday.substring(0, 7))).sort((a, b) => a[0].localeCompare(b[0])).map(([dateStr, cells]) => {
-                  const assigns: string[] = [];
-                  Object.entries(cells).forEach(([sec, val]) => {
-                    if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
-                    const members = split(val as string); const myAssign = members.find(m => extractStaffName(m) === selectedStaffForStats);
-                    if (myAssign) { const timeStr = myAssign.substring(selectedStaffForStats.length); assigns.push(`${sec}${timeStr}`); }
-                  });
-                  const dObj = new Date(dateStr); const YOUBI = ["日", "月", "火", "水", "木", "金", "土"];
-                  const label = `${dObj.getMonth() + 1}/${dObj.getDate()}(${YOUBI[dObj.getDay()]})`;
-                  return (
-                    <tr key={dateStr} style={{ borderBottom: "2px solid #f1f5f9" }}>
-                      <td style={{ padding: "16px 12px", fontWeight: 600 }}>{label}</td>
-                      <td style={{ padding: "16px 12px", color: assigns.length > 0 ? "#0ea5e9" : "#94a3b8", fontWeight: 700 }}>{assigns.length > 0 ? assigns.join(" / ") : "なし"}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div style={{ textAlign: "center", marginTop: 32 }}><button onClick={() => setSelectedStaffForStats(null)} style={btnStyle("#2563eb")}>閉じる</button></div>
-          </div>
-        </div>
-      )}
 
       {selectedLogDay && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedLogDay(null)}>
