@@ -53,7 +53,7 @@ interface RuleSubstitute { target: string; subs: string; section: string; }
 interface RulePushOut { s1?: string; triggerStaff?: string; s2?: string; targetStaff?: string; triggerSection: string; targetSections: string; }
 interface RuleEmergency { threshold: number; type: string; role?: string; section?: string; s1?: string; s2?: string; newCapacity?: number; }
 interface RuleKenmuPair { s1: string; s2: string; }
-interface RuleRescue { targetRoom: string; sourceRooms: string; } // 🌟 追加：救済ルール
+interface RuleRescue { targetRoom: string; sourceRooms: string; }
 interface RuleLateShift { section: string; lateTime: string; dayEndTime: string; }
 interface RuleLunchSpecial { day: string; count: number; }
 interface RuleLunchCond { section: string; min: number; out: number; }
@@ -63,7 +63,7 @@ interface CustomRules {
   capacity: RuleCapacity; dailyCapacities: RuleDailyCapacity[]; dailyAdditions: RuleDailyAddition[]; priorityRooms: string[];
   fullDayOnlyRooms: string; noConsecutiveRooms: string; noLateShiftStaff: string; ngPairs: RuleNgPair[]; fixed: RuleFixed[];
   forbidden: RuleForbidden[]; substitutes: RuleSubstitute[]; pushOuts: RulePushOut[]; emergencies: RuleEmergency[]; kenmuPairs: RuleKenmuPair[];
-  rescueRules: RuleRescue[]; // 🌟 追加：救済ルール
+  rescueRules: RuleRescue[];
   lateShifts: RuleLateShift[]; helpThreshold: number; lunchBaseCount: number; lunchSpecialDays: RuleLunchSpecial[];
   lunchConditional: RuleLunchCond[]; lunchPrioritySections: string; lunchLastResortSections: string;
 }
@@ -107,14 +107,14 @@ const DEFAULT_RULES: CustomRules = {
   noConsecutiveRooms: "MMG,ポータブル,透視（6号）,透視（11号）",
   noLateShiftStaff: "",
   ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], 
-  rescueRules: [], // 🌟 追加
+  rescueRules: [],
   lateShifts: [], helpThreshold: 17, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI,1号室,2号室,3号室,5号室,CT", lunchLastResortSections: "治療" 
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v130"; 
-const KEY_MONTHLY = "shifto_monthly_v130"; 
-const KEY_RULES = "shifto_rules_v130";
+const KEY_ALL_DAYS = "shifto_alldays_v131"; 
+const KEY_MONTHLY = "shifto_monthly_v131"; 
+const KEY_RULES = "shifto_rules_v131";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -651,7 +651,7 @@ class AutoAssigner {
       
       if (currentAmount >= targetCap) return; // 埋まっているなら何もしない
       
-      // 救済ルールから、この部屋が空室になった時に頼るべき「情報源の部屋」を取得
+      // 救済ルールから、この部屋が空室（または定員割れ）になった時に頼るべき「情報源の部屋」を取得
       const rescueRule = (this.ctx.customRules.rescueRules || []).find((r: any) => r.targetRoom === targetRoom);
       if (rescueRule && rescueRule.sourceRooms) {
          const sourceRooms = split(rescueRule.sourceRooms);
@@ -677,7 +677,7 @@ class AutoAssigner {
          for (const cand of candidates) {
             if (currentAmount >= targetCap) break;
             currentMems.push(cand.fullStr); const amount = getStaffAmount(cand.fullStr); currentAmount += amount; this.addU(cand.core, amount);
-            this.log(`🆘 [バックアップ発動] 空室の ${targetRoom} に、${cand.core} を兼務で追加しました`);
+            this.log(`🆘 [バックアップ発動] 定員割れの ${targetRoom} に、${cand.core} を兼務で追加しました`);
          }
          this.dayCells[targetRoom] = join(currentMems);
       }
@@ -1272,25 +1272,30 @@ export default function App() {
                 <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("kenmuPairs", { s1: "", s2: "" })}>＋ ペアを追加</button>
               </div>
 
-              {/* 🌟 追加：空室救済ルール */}
+              {/* 🌟 変更点：空室救済ルールの並び替え（優先度変更）を追加 */}
               <div style={{ background: "#fefce8", padding: 32, borderRadius: 16, border: "2px solid #fde047", gridColumn: "1 / -1" }}>
-                <h4 style={{ margin: "0 0 16px 0", color: "#854d0e", fontSize: 28, fontWeight: 800 }}>🆘 空室救済（バックアップ）ルール</h4>
+                <h4 style={{ margin: "0 0 16px 0", color: "#854d0e", fontSize: 28, fontWeight: 800 }}>🆘 空室（人数不足）救済ルール</h4>
                 <p style={{ fontSize: 22, color: "#a16207", marginBottom: 24, fontWeight: 600 }}>
-                  指定した部屋が「空室」になってしまった場合、指定した他の部屋からスタッフを引っ張ってきて【兼務】させます。（左の部屋から優先して探します）
+                  指定した部屋が「空室」や「定員割れ（半日しか人がいない等）」になった場合、指定した他の部屋からスタッフを引っ張ってきて【兼務】させます。（上のルールから順番に発動します）
                 </p>
-                {(customRules.rescueRules || []).map((rule: any, idx: number) => (
-                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "20px 24px", border: "2px solid #fde047", borderRadius: 12, alignItems: "flex-start" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {(customRules.rescueRules || []).map((rule: any, idx: number, arr: any[]) => (
+                  <div key={idx} className="rule-row" style={{ background: "#fff", padding: "20px 24px", border: "2px solid #fde047", borderRadius: 12, alignItems: "flex-start", position: "relative" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", width: "100%" }}>
                       <span style={{ fontSize: 22, fontWeight: 700, color: "#854d0e" }}>もし</span>
                       <select value={rule.targetRoom} onChange={e => updateRule("rescueRules", idx, "targetRoom", e.target.value)} className="rule-sel" style={{ borderColor: "#fef08a", minWidth: 200 }}>
                         <option value="">（空室の部屋）</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <span style={{ fontSize: 22, fontWeight: 700, color: "#854d0e" }}>が空室なら ➔ 以下の部屋から兼務を探す</span>
+                      <span style={{ fontSize: 22, fontWeight: 700, color: "#854d0e" }}>が不足なら ➔ 以下の部屋から兼務を探す</span>
                     </div>
                     <div style={{ width: "100%", paddingLeft: 60 }}>
                       <MultiSectionPicker selected={rule.sourceRooms} onChange={v => updateRule("rescueRules", idx, "sourceRooms", v)} options={ROOM_SECTIONS} />
                     </div>
-                    <button onClick={() => removeRule("rescueRules", idx)} className="rule-del" style={{ alignSelf: "center", marginLeft: "auto" }}>✖</button>
+                    {/* 🌟 上下移動ボタンを追加 */}
+                    <div style={{ position: "absolute", right: 60, top: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.rescueRules || [])]; [newArr[idx - 1], newArr[idx]] = [newArr[idx], newArr[idx - 1]]; return { ...prev, rescueRules: newArr }; }); }} disabled={idx === 0} style={{ border: "none", background: idx === 0 ? "transparent" : "#fef08a", cursor: idx === 0 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#a16207", lineHeight: 1 }}>▲</button>
+                      <button onClick={() => { setCustomRules((prev: any) => { const newArr = [...(prev.rescueRules || [])]; [newArr[idx + 1], newArr[idx]] = [newArr[idx], newArr[idx + 1]]; return { ...prev, rescueRules: newArr }; }); }} disabled={idx === arr.length - 1} style={{ border: "none", background: idx === arr.length - 1 ? "transparent" : "#fef08a", cursor: idx === arr.length - 1 ? "default" : "pointer", fontSize: 18, padding: "6px 12px", borderRadius: 6, color: "#a16207", lineHeight: 1 }}>▼</button>
+                    </div>
+                    <button onClick={() => removeRule("rescueRules", idx)} className="rule-del" style={{ position: "absolute", right: 20, top: 30 }}>✖</button>
                   </div>
                 ))}
                 <button className="rule-add" style={{ color: "#854d0e", borderColor: "#fde047" }} onClick={() => addRule("rescueRules", { targetRoom: "", sourceRooms: "" })}>＋ 救済ルールを追加</button>
