@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v240"; 
-const KEY_MONTHLY = "shifto_monthly_v240"; 
-const KEY_RULES = "shifto_rules_v240";
+const KEY_ALL_DAYS = "shifto_alldays_v250"; 
+const KEY_MONTHLY = "shifto_monthly_v250"; 
+const KEY_RULES = "shifto_rules_v250";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -1377,9 +1377,24 @@ export default function App() {
   const handleTextImport = () => {
     if(!importText) return;
     try {
-      const dataObj = JSON.parse(importText);
-      if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(dataObj.customRules); alert("テキストからデータを復元しました！"); setImportText(""); } else { alert("正しいデータ形式ではありません。"); }
-    } catch (err) { alert("テキストの読み込みに失敗しました。コピー漏れがないか確認してください。"); }
+      let cleanText = importText.trim().replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) cleanText = jsonMatch[0];
+      
+      const dataObj = JSON.parse(cleanText);
+      if (dataObj.allDays) { 
+        setAllDaysWithHistory(dataObj.allDays); 
+        if (dataObj.monthlyAssign) setMonthlyAssign({ ...DEFAULT_MONTHLY_ASSIGN, ...dataObj.monthlyAssign }); 
+        if (dataObj.customRules) setCustomRules({ ...DEFAULT_RULES, ...dataObj.customRules }); 
+        else if (dataObj.rules) setCustomRules({ ...DEFAULT_RULES, ...dataObj.rules });
+        alert("テキストからデータを復元しました！"); 
+        setImportText(""); 
+      } else { 
+        alert("正しいデータ形式ではありません。（allDaysが見つかりません）"); 
+      }
+    } catch (err: any) { 
+      alert("テキストの読み込みに失敗しました。最初から最後まで全てコピーされているか確認してください。\nエラー詳細: " + err.message); 
+    }
   };
 
   return (
@@ -1404,10 +1419,10 @@ export default function App() {
           <summary style={{ fontWeight: 800, color: "#be185d", fontSize: 26, display: "flex", alignItems: "center", gap: 12 }}>
             📱 スマホ連携（テキストコピー）
           </summary>
-          <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
-            <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, justifyContent: "center" }}>📋 コピー</button>
-            <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 2, padding: "20px 24px", fontSize: 24, borderRadius: 12, border: "2px solid #f9a8d4" }} />
-            <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1, justifyContent: "center" }}>✨ 復元</button>
+          <div style={{ display: "flex", gap: 16, marginTop: 24, alignItems: "stretch" }}>
+            <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, justifyContent: "center", padding: "16px" }}>📋 コピー</button>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="ここにテキストを貼り付けて復元" style={{ flex: 2, padding: "16px 20px", fontSize: 20, borderRadius: 12, border: "2px solid #f9a8d4", resize: "none", margin: 0 }} />
+            <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1, justifyContent: "center", padding: "16px" }}>✨ 復元</button>
           </div>
         </details>
       </div>
@@ -1827,8 +1842,8 @@ export default function App() {
                 <th style={{...cellStyle(true, false, false, true), borderRight: "3px solid #e2e8f0", borderBottom: "3px solid #e2e8f0"}}>区分</th>
                 {days.map(day => {
                   const dayWarnings = getDayWarnings(day.id);
-                  const errorCount = dayWarnings.filter((w: {type: string}) => w.type === 'error').length;
-                  const alertCount = dayWarnings.filter((w: {type: string}) => w.type === 'alert').length;
+                  const errorCount = dayWarnings.filter(w => w.type === 'error').length;
+                  const alertCount = dayWarnings.filter(w => w.type === 'alert').length;
                   return (
                     <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
