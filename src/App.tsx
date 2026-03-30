@@ -67,23 +67,20 @@ interface CustomRules {
 
 type AutoAssignContext = { allStaff: string[]; activeGeneralStaff: string[]; activeReceptionStaff: string[]; monthlyAssign: Record<string, string>; customRules: CustomRules; };
 
-const SECTIONS = [ "明け","入り","土日休日代休","不在","待機","CT","MRI","RI","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","治療","検像","昼当番","受付","受付ヘルプ" ];
-
+const SECTIONS = [ "明け","入り","土日休日代休","不在","待機","遅番","CT","MRI","RI","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","治療","検像","昼当番","受付","受付ヘルプ" ];
 const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番"].includes(s));
 const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
 
-
 const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日" };
-
 
 const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "" };
 
-const DEFAULT_PRIORITY_ROOMS = [ "治療", "受付", "MMG", "RI", "MRI", "CT", "透視（6号）", "透視（11号）", "1号室", "5号室", "2号室", "骨塩", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部" ];
+const DEFAULT_PRIORITY_ROOMS = [ "治療", "受付", "MMG", "RI", "MRI", "CT", "遅番", "透視（6号）", "透視（11号）", "1号室", "5号室", "2号室", "骨塩", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部" ];
 
 const DEFAULT_RULES: CustomRules = { 
-  staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", noLateShiftStaff: "浅野、木内康、髙橋", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像", linkedRooms: []
+  staffList: DEFAULT_STAFF, receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2, 遅番: 1 }, dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", noLateShiftStaff: "浅野、木内康、髙橋", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像", linkedRooms: []
 };
 
 const KEY_ALL_DAYS = "shifto_alldays_v370"; const KEY_MONTHLY = "shifto_monthly_v370"; const KEY_RULES = "shifto_rules_v370";
@@ -133,7 +130,7 @@ const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
   { title: "モダリティ", color: "#3b82f6", sections: ["CT","MRI","RI","治療"] },
   { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","検像","受付","受付ヘルプ","昼当番"] },
-  { title: "待機・その他", color: "#f59e0b", sections: ["待機"] } 
+  { title: "待機・遅番・その他", color: "#f59e0b", sections: ["待機", "遅番"] } 
 ];
 
 const MultiSectionPicker = ({ selected, onChange, options, hasArrows = false }: { selected: string, onChange: (v: string) => void, options: string[], hasArrows?: boolean }) => {
@@ -558,6 +555,10 @@ class AutoAssigner {
          if (current.map(extractStaffName).includes(name)) return { hard: true, msg: "同室に配置済" };
          if (this.isUsed(name)) return { hard: true, msg: "他業務で配置済" };
          
+         if (section === "遅番" && split(this.ctx.customRules.noLateShiftStaff || "").includes(name)) {
+             return { hard: true, msg: "遅番不可設定" };
+         }
+
          for (const gSec of groupSecs) {
            if (this.isForbidden(name, gSec)) return { hard: true, msg: `${gSec}の担当不可設定` };
          }
@@ -734,7 +735,6 @@ class AutoAssigner {
     const basePriorityList = this.ctx.customRules.priorityRooms && this.ctx.customRules.priorityRooms.length > 0 ? this.ctx.customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
     const PRIORITY_LIST = ["治療", ...basePriorityList.filter((r: string) => r !== "治療")];
 
-   
     const kenmuTargetRooms = (this.ctx.customRules.kenmuPairs || []).map((r: any) => r.s2);
 
     PRIORITY_LIST.forEach((room: string) => {
@@ -1560,6 +1560,16 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* ▼▼▼ 追加：遅番設定パネル ▼▼▼ */}
+            <div style={{ background: "#fff7ed", padding: 32, borderRadius: 16, border: "2px solid #fed7aa", marginBottom: 24, marginTop: 24 }}>
+              <h4 style={{ margin: "0 0 16px 0", color: "#c2410c", fontSize: 28, fontWeight: 800 }}>🌙 遅番ルール</h4>
+              <div style={{ background: "#fff", padding: 24, borderRadius: 12, border: "2px solid #fdba74" }}>
+                <label style={{ display: "block", marginBottom: 12, fontWeight: 700, color: "#c2410c" }}>遅番に入れないスタッフ</label>
+                <MultiStaffPicker selected={customRules.noLateShiftStaff || ""} onChange={v => setCustomRules({...customRules, noLateShiftStaff: v})} options={allStaff} placeholder="＋スタッフを選択" hasArrows={false} />
+              </div>
+            </div>
+            {/* ▲▲▲ 追加ここまで ▲▲▲ */}
 
             <div style={{ background: "#f0fdf4", padding: 32, borderRadius: 16, border: "2px solid #bbf7d0" }}>
               <h4 style={{ margin: "0 0 16px 0", color: "#15803d", fontSize: 28, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h4>
