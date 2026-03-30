@@ -137,7 +137,6 @@ const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休�
 const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番"].includes(s));
 const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
-const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "検像"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = {
   "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日"
@@ -174,9 +173,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v201"; 
-const KEY_MONTHLY = "shifto_monthly_v201"; 
-const KEY_RULES = "shifto_rules_v201";
+const KEY_ALL_DAYS = "shifto_alldays_v210"; 
+const KEY_MONTHLY = "shifto_monthly_v210"; 
+const KEY_RULES = "shifto_rules_v210";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -689,8 +688,34 @@ class AutoAssigner {
   assignRooms() {
     const availAll = this.initialAvailAll; const availGeneral = this.initialAvailGeneral; const availReception = this.initialAvailReception; const fullDayOnlyList = split(this.ctx.customRules.fullDayOnlyRooms ?? "");
     
-    (this.ctx.customRules.fixed || []).forEach((rule: any) => { if (!rule.staff || !rule.section) return; Object.keys(this.dayCells).forEach(sec => { if (sec === rule.section) return; if (REST_SECTIONS.includes(sec)) return; const before = split(this.dayCells[sec]); const after = before.filter(m => extractStaffName(m) !== rule.staff); if (before.length !== after.length) { this.dayCells[sec] = join(after); this.assignCounts[rule.staff] = 0; this.blockMap.set(rule.staff, 'NONE'); } }); });
-    (this.ctx.customRules.fixed || []).forEach((rule: any) => { if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || this.isUsed(rule.staff) || this.isForbidden(rule.staff, rule.section)) return; if (this.skipSections.includes(rule.section)) return; const current = split(this.dayCells[rule.section]); if (current.map(extractStaffName).includes(rule.staff) || this.hasNGPair(rule.staff, current.map(extractStaffName), false)) return; const b = this.blockMap.get(rule.staff); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(rule.staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(rule.staff, 'ALL'); } else { this.blockMap.set(rule.staff, 'ALL'); } this.dayCells[rule.section] = join([...current, `${rule.staff}${tag}`]); this.addU(rule.staff, f); this.log(`🔒 [専従] ${rule.staff} を ${rule.section} に固定配置しました`); });
+    (this.ctx.customRules.fixed || []).forEach((rule: any) => { 
+      if (!rule.staff || !rule.section) return; 
+      Object.keys(this.dayCells).forEach(sec => { 
+        if (sec === rule.section) return; 
+        if (REST_SECTIONS.includes(sec)) return; 
+        const before = split(this.dayCells[sec]); 
+        const after = before.filter(m => extractStaffName(m) !== rule.staff); 
+        if (before.length !== after.length) { 
+          this.dayCells[sec] = join(after); 
+        } 
+      }); 
+    });
+
+    (this.ctx.customRules.fixed || []).forEach((rule: any) => { 
+      if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || this.isForbidden(rule.staff, rule.section)) return; 
+      if (this.skipSections.includes(rule.section)) return; 
+      
+      const current = split(this.dayCells[rule.section]); 
+      const isAlreadyIn = current.map(extractStaffName).includes(rule.staff); 
+      
+      this.blockMap.set(rule.staff, 'ALL'); 
+      this.assignCounts[rule.staff] = 1; 
+
+      if (!isAlreadyIn) { 
+        this.dayCells[rule.section] = join([...current, rule.staff]); 
+        this.log(`🔒 [専従] ${rule.staff} を ${rule.section} に固定配置しました`); 
+      } 
+    });
 
     Object.values(this.roleAssignments).forEach((ra: any) => { if (this.skipSections.includes(ra.section)) return; const candidates = split(this.ctx.monthlyAssign[ra.role] || ""); const targetAvail = ["受付"].includes(ra.role) ? availReception : availGeneral; const staff = candidates.find(s => targetAvail.includes(s) && !this.isUsed(s) && !this.isForbidden(s, ra.section)); if (staff && !split(this.dayCells[ra.section]).map(extractStaffName).includes(staff)) { const b = this.blockMap.get(staff); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); } this.dayCells[ra.section] = join([...split(this.dayCells[ra.section]), `${staff}${tag}`]); this.addU(staff, f); this.log(`📌 [緊急役割] ${staff} を ${ra.section} に配置しました`); } });
 
@@ -1191,13 +1216,6 @@ export default function App() {
     });
     return stats;
   }, [targetMonday, allDays, activeGeneralStaff]);
-
-  const priorityRoomsList = useMemo(() => {
-    const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
-    const list = [...base];
-    ROOM_SECTIONS.forEach(r => { if (!list.includes(r)) list.push(r); });
-    return list;
-  }, [customRules.priorityRooms]);
 
   const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
     const baseStaff = section === "受付" ? (activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff) : (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section) ? allStaff : activeGeneralStaff);
