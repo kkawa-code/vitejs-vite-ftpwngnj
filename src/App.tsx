@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v320"; 
-const KEY_MONTHLY = "shifto_monthly_v320"; 
-const KEY_RULES = "shifto_rules_v320";
+const KEY_ALL_DAYS = "shifto_alldays_v340"; 
+const KEY_MONTHLY = "shifto_monthly_v340"; 
+const KEY_RULES = "shifto_rules_v340";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -424,7 +424,8 @@ class AutoAssigner {
   dynamicCapacity: Record<string, number> = {}; assignCounts: Record<string, number> = {}; maxAssigns: Record<string, number> = {}; counts: Record<string, number> = {}; roomCounts: Record<string, Record<string, number>> = {};
   initialAvailAll: string[] = []; initialAvailGeneral: string[] = []; initialAvailSupport: string[] = []; initialAvailReception: string[] = [];
   logInfo: string[] = [];
-  kenmuGroups: Set<string>[] = []; // 🌟 追加：セット割り当て用グループ
+  kenmuGroups: Set<string>[] = []; 
+  shouldClear: boolean; // 🌟 追加：クリアして最適化するかどうか
   
   private log(msg: string) { this.logInfo.push(`・${msg}`); }
 
@@ -437,11 +438,18 @@ class AutoAssigner {
     return count;
   }
 
-  constructor(day: DayData, prevDay: DayData | null, pastDays: DayData[], ctx: AutoAssignContext) {
+  constructor(day: DayData, prevDay: DayData | null, pastDays: DayData[], ctx: AutoAssignContext, shouldClear: boolean = false) {
     this.day = { ...day }; this.prevDay = prevDay; this.pastDays = pastDays; this.ctx = ctx; this.dayCells = { ...day.cells }; this.dynamicCapacity = { ...(ctx.customRules.capacity || {}) };
+    this.shouldClear = shouldClear;
+
+    // 🌟 全クリア指示があった場合、メインの部屋を空にする（手入力のしがらみをなくす）
+    if (this.shouldClear) {
+      ROOM_SECTIONS.forEach(sec => {
+         this.dayCells[sec] = "";
+      });
+    }
   }
 
-  // 🌟 追加：兼務ペアを「ニコイチ」のグループにまとめる
   buildKenmuGroups() {
     this.kenmuGroups = [];
     (this.ctx.customRules.kenmuPairs || []).forEach((pair: any) => {
@@ -478,7 +486,7 @@ class AutoAssigner {
       return { ...this.day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])), logInfo: this.logInfo };
     }
 
-    this.buildKenmuGroups(); // 🌟 追加
+    this.buildKenmuGroups(); 
     this.buildBlockMap(); this.applyDailyAdditions(); this.evaluateEmergencies(); this.initCounts(); this.cleanUpDayCells();
     this.prepareAvailability(); this.assignRooms(); this.processPostTasks();
     return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
@@ -528,15 +536,18 @@ class AutoAssigner {
   }
 
   cleanUpDayCells() {
-    // 🌟 追加：手動入力の兼務ペアの矛盾（片方にしかいない）を事前に統合
+    // 🌟 手動入力の兼務ペアの矛盾解消（手入力された場合でも左側優先で同期）
     (this.ctx.customRules.kenmuPairs || []).forEach((pair: any) => {
         if (!pair.s1 || !pair.s2) return;
         const m1 = split(this.dayCells[pair.s1] || "");
         const m2 = split(this.dayCells[pair.s2] || "");
-        if (m1.length > 0 || m2.length > 0) {
-            const merged = Array.from(new Set([...m1, ...m2]));
-            this.dayCells[pair.s1] = join(merged);
-            this.dayCells[pair.s2] = join(merged);
+        if (m1.length > 0 && m2.length > 0 && m1.join() !== m2.join()) {
+            this.dayCells[pair.s2] = join(m1); // 左側を正として上書き（競合解消）
+            this.log(`⚠️ [自動修正] ${pair.s1} と ${pair.s2} の手入力が異なっていたため、${pair.s1} に統一しました`);
+        } else if (m1.length > 0) {
+            this.dayCells[pair.s2] = join(m1);
+        } else if (m2.length > 0) {
+            this.dayCells[pair.s1] = join(m2);
         }
     });
 
@@ -544,19 +555,25 @@ class AutoAssigner {
       if (["明け","入り","不在","土日休日代休"].includes(sec)) return;
       if (this.skipSections.includes(sec)) { this.dayCells[sec] = ""; return; }
       let members = split(this.dayCells[sec]).map(m => {
-        const core = extractStaffName(m); if (ROLE_PLACEHOLDERS.includes(core)) return m;
+        const core = extractStaffName(m); 
+        if (ROLE_PLACEHOLDERS.includes(core)) return m;
+        // 🌟 強制お掃除：禁止されている部屋に手入力で入っていたら消す（浅野さんが待機にいる問題を解決）
+        if (this.isForbidden(core, sec)) {
+           this.log(`⚠️ [自動修正] ${core}さんは ${sec} を担当不可のため、配置を解除しました`);
+           return null;
+        }
         const block = this.blockMap.get(core);
         if (block === 'ALL') return null; if (block === 'AM' && m.includes('(AM)')) return null; if (block === 'PM' && m.includes('(PM)')) return null; 
         if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) return `${core}(PM)`; if (block === 'PM' && !m.includes('(AM)') && !m.match(/\(.*\)/)) return `${core}(AM)`;
         return m;
       }).filter(Boolean) as string[];
       this.dayCells[sec] = join(members);
-      // 🌟 修正：兼務ペアで複数部屋に名前があっても、assignCountの消費は1回だけにする
+      
       if (!REST_SECTIONS.includes(sec) && sec !== "昼当番") { 
          split(this.dayCells[sec]).forEach((name: string) => { 
             const c = extractStaffName(name); 
             if (ROLE_PLACEHOLDERS.includes(c)) return; 
-            // 既に消費済みなら無視
+            // すでに消費済みでなければ追加
             if ((this.assignCounts[c] || 0) < getStaffAmount(name)) {
                 this.addU(c, getStaffAmount(name)); 
             }
@@ -576,6 +593,7 @@ class AutoAssigner {
         if (rule.staff !== staff) return false;
         const secs = split(rule.sections);
         if (secs.includes(section)) return true;
+        // 🌟 互換性：「残り・待機」と書いてあっても「待機」としてブロックする
         if (section === "待機" && secs.includes("残り・待機")) return true; 
         return false;
     }); 
@@ -605,12 +623,11 @@ class AutoAssigner {
     const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
     const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
     
-    // 🌟 修正：グループ全ての部屋に対する条件をチェックする
     const groupSecs = section ? this.getKenmuGroup(section) : [];
 
     const filterFn = (name: string, checkSoftNg: boolean, checkConsec: boolean) => {
       if (!availList.includes(name) || this.isUsed(name)) return false;
-      if (section && groupSecs.some(gSec => this.isForbidden(name, gSec))) return false; // グループ内に1つでもNGがあれば不可
+      if (section && groupSecs.some(gSec => this.isForbidden(name, gSec))) return false; // 兼務先の部屋でNGなら不可
       if (checkConsec && prevDayMembers.includes(name)) return false;
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false;
       return true;
@@ -629,7 +646,6 @@ class AutoAssigner {
     const fullDayOnlyList = split(this.ctx.customRules.fullDayOnlyRooms ?? "");
     const getCurrentAmount = (arr: string[]) => arr.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
     
-    // 🌟 追加：兼務グループの取得
     const groupSecs = this.getKenmuGroup(section);
     
     let prevAmount = -1;
@@ -651,7 +667,6 @@ class AutoAssigner {
          if (current.map(extractStaffName).includes(name)) return { hard: true, msg: "同室に配置済" };
          if (this.isUsed(name)) return { hard: true, msg: "他業務で配置済" };
          
-         // 🌟 修正：グループ内のどの部屋の担当不可にも引っかかってはいけない
          for (const gSec of groupSecs) {
            if (this.isForbidden(name, gSec)) return { hard: true, msg: `${gSec}の担当不可設定` };
          }
@@ -725,8 +740,8 @@ class AutoAssigner {
              let scoreA = 0; let scoreB = 0;
              
              // 🌟 修正：担当不可が多い（不器用な）スタッフを最優先に救済するブースト
-             scoreA += this.getForbiddenCount(a) * 500;
-             scoreB += this.getForbiddenCount(b) * 500;
+             scoreA += this.getForbiddenCount(a) * 3000;
+             scoreB += this.getForbiddenCount(b) * 3000;
 
              const bA = this.blockMap.get(a); const bB = this.blockMap.get(b);
              if (mainStaff.includes(a)) scoreA += 10000; else if (subPrioStaff.includes(a)) scoreA += 5000; else if (subStaff.includes(a)) scoreA += 2000;
@@ -768,7 +783,6 @@ class AutoAssigner {
       });
       this.addU(core, f);
       
-      // 今扱っている部屋（ループ用変数）も更新
       current = split(this.dayCells[section]);
 
       const isPref = preferredList.includes(core);
@@ -780,7 +794,6 @@ class AutoAssigner {
   assignRooms() {
     const availAll = this.initialAvailAll; const availGeneral = this.initialAvailGeneral; const availReception = this.initialAvailReception; const fullDayOnlyList = split(this.ctx.customRules.fullDayOnlyRooms ?? "");
     
-    // 専従の前処理（ゴミ掃除）
     (this.ctx.customRules.fixed || []).forEach((rule: any) => { 
       if (!rule.staff || !rule.section) return; 
       Object.keys(this.dayCells).forEach(sec => { 
@@ -794,7 +807,6 @@ class AutoAssigner {
       }); 
     });
 
-    // 専従のアサイン処理（兼務グループ対応）
     (this.ctx.customRules.fixed || []).forEach((rule: any) => { 
       if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || this.isForbidden(rule.staff, rule.section)) return; 
       if (this.skipSections.includes(rule.section)) return; 
@@ -859,7 +871,8 @@ class AutoAssigner {
         }
         const currentUketsukeAmount = currentUketsuke.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
         let neededUketsuke = targetCount - currentUketsukeAmount;
-        if (neededUketsuke > 0 && !kenmuTargetRooms.includes(room)) { 
+        // 受付は兼務ルールとは無縁なのでそのまま埋める
+        if (neededUketsuke > 0) { 
           const pickedUketsuke = this.pick(availReception, availReception, Math.ceil(neededUketsuke), "受付", currentUketsuke);
           pickedUketsuke.forEach((name: string) => {
             const b = this.blockMap.get(name); let tag = ""; let f = 1;
@@ -883,6 +896,63 @@ class AutoAssigner {
         }
       }
     });
+
+    const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string, isStrictPair: boolean = false) => {
+       const targetCap = this.dynamicCapacity[targetRoom] || 1; 
+       const targetCores = targetMems.map(extractStaffName);
+       const getCurrentAmount = (arr: string[]) => arr.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
+       let currentAmount = getCurrentAmount(targetMems);
+       
+       for (const m of sourceMems) {
+          if (!isStrictPair && currentAmount >= targetCap) break; 
+          const core = extractStaffName(m);
+          const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
+          if (isFixedToSource) {
+              if(!isStrictPair) this.log(`🔒 [兼務ブロック] ${core} さんは専従のため、${targetRoom} への兼務は行いません`);
+              continue;
+          }
+          if (targetCores.includes(core)) continue; 
+          if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; 
+          if (this.isForbidden(core, targetRoom)) continue;
+          
+          let pushStr = m;
+          let curAm = 0; let curPm = 0;
+          targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+          
+          if (!isStrictPair) {
+            if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) continue; pushStr = `${core}(AM)`; } 
+            else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) continue; pushStr = `${core}(PM)`; }
+          }
+
+          targetMems.push(pushStr); targetCores.push(core);
+          const amount = getStaffAmount(pushStr); currentAmount += amount; this.addU(core, amount);
+       }
+       return targetMems;
+    };
+
+    // 🌟 常時兼務の伝播ループ（複数回回して連鎖させる）
+    let changedKenmu = true;
+    let loopKenmu = 0;
+    while(changedKenmu && loopKenmu < 5) {
+      changedKenmu = false;
+      (this.ctx.customRules.kenmuPairs || []).forEach((pair: any) => {
+        if (!pair.s1 || !pair.s2) return;
+        const beforeS1 = this.dayCells[pair.s1] || "";
+        const beforeS2 = this.dayCells[pair.s2] || "";
+        
+        let m1 = split(beforeS1); let m2 = split(beforeS2);
+        this.dayCells[pair.s2] = join(processKenmu(m1, m2, pair.s2, true));
+        
+        m2 = split(this.dayCells[pair.s2]); 
+        this.dayCells[pair.s1] = join(processKenmu(m2, m1, pair.s1, true));
+        
+        if (beforeS1 !== this.dayCells[pair.s1] || beforeS2 !== this.dayCells[pair.s2]) {
+           changedKenmu = true;
+           if (loopKenmu === 0) this.log(`🔗 [常時兼務] ${pair.s1} と ${pair.s2} を連動させました`);
+        }
+      });
+      loopKenmu++;
+    }
   }
 
   processPostTasks() {
@@ -1200,7 +1270,7 @@ export default function App() {
   const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { const saved = localStorage.getItem(KEY_ALL_DAYS); if (saved) return JSON.parse(saved); } catch {} return {}; });
   const [assignLogs, setAssignLogs] = useState<Record<string, string[]>>({});
   const [selectedLogDay, setSelectedLogDay] = useState<string | null>(null);
-  const [selectedWarningsDay, setSelectedWarningsDay] = useState<string | null>(null); // 🌟 追加: 警告表示用
+  const [selectedWarningsDay, setSelectedWarningsDay] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
@@ -1331,13 +1401,14 @@ export default function App() {
 
   const handleAutoOne = () => {
     if(!cur || cur.isPublicHoliday) return;
+    const shouldClear = window.confirm("既に割り当てられているシフトを一度クリアして、最適な配置を計算し直しますか？\n\n※[OK] ＝ 現在の配置をリセットして全体を最適化（推奨）\n※[キャンセル] ＝ 今の配置を残したまま空き枠だけを補充");
     setAllDaysWithHistory((prev: any) => {
       const nextAll = { ...prev };
       const idx = days.findIndex(d => d.id === cur.id);
       const baseDay = { ...days[idx], cells: nextAll[days[idx].id] || days[idx].cells };
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx, shouldClear);
       const res: DayData = worker.execute();
       nextAll[res.id] = res.cells;
       setAssignLogs(logState => ({...logState, [res.id]: res.logInfo || []}));
@@ -1346,6 +1417,7 @@ export default function App() {
   };
 
   const handleAutoAll = () => {
+    const shouldClear = window.confirm("既に割り当てられているシフトを一度クリアして、最適な配置を計算し直しますか？\n\n※[OK] ＝ 現在の配置をリセットして全体を最適化（推奨）\n※[キャンセル] ＝ 今の配置を残したまま空き枠だけを補充");
     setAllDaysWithHistory((prev: any) => {
       const nextAll = { ...prev };
       let prevDayObj: DayData | null = null;
@@ -1354,7 +1426,7 @@ export default function App() {
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx, shouldClear);
         const res: DayData = worker.execute();
         nextAll[res.id] = res.cells;
         newLogs[res.id] = res.logInfo || [];
