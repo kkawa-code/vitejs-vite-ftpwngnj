@@ -252,7 +252,7 @@ const MultiSectionPicker = ({ selected, onChange, options, hasArrows = false }: 
       {current.map((sec, i) => (
         <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 24, padding: hasArrows ? "8px 16px" : "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: hasArrows ? 10 : 12, border: "2px solid #bae6fd", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
           {hasArrows && (i > 0 ? <button onClick={() => handleMoveLeft(i)} style={{ background: "#7dd3fc", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>◀</button> : <span style={{ width: 32 }}></span>)}
-          <span style={{ userSelect: "none" }}>{sec}</span>
+          <span style={{ userSelect: "none", padding: hasArrows ? "0 4px" : "0" }}>{sec}</span>
           {hasArrows && (i < current.length - 1 ? <button onClick={() => handleMoveRight(i)} style={{ background: "#7dd3fc", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>▶</button> : <span style={{ width: 32 }}></span>)}
           <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: hasArrows ? 8 : 4, fontSize: 24 }}>✖</span>
         </div>
@@ -277,7 +277,7 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
       {current.map((name, i) => (
         <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 24, padding: hasArrows ? "8px 16px" : "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: hasArrows ? 10 : 12, border: "2px solid #cbd5e1", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
           {hasArrows && (i > 0 ? <button onClick={() => handleMoveLeft(i)} style={{ background: "#94a3b8", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>◀</button> : <span style={{ width: 32 }}></span>)}
-          <span style={{ userSelect: "none" }}>{name}</span>
+          <span style={{ userSelect: "none", padding: hasArrows ? "0 4px" : "0" }}>{name}</span>
           {hasArrows && (i < current.length - 1 ? <button onClick={() => handleMoveRight(i)} style={{ background: "#94a3b8", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>▶</button> : <span style={{ width: 32 }}></span>)}
           <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: hasArrows ? 8 : 4, fontSize: 24 }}>✖</span>
         </div>
@@ -689,8 +689,34 @@ class AutoAssigner {
   assignRooms() {
     const availAll = this.initialAvailAll; const availGeneral = this.initialAvailGeneral; const availReception = this.initialAvailReception; const fullDayOnlyList = split(this.ctx.customRules.fullDayOnlyRooms ?? "");
     
-    (this.ctx.customRules.fixed || []).forEach((rule: any) => { if (!rule.staff || !rule.section) return; Object.keys(this.dayCells).forEach(sec => { if (sec === rule.section) return; if (REST_SECTIONS.includes(sec)) return; const before = split(this.dayCells[sec]); const after = before.filter(m => extractStaffName(m) !== rule.staff); if (before.length !== after.length) { this.dayCells[sec] = join(after); this.assignCounts[rule.staff] = 0; this.blockMap.set(rule.staff, 'NONE'); } }); });
-    (this.ctx.customRules.fixed || []).forEach((rule: any) => { if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || this.isUsed(rule.staff) || this.isForbidden(rule.staff, rule.section)) return; if (this.skipSections.includes(rule.section)) return; const current = split(this.dayCells[rule.section]); if (current.map(extractStaffName).includes(rule.staff) || this.hasNGPair(rule.staff, current.map(extractStaffName), false)) return; const b = this.blockMap.get(rule.staff); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(rule.staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(rule.staff, 'ALL'); } else { this.blockMap.set(rule.staff, 'ALL'); } this.dayCells[rule.section] = join([...current, `${rule.staff}${tag}`]); this.addU(rule.staff, f); this.log(`🔒 [専従] ${rule.staff} を ${rule.section} に固定配置しました`); });
+    (this.ctx.customRules.fixed || []).forEach((rule: any) => { 
+      if (!rule.staff || !rule.section) return; 
+      Object.keys(this.dayCells).forEach(sec => { 
+        if (sec === rule.section) return; 
+        if (REST_SECTIONS.includes(sec)) return; 
+        const before = split(this.dayCells[sec]); 
+        const after = before.filter(m => extractStaffName(m) !== rule.staff); 
+        if (before.length !== after.length) { 
+          this.dayCells[sec] = join(after); 
+        } 
+      }); 
+    });
+
+    (this.ctx.customRules.fixed || []).forEach((rule: any) => { 
+      if (!rule.staff || !rule.section || !availAll.includes(rule.staff) || this.isForbidden(rule.staff, rule.section)) return; 
+      if (this.skipSections.includes(rule.section)) return; 
+      
+      const current = split(this.dayCells[rule.section]); 
+      const isAlreadyIn = current.map(extractStaffName).includes(rule.staff); 
+      
+      this.blockMap.set(rule.staff, 'ALL'); 
+      this.assignCounts[rule.staff] = 1; 
+
+      if (!isAlreadyIn) { 
+        this.dayCells[rule.section] = join([...current, rule.staff]); 
+        this.log(`🔒 [専従] ${rule.staff} を ${rule.section} に固定配置しました`); 
+      } 
+    });
 
     Object.values(this.roleAssignments).forEach((ra: any) => { if (this.skipSections.includes(ra.section)) return; const candidates = split(this.ctx.monthlyAssign[ra.role] || ""); const targetAvail = ["受付"].includes(ra.role) ? availReception : availGeneral; const staff = candidates.find(s => targetAvail.includes(s) && !this.isUsed(s) && !this.isForbidden(s, ra.section)); if (staff && !split(this.dayCells[ra.section]).map(extractStaffName).includes(staff)) { const b = this.blockMap.get(staff); let tag = ""; let f = 1; if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); } this.dayCells[ra.section] = join([...split(this.dayCells[ra.section]), `${staff}${tag}`]); this.addU(staff, f); this.log(`📌 [緊急役割] ${staff} を ${ra.section} に配置しました`); } });
 
@@ -1192,6 +1218,13 @@ export default function App() {
     return stats;
   }, [targetMonday, allDays, activeGeneralStaff]);
 
+  const priorityRoomsList = useMemo(() => {
+    const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
+    const list = [...base];
+    ROOM_SECTIONS.forEach(r => { if (!list.includes(r)) list.push(r); });
+    return list;
+  }, [customRules.priorityRooms]);
+
   const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
     const baseStaff = section === "受付" ? (activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff) : (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section) ? allStaff : activeGeneralStaff);
     if (REST_SECTIONS.includes(section)) return baseStaff;
@@ -1214,8 +1247,8 @@ export default function App() {
       const baseDay = { ...days[idx], cells: nextAll[days[idx].id] || days[idx].cells };
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const res: DayData = worker.execute();
+      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const res = worker.execute();
       nextAll[res.id] = res.cells;
       setAssignLogs(logState => ({...logState, [res.id]: res.logInfo || []}));
       return nextAll;
@@ -1231,8 +1264,8 @@ export default function App() {
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const res: DayData = worker.execute();
+        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const res = worker.execute();
         nextAll[res.id] = res.cells;
         newLogs[res.id] = res.logInfo || [];
         prevDayObj = res;
@@ -1400,7 +1433,7 @@ export default function App() {
             <div style={{ background: "#fffbeb", padding: 32, borderRadius: 16, border: "2px solid #fde68a" }}>
               <h4 style={{ margin: "0 0 16px 0", color: "#b45309", fontSize: 28, fontWeight: 800 }}>👑 部屋の割り当て優先順位</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-                {(customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS).map((room, idx, arr) => (
+                {priorityRoomsList.map((room: string, idx: number, arr: string[]) => (
                   <div key={room} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", padding: "12px 16px", borderRadius: 10, border: "2px solid #fcd34d" }}>
                     <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 20, fontWeight: 800, color: "#92400e", marginRight: 12 }}>{idx + 1}.</span><span style={{ fontSize: 24, fontWeight: 700, color: "#b45309" }}>{room}</span></div>
                     <div style={{ display: "flex", gap: 4 }}>
@@ -1721,7 +1754,7 @@ export default function App() {
               <thead>
                 <tr>
                   <th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 800 }}>スタッフ</th>
-                  {ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 800 }}>{r}</th>)}
+                  {ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: "12px 8px", borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 800, whiteSpace: "nowrap", fontSize: "20px" }}>{r}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -1730,7 +1763,7 @@ export default function App() {
                   const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
                   return (
                     <tr key={staff} className="calendar-row">
-                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
+                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: "12px 16px", borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
                       {ROOM_SECTIONS.map(r => {
                         const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 };
                         let bg = rowBg; let color = "#334155";
@@ -1739,10 +1772,10 @@ export default function App() {
                           else if (isMonthlyMainStaff(r, staff, monthlyAssign)) bg = "#fef08a";
                         }
                         return (
-                          <td key={r} style={{ padding: 8, background: bg, color: color, fontWeight: stat.total > 0 ? 800 : 500, borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" }}>
+                          <td key={r} style={{ padding: "8px 12px", background: bg, color: color, fontWeight: stat.total > 0 ? 800 : 500, borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                               {stat.total > 0 ? <span style={{fontSize:20}}>{stat.total}</span> : <span style={{ width: "20px" }}></span>}
-                              {stat.late > 0 && <span style={{ fontSize: "14px", background: "#fef08a", color: "#b45309", padding: "2px 6px", borderRadius: "12px", border: "1px solid #fde047" }}>遅 {stat.late}</span>}
+                              {stat.late > 0 && <span style={{ fontSize: "14px", background: "#fef08a", color: "#b45309", padding: "2px 6px", borderRadius: "12px", lineHeight: 1, fontWeight: 800, border: "1px solid #fde047" }}>遅 {stat.late}</span>}
                             </div>
                           </td>
                         );
