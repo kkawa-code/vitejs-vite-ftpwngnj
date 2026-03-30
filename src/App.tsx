@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v260"; 
-const KEY_MONTHLY = "shifto_monthly_v260"; 
-const KEY_RULES = "shifto_rules_v260";
+const KEY_ALL_DAYS = "shifto_alldays_v270"; 
+const KEY_MONTHLY = "shifto_monthly_v270"; 
+const KEY_RULES = "shifto_rules_v270";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -1273,8 +1273,8 @@ export default function App() {
       const baseDay = { ...days[idx], cells: nextAll[days[idx].id] || days[idx].cells };
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const res = worker.execute();
+      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const res: DayData = worker.execute();
       nextAll[res.id] = res.cells;
       setAssignLogs(logState => ({...logState, [res.id]: res.logInfo || []}));
       return nextAll;
@@ -1290,8 +1290,8 @@ export default function App() {
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const res = worker.execute();
+        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const res: DayData = worker.execute();
         nextAll[res.id] = res.cells;
         newLogs[res.id] = res.logInfo || [];
         prevDayObj = res;
