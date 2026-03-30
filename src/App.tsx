@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v290"; 
-const KEY_MONTHLY = "shifto_monthly_v290"; 
-const KEY_RULES = "shifto_rules_v290";
+const KEY_ALL_DAYS = "shifto_alldays_v300"; 
+const KEY_MONTHLY = "shifto_monthly_v300"; 
+const KEY_RULES = "shifto_rules_v300";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -514,6 +514,17 @@ class AutoAssigner {
       this.dayCells[sec] = join(members);
       if (!REST_SECTIONS.includes(sec) && sec !== "昼当番") { split(this.dayCells[sec]).forEach((name: string) => { const c = extractStaffName(name); if (ROLE_PLACEHOLDERS.includes(c)) return; this.addU(c, getStaffAmount(name)); }); }
     });
+
+    // 🌟 手動入力データの事前統合：兼務ペアの矛盾解消
+    (this.ctx.customRules.kenmuPairs || []).forEach((pair: any) => {
+        if (!pair.s1 || !pair.s2) return;
+        const m1 = split(this.dayCells[pair.s1]);
+        const m2 = split(this.dayCells[pair.s2]);
+        if (m2.length > 0) {
+            this.dayCells[pair.s1] = join(Array.from(new Set([...m1, ...m2])));
+            this.dayCells[pair.s2] = "";
+        }
+    });
   }
 
   getForbiddenCount(staffName: string): number {
@@ -522,7 +533,6 @@ class AutoAssigner {
     return rule ? split(rule.sections).length : 0;
   }
 
-  // 🌟 修正: 残り・待機 の互換性対応
   isForbidden(staff: string, section: string): boolean { 
     return (this.ctx.customRules.forbidden || []).some((rule: any) => {
         if (rule.staff !== staff) return false;
@@ -748,7 +758,6 @@ class AutoAssigner {
     const PRIORITY_LIST = ["治療", ...basePriorityList.filter((r: string) => r !== "治療")];
 
     const linkedTargetRooms = (this.ctx.customRules.linkedRooms || []).map((r: any) => r.target);
-    // 🌟 修正: 常時兼務ペアの右側（s2）は、専任割当から外して後で兼務として埋める
     const kenmuTargetRooms = (this.ctx.customRules.kenmuPairs || []).map((r: any) => r.s2);
 
     PRIORITY_LIST.forEach((room: string) => {
@@ -799,26 +808,32 @@ class AutoAssigner {
       }
     });
 
-    const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
-       const targetCap = this.dynamicCapacity[targetRoom] || 1; const targetCores = targetMems.map(extractStaffName);
+    const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string, isStrictPair: boolean = false) => {
+       const targetCap = this.dynamicCapacity[targetRoom] || 1; 
+       const targetCores = targetMems.map(extractStaffName);
        const getCurrentAmount = (arr: string[]) => arr.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
        let currentAmount = getCurrentAmount(targetMems);
-       if (currentAmount >= targetCap) return targetMems;
+       
        for (const m of sourceMems) {
-          if (currentAmount >= targetCap) break;
+          if (!isStrictPair && currentAmount >= targetCap) break; 
           const core = extractStaffName(m);
           const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
           if (isFixedToSource) {
-              this.log(`🔒 [兼務ブロック] ${core} さんは専従のため、${targetRoom} への兼務は行いません`);
+              if(!isStrictPair) this.log(`🔒 [兼務ブロック] ${core} さんは専従のため、${targetRoom} への兼務は行いません`);
               continue;
           }
-          if (targetCores.includes(core)) continue; if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; if (this.isForbidden(core, targetRoom)) continue;
+          if (targetCores.includes(core)) continue; 
+          if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; 
+          if (this.isForbidden(core, targetRoom)) continue;
           
           let pushStr = m;
           let curAm = 0; let curPm = 0;
           targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
-          if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) continue; pushStr = `${core}(AM)`; } 
-          else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) continue; pushStr = `${core}(PM)`; }
+          
+          if (!isStrictPair) {
+            if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) continue; pushStr = `${core}(AM)`; } 
+            else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) continue; pushStr = `${core}(PM)`; }
+          }
 
           targetMems.push(pushStr); targetCores.push(core);
           const amount = getStaffAmount(pushStr); currentAmount += amount; this.addU(core, amount);
@@ -826,13 +841,29 @@ class AutoAssigner {
        return targetMems;
     };
 
-    (this.ctx.customRules.kenmuPairs || []).forEach((pair: any) => {
-      if (!pair.s1 || !pair.s2) return;
-      let m1 = split(this.dayCells[pair.s1]); let m2 = split(this.dayCells[pair.s2]);
-      if (m1.length > 0 || m2.length > 0) this.log(`🔗 [常時兼務] ${pair.s1} と ${pair.s2} を連動させました`);
-      this.dayCells[pair.s2] = join(processKenmu(m1, m2, pair.s2));
-      m2 = split(this.dayCells[pair.s2]); this.dayCells[pair.s1] = join(processKenmu(m2, m1, pair.s1));
-    });
+    // 🌟 常時兼務の伝播ループ（複数回回して連鎖させる）
+    let changedKenmu = true;
+    let loopKenmu = 0;
+    while(changedKenmu && loopKenmu < 5) {
+      changedKenmu = false;
+      (this.ctx.customRules.kenmuPairs || []).forEach((pair: any) => {
+        if (!pair.s1 || !pair.s2) return;
+        const beforeS1 = this.dayCells[pair.s1] || "";
+        const beforeS2 = this.dayCells[pair.s2] || "";
+        
+        let m1 = split(beforeS1); let m2 = split(beforeS2);
+        this.dayCells[pair.s2] = join(processKenmu(m1, m2, pair.s2, true));
+        
+        m2 = split(this.dayCells[pair.s2]); 
+        this.dayCells[pair.s1] = join(processKenmu(m2, m1, pair.s1, true));
+        
+        if (beforeS1 !== this.dayCells[pair.s1] || beforeS2 !== this.dayCells[pair.s2]) {
+           changedKenmu = true;
+           if (loopKenmu === 0) this.log(`🔗 [常時兼務] ${pair.s1} と ${pair.s2} を連動させました`);
+        }
+      });
+      loopKenmu++;
+    }
   }
 
   processPostTasks() {
