@@ -37,7 +37,6 @@ const globalStyle = `
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 26px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   
-  /* タブ用CSS */
   .tabs-header { display: flex; gap: 12px; border-bottom: 4px solid #e2e8f0; margin-bottom: 32px; padding: 0 16px; }
   .tab-btn { background: none; border: none; padding: 16px 36px; font-size: 28px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 5px solid transparent; margin-bottom: -4px; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
@@ -59,22 +58,6 @@ const globalStyle = `
 type RenderGroup = { title: string; color: string; sections: string[] };
 type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
 type RejectReason = { hard: boolean, msg: string };
-
-interface RuleCapacity { [room: string]: number; }
-interface RuleDailyCapacity { date: string; section: string; capacity: number; }
-interface RuleDailyAddition { date: string; section: string; time: string; count: number; }
-interface RuleNgPair { s1: string; s2: string; level: string; }
-interface RuleFixed { staff: string; section: string; }
-interface RuleForbidden { staff: string; sections: string; }
-interface RuleSubstitute { target: string; subs: string; section: string; }
-interface RulePushOut { s1?: string; triggerStaff?: string; s2?: string; targetStaff?: string; triggerSection: string; targetSections: string; }
-interface RuleEmergency { threshold: number; type: string; role?: string; section?: string; s1?: string; s2?: string; newCapacity?: number; }
-interface RuleKenmuPair { s1: string; s2: string; }
-interface RuleRescue { targetRoom: string; sourceRooms: string; }
-interface RuleLateShift { section: string; lateTime: string; dayEndTime: string; }
-interface RuleLunchSpecial { day: string; count: number; }
-interface RuleLunchCond { section: string; min: number; out: number; }
-interface RuleLinked { target: string; sources: string; } 
 
 interface CustomRules {
   staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; customHolidays: string;
@@ -102,7 +85,6 @@ const MONTHLY_CATEGORIES = [
   { key: "治療サブ", label: "治療 (サブ)" }, { key: "RI", label: "RI (メイン)" }, { key: "RIサブ", label: "RI (サブ)" }, { key: "MMG", label: "MMG" }, { key: "受付", label: "受付" }, { key: "受付ヘルプ", label: "受付ヘルプ" }
 ];
 
-const DEFAULT_STAFF = "";
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "" };
 const DEFAULT_PRIORITY_ROOMS = ["治療", "受付", "MMG", "RI", "MRI", "CT", "透視（6号）", "透視（11号）", "1号室", "5号室", "2号室", "骨塩", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部"];
 
@@ -871,22 +853,26 @@ export default function App() {
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
+  const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
+
+  useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
 
   useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); localStorage.setItem(KEY_RULES, JSON.stringify(customRules)); localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [allDays, customRules, monthlyAssign]);
 
   const activeGeneralStaff = useMemo(() => parseAndSortStaff(customRules.staffList), [customRules.staffList]);
   const activeReceptionStaff = useMemo(() => parseAndSortStaff(customRules.receptionStaffList), [customRules.receptionStaffList]);
   const allStaff = useMemo(() => Array.from(new Set([...activeGeneralStaff, ...activeReceptionStaff])), [activeGeneralStaff, activeReceptionStaff]);
+  const customHolidays = split(customRules.customHolidays || "");
 
   const days = useMemo(() => {
     const [y, m, d] = targetMonday.split('-').map(Number); const mon = new Date(y, m - 1, d);
     return [0, 1, 2, 3, 4].map(i => {
       const curr = new Date(mon); curr.setDate(curr.getDate() + i);
       const id = `${curr.getFullYear()}-${pad(curr.getMonth()+1)}-${pad(curr.getDate())}`;
-      const isHoliday = !!FALLBACK_HOLIDAYS[id] || split(customRules.customHolidays).includes(id);
-      return { id, label: formatDayForDisplay(curr), isPublicHoliday: isHoliday, holidayName: FALLBACK_HOLIDAYS[id] || "休診日", cells: allDays[id] || Object.fromEntries(SECTIONS.map(s => [s, ""])) };
+      const isHoliday = !!nationalHolidays[id] || customHolidays.includes(id);
+      return { id, label: formatDayForDisplay(curr), isPublicHoliday: isHoliday, holidayName: nationalHolidays[id] || "休診日", cells: allDays[id] || Object.fromEntries(SECTIONS.map(s => [s, ""])) };
     });
-  }, [targetMonday, allDays, customRules.customHolidays]);
+  }, [targetMonday, allDays, customHolidays, nationalHolidays]);
 
   useEffect(() => { if (!sel || !days.find(d => d.id === sel)) setSel(days[0].id); }, [days, sel]);
   const cur = days.find(d => d.id === sel) || days[0];
@@ -915,6 +901,26 @@ export default function App() {
     }
     return w;
   };
+
+  const monthlyMatrixStats = useMemo(() => {
+    const targetMonth = targetMonday.substring(0, 7);
+    const stats: Record<string, Record<string, { total: number, late: number }>> = {};
+    activeGeneralStaff.forEach(s => { stats[s] = {}; ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); });
+    Object.entries(allDays).forEach(([dateStr, cells]) => {
+      if (dateStr.startsWith(targetMonth)) {
+        ROOM_SECTIONS.forEach(room => {
+          split(cells[room] || "").forEach(m => {
+            const core = extractStaffName(m);
+            if (stats[core] !== undefined && stats[core][room] !== undefined) {
+              stats[core][room].total += 1;
+              if (m.includes("17:00") || m.includes("18:00") || m.includes("19:00") || m.includes("22:00")) stats[core][room].late += 1;
+            }
+          });
+        });
+      }
+    });
+    return stats;
+  }, [targetMonday, allDays, activeGeneralStaff]);
 
   const handleAutoAssign = (isSmart: boolean, isWeekly: boolean) => {
     setAllDays(prev => {
@@ -978,7 +984,7 @@ export default function App() {
 
   const handleCopyToClipboard = () => {
     const dataObj = { allDays, monthlyAssign, customRules };
-    navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => { alert("データをコピーしました！LINEのKeepメモなどに貼り付けてスマホに送ってください。"); }).catch(() => { alert("コピーに失敗しました。お使いのブラウザでは許可されていません。"); });
+    navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => { alert("データをコピーしました！"); }).catch(() => { alert("コピーに失敗しました。"); });
   };
 
   const handleTextImport = () => {
@@ -986,7 +992,7 @@ export default function App() {
     try {
       const dataObj = JSON.parse(importText);
       if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDays(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(dataObj.customRules); alert("テキストからデータを復元しました！"); setImportText(""); } else { alert("正しいデータ形式ではありません。"); }
-    } catch (err) { alert("テキストの読み込みに失敗しました。コピー漏れがないか確認してください。"); }
+    } catch (err) { alert("テキストの読み込みに失敗しました。"); }
   };
 
   return (
@@ -1074,6 +1080,7 @@ export default function App() {
                 <button className="btn-hover" onClick={() => handleAutoAssign(false, false)} style={btnStyle("#10b981")}>✨ 1日自動割当</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(false, true)} style={btnStyle("#0ea5e9")}>⚡ 週間自動割当</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(true, false)} style={btnStyle("#f59e0b")}>🔄 欠員補充(1日)</button>
+                <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6")}}>↩️ 戻る</button>
              </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: 32 }}>
@@ -1084,14 +1091,47 @@ export default function App() {
 
       {/* ===================== 📊 マトリックス タブ ===================== */}
       <div className="no-print" style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
-        <div style={{ ...panelStyle() }}>
-           <h3 style={{ fontSize: 32, fontWeight: 900, color: "#1e293b", marginBottom: 32 }}>月間集計</h3>
-           <p style={{ fontSize: 24 }}>表示中の月（{targetMonday.substring(0,7)}）の配置回数を表示しています。</p>
+        <div style={{ ...panelStyle(), marginBottom: 32 }}>
+          <h3 style={{ fontWeight: 900, color: "#3b82f6", fontSize: 32, marginTop: 0 }}>配置マトリックス（月間集計）</h3>
+          <div style={{ marginTop: 24, overflowX: "auto", maxHeight: "70vh", border: "3px solid #cbd5e1", borderRadius: 16 }}>
+            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "20px", textAlign: "center", minWidth: 1200 }}>
+              <thead>
+                <tr>
+                  <th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 16, borderRight: "2px solid #cbd5e1", borderBottom: "3px solid #cbd5e1", color: "#1e293b", fontWeight: 900 }}>スタッフ</th>
+                  {ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: 16, borderRight: "2px solid #cbd5e1", borderBottom: "3px solid #cbd5e1", background: "#f8fafc", fontWeight: 900 }}>{r}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {allStaff.filter(s => activeGeneralStaff.includes(s)).map((staff, sIdx) => {
+                  const isZebra = sIdx % 2 === 1; const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
+                  return (
+                    <tr key={staff} className="calendar-row">
+                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 16, borderRight: "3px solid #cbd5e1", borderBottom: "2px solid #e2e8f0", fontWeight: 900, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
+                      {ROOM_SECTIONS.map(r => {
+                        const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 };
+                        let bg = rowBg; let color = "#334155";
+                        if (["CT", "MRI"].includes(r)) { if (stat.total > 0) { bg = `rgba(59, 130, 246, ${Math.min(0.1 + stat.total * 0.15, 0.9)})`; if(stat.total >= 3) color = "#fff"; } else if (isMonthlyMainStaff(r, staff, monthlyAssign)) bg = "#fef08a"; }
+                        return (
+                          <td key={r} style={{ padding: 12, background: bg, color: color, fontWeight: stat.total > 0 ? 900 : 500, borderRight: "2px solid #e2e8f0", borderBottom: "2px solid #e2e8f0", verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                              {stat.total > 0 ? <span style={{fontSize:24}}>{stat.total}</span> : <span style={{ width: "24px" }}></span>}
+                              {stat.late > 0 && <span style={{ fontSize: "16px", background: "#fef08a", color: "#b45309", padding: "4px 8px", borderRadius: "12px", border: "2px solid #fde047" }}>遅{stat.late}</span>}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {/* ===================== ⚙️ 設定 タブ ===================== */}
       <div className="no-print" style={{ display: activeTab === 'rules' ? 'block' : 'none' }}>
+        
         <div style={{ ...panelStyle(), marginBottom: 40 }}>
           <h3 style={{ fontSize: 32, fontWeight: 900, marginBottom: 24, color: "#0f766e" }}>⚙️ スタッフ設定・連日アラート</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
@@ -1102,26 +1142,25 @@ export default function App() {
              <div style={{ background: "#fff1f2", padding: 32, borderRadius: 20, border: "3px solid #fecaca" }}>
                <label style={{ fontSize: 28, fontWeight: 800, color: "#be185d", marginBottom: 12, display: "block" }}>⚠️ 連日担当のアラートを出す部屋</label>
                <p style={{ fontSize: 22, color: "#9f1239", marginBottom: 20 }}>ここで選んだ部屋のみ、2日連続で入ったスタッフの名前が週間表で赤字になります。</p>
-               <MultiPicker selected={customRules.consecutiveAlertRooms} onChange={(v:any) => setCustomRules({...customRules, consecutiveAlertRooms: v})} options={ROOM_SECTIONS} />
+               <MultiPicker selected={customRules.consecutiveAlertRooms} onChange={(v: string) => setCustomRules({...customRules, consecutiveAlertRooms: v})} options={ROOM_SECTIONS} />
              </div>
           </div>
         </div>
 
-        <div style={{ ...panelStyle() }}>
+        <div style={{ ...panelStyle(), marginBottom: 40 }}>
           <h3 style={{ fontSize: 32, fontWeight: 900, marginBottom: 24, color: "#be185d" }}>📱 データ保存・復元</h3>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center" }}>
              <button className="btn-hover" onClick={handleExport} style={btnStyle("#6366f1")}>💾 ファイル保存</button>
              <button className="btn-hover" onClick={() => fileInputRef.current?.click()} style={btnStyle("#8b5cf6")}>📂 ファイル読込</button>
              <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleImport} />
-             <div style={{ width: "4px", background: "#cbd5e1", margin: "0 10px" }}></div>
+             <div style={{ width: "4px", height: "40px", background: "#cbd5e1", margin: "0 10px" }}></div>
              <button className="btn-hover" onClick={handleCopyToClipboard} style={btnStyle("#db2777")}>📋 テキストコピー</button>
-             <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "16px", fontSize: 24, borderRadius: 12, border: "2px solid #f9a8d4" }} />
+             <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "16px 20px", fontSize: 24, borderRadius: 12, border: "2px solid #f9a8d4" }} />
              <button className="btn-hover" onClick={handleTextImport} style={btnStyle("#be185d")}>✨ 復元</button>
           </div>
         </div>
 
-        {/* ルール群 */}
-        <div style={{ ...panelStyle(), marginTop: 40 }}>
+        <div style={{ ...panelStyle() }}>
           <h3 style={{ fontSize: 32, fontWeight: 900, marginBottom: 24, color: "#0f766e" }}>📋 各種ルール設定</h3>
           
           <div style={{ background: "#f8fafc", padding: 32, borderRadius: 16, border: "2px solid #e2e8f0", marginBottom: 32 }}>
@@ -1186,6 +1225,7 @@ export default function App() {
 
           <div style={{ background: "#ecfdf5", padding: 32, borderRadius: 16, border: "2px solid #a7f3d0", marginBottom: 32 }}>
             <h4 style={{ margin: "0 0 16px 0", color: "#065f46", fontSize: 26, fontWeight: 800 }}>🔗 兼務・セット配置ルール</h4>
+            
             <h5 style={{ fontSize: 24, color: "#047857", marginTop: 24, marginBottom: 12 }}>■ 常時兼務ペア</h5>
             {(customRules.kenmuPairs || []).map((rule: any, idx: number) => (
               <div key={idx} className="rule-row" style={{ background: "#fff", padding: "18px 24px", border: "2px solid #a7f3d0", borderRadius: 12 }}>
@@ -1441,7 +1481,7 @@ export default function App() {
             <div style={{ fontSize: 30, lineHeight: 1.8, color: "#ef4444", fontWeight: 800, textAlign: "center" }}>
               {getDailyStats(showUnassignedList).unassigned.join("、") || "全員配置済みです"}
             </div>
-            <button onClick={() => setShowUnassignedList(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center", padding: "20px" }}>閉じる</button>
+            <button onClick={() => setShowUnassignedList(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center" }}>閉じる</button>
           </div>
         </div>
       )}
@@ -1457,13 +1497,13 @@ export default function App() {
                 </li>
               ))}
             </ul>
-            <button onClick={() => setSelectedErrorDay(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center", padding: "20px" }}>閉じる</button>
+            <button onClick={() => setSelectedErrorDay(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center" }}>閉じる</button>
           </div>
         </div>
       )}
 
       {selectedStaffForStats && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedStaffForStats(null)}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)" }} onClick={() => setSelectedStaffForStats(null)}>
           <div className="modal-animate" style={{ background: "#fff", padding: 48, borderRadius: 28, maxWidth: 700, maxHeight: "80vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: 36, fontWeight: 900, marginBottom: 24 }}>👤 {selectedStaffForStats} さんの詳細</h3>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 26 }}>
@@ -1488,7 +1528,7 @@ export default function App() {
                 })}
               </tbody>
             </table>
-            <button onClick={() => setSelectedStaffForStats(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center", padding: "20px" }}>閉じる</button>
+            <button onClick={() => setSelectedStaffForStats(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center" }}>閉じる</button>
           </div>
         </div>
       )}
@@ -1500,7 +1540,7 @@ export default function App() {
             <ul style={{ listStyle: "none", padding: 0 }}>
               {assignLogs[selectedLogDay]?.map((log, i) => <li key={i} style={{ padding: "12px 0", borderBottom: "2px dashed #cbd5e1", fontSize: 24 }}>{log}</li>)}
             </ul>
-            <button onClick={() => setSelectedLogDay(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center", padding: "20px" }}>閉じる</button>
+            <button onClick={() => setSelectedLogDay(null)} style={{ ...btnStyle("#2563eb"), marginTop: 40, width: "100%", justifyContent: "center" }}>閉じる</button>
           </div>
         </div>
       )}
