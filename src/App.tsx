@@ -137,7 +137,6 @@ const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休�
 const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番"].includes(s));
 const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
-const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "検像"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = {
   "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日"
@@ -174,9 +173,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v183"; 
-const KEY_MONTHLY = "shifto_monthly_v183"; 
-const KEY_RULES = "shifto_rules_v183";
+const KEY_ALL_DAYS = "shifto_alldays_v190"; 
+const KEY_MONTHLY = "shifto_monthly_v190"; 
+const KEY_RULES = "shifto_rules_v190";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -252,7 +251,7 @@ const MultiSectionPicker = ({ selected, onChange, options, hasArrows = false }: 
       {current.map((sec, i) => (
         <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 24, padding: hasArrows ? "8px 16px" : "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: hasArrows ? 10 : 12, border: "2px solid #bae6fd", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
           {hasArrows && (i > 0 ? <button onClick={() => handleMoveLeft(i)} style={{ background: "#7dd3fc", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>◀</button> : <span style={{ width: 32 }}></span>)}
-          <span style={{ userSelect: "none", padding: hasArrows ? "0 4px" : "0" }}>{sec}</span>
+          <span style={{ userSelect: "none" }}>{sec}</span>
           {hasArrows && (i < current.length - 1 ? <button onClick={() => handleMoveRight(i)} style={{ background: "#7dd3fc", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>▶</button> : <span style={{ width: 32 }}></span>)}
           <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: hasArrows ? 8 : 4, fontSize: 24 }}>✖</span>
         </div>
@@ -277,7 +276,7 @@ const MultiStaffPicker = ({ selected, onChange, options, placeholder = "＋追�
       {current.map((name, i) => (
         <div key={i} style={{ background: "#f1f5f9", color: "#334155", borderRadius: 24, padding: hasArrows ? "8px 16px" : "12px 20px", fontSize: 22, fontWeight: 800, display: "flex", alignItems: "center", gap: hasArrows ? 10 : 12, border: "2px solid #cbd5e1", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>
           {hasArrows && (i > 0 ? <button onClick={() => handleMoveLeft(i)} style={{ background: "#94a3b8", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>◀</button> : <span style={{ width: 32 }}></span>)}
-          <span style={{ userSelect: "none", padding: hasArrows ? "0 4px" : "0" }}>{name}</span>
+          <span style={{ userSelect: "none" }}>{name}</span>
           {hasArrows && (i < current.length - 1 ? <button onClick={() => handleMoveRight(i)} style={{ background: "#94a3b8", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18, fontWeight: "bold" }}>▶</button> : <span style={{ width: 32 }}></span>)}
           <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, marginLeft: hasArrows ? 8 : 4, fontSize: 24 }}>✖</span>
         </div>
@@ -308,15 +307,14 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
     if (dayOfWeek === 6 || d === daysInMonth) { weeks.push(currentWeek); currentWeek = new Array(7).fill(null); }
   }
   const handleWeekClick = (weekObj: (number|null)[]) => {
-    // 🌟 時差バグ修正：クリックした行から「月曜日〜土曜日」のどれかを基準日とする（日曜だと前週と判定されるため）
     let validDay = null;
     for (let i = 1; i < 7; i++) {
       if (weekObj[i] !== null) { validDay = weekObj[i]; break; }
     }
-    if (validDay === null && weekObj[0] !== null) validDay = weekObj[0]; // 全てnullなら日曜
+    if (validDay === null && weekObj[0] !== null) validDay = weekObj[0]; 
     if (!validDay) return;
 
-    const dObj = new Date(year, month - 1, validDay, 12, 0, 0); // 12時にして時差ズレ防止
+    const dObj = new Date(year, month - 1, validDay, 12, 0, 0); 
     const day = dObj.getDay();
     const diff = dObj.getDate() - day + (day === 0 ? -6 : 1);
     const mon = new Date(dObj.getTime());
@@ -545,20 +543,15 @@ class AutoAssigner {
 
   pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = []): string[] {
     const result: string[] = []; const uniqueList = Array.from(new Set(list.filter(Boolean)));
-    const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
-    const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
     
-    const filterFn = (name: string, checkSoftNg: boolean, checkConsec: boolean) => {
+    const filterFn = (name: string, checkSoftNg: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
-      if (checkConsec && prevDayMembers.includes(name)) return false;
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false;
       return true;
     };
     
-    for (const name of uniqueList.filter(n => filterFn(n, true, true))) { result.push(name); if (result.length >= n) return result; }
-    for (const name of uniqueList.filter(n => filterFn(n, false, true))) { result.push(name); if (result.length >= n) return result; }
-    for (const name of uniqueList.filter(n => filterFn(n, true, false))) { result.push(name); if (result.length >= n) return result; }
-    for (const name of uniqueList.filter(n => filterFn(n, false, false))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, true))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, false))) { result.push(name); if (result.length >= n) return result; }
     return result;
   }
 
@@ -744,12 +737,7 @@ class AutoAssigner {
         this.dayCells["受付"] = join(currentUketsuke);
       } else {
         let preferredList: string[] = [];
-        if (["治療", "RI", "CT", "MRI", "MMG"].includes(room)) { 
-          // 🌟 修正：古い関数名を正しい関数名に変更
-          preferredList = getMonthlyStaffForSection(room, this.ctx.monthlyAssign).filter((s: string) => availGeneral.includes(s)); 
-        } else if (this.ctx.monthlyAssign[room]) { 
-          preferredList = split(this.ctx.monthlyAssign[room]).filter((s: string) => availGeneral.includes(s)); 
-        }
+        if (["治療", "RI", "CT", "MRI", "MMG"].includes(room)) { preferredList = getMonthlyStaffForSection(room, this.ctx.monthlyAssign).filter((s: string) => availGeneral.includes(s)); } else if (this.ctx.monthlyAssign[room]) { preferredList = split(this.ctx.monthlyAssign[room]).filter((s: string) => availGeneral.includes(s)); }
         let candidates = availGeneral;
         const strictRooms = ["治療", "RI", "MMG"];
         if (strictRooms.includes(room)) { candidates = preferredList.length > 0 ? preferredList : availGeneral; }
@@ -1035,7 +1023,7 @@ class AutoAssigner {
         const getHelp = (exclude: string[]) => {
           let cand = availGeneral.filter(n => {
             if (exclude.includes(n)) return false; if (helpMems.map(extractStaffName).includes(n)) return false; if (this.isForbidden(n, "受付ヘルプ")) return false; if (cannotLateShift.includes(n)) return false; 
-            if (isFixedToAny(n)) return false; // 🌟 修正：専従スタッフは受付ヘルプに行かない
+            if (isFixedToAny(n)) return false; 
             return true;
           });
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
@@ -1418,7 +1406,7 @@ export default function App() {
             <div style={{ background: "#fffbeb", padding: 32, borderRadius: 16, border: "2px solid #fde68a" }}>
               <h4 style={{ margin: "0 0 16px 0", color: "#b45309", fontSize: 28, fontWeight: 800 }}>👑 部屋の割り当て優先順位</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-                {priorityRoomsList.map((room: string, idx: number, arr: string[]) => (
+                {priorityRoomsList.map((room, idx, arr) => (
                   <div key={room} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", padding: "12px 16px", borderRadius: 10, border: "2px solid #fcd34d" }}>
                     <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 20, fontWeight: 800, color: "#92400e", marginRight: 12 }}>{idx + 1}.</span><span style={{ fontSize: 24, fontWeight: 700, color: "#b45309" }}>{room}</span></div>
                     <div style={{ display: "flex", gap: 4 }}>
@@ -1718,9 +1706,12 @@ export default function App() {
             <div style={{ paddingTop: 32, borderTop: "2px dashed #cbd5e1" }}>
               <h4 style={{ fontSize: 28, fontWeight: 800 }}>📅 月間担当者の設定</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 24 }}>
-                {MONTHLY_CATEGORIES.map(({ key, label }) => (
-                  <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={key === "受付" ? activeReceptionStaff : allStaff} onChange={v => updateMonthly(key, v)} noTime={true} />
-                ))}
+                {MONTHLY_CATEGORIES.map(({ key, label }) => {
+                  const opts = key === "受付ヘルプ" ? GENERAL_ROOMS : [];
+                  return (
+                    <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={key === "受付" ? activeReceptionStaff : allStaff} onChange={v => updateMonthly(key, v)} noTime={true} customOptions={opts} />
+                  );
+                })}
               </div>
             </div>
 
@@ -1783,12 +1774,13 @@ export default function App() {
                 <th style={{...cellStyle(true, false, false, true), borderRight: "3px solid #e2e8f0", borderBottom: "3px solid #e2e8f0"}}>区分</th>
                 {days.map(day => {
                   const dayWarnings = getDayWarnings(day.id);
-                  const errorCount = dayWarnings.filter((w: {type: string}) => w.type === 'error').length;
-                  const alertCount = dayWarnings.filter((w: {type: string}) => w.type === 'alert').length;
+                  const errorCount = dayWarnings.filter(w => w.type === 'error').length;
+                  const alertCount = dayWarnings.filter(w => w.type === 'alert').length;
                   return (
                     <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                         {day.label}
+                        {/* 🌟 週間一覧のアラートバッジ */}
                         {errorCount > 0 && <div style={{ background: "#fef2f2", border: "2px solid #ef4444", color: "#ef4444", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>🚨 エラー {errorCount}</div>}
                         {errorCount === 0 && alertCount > 0 && <div style={{ background: "#fffbeb", border: "2px solid #f59e0b", color: "#b45309", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>⚠️ 注意 {alertCount}</div>}
                         {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && (
