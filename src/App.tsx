@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v230"; 
-const KEY_MONTHLY = "shifto_monthly_v230"; 
-const KEY_RULES = "shifto_rules_v230";
+const KEY_ALL_DAYS = "shifto_alldays_v240"; 
+const KEY_MONTHLY = "shifto_monthly_v240"; 
+const KEY_RULES = "shifto_rules_v240";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -544,15 +544,20 @@ class AutoAssigner {
 
   pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = []): string[] {
     const result: string[] = []; const uniqueList = Array.from(new Set(list.filter(Boolean)));
+    const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
+    const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
     
-    const filterFn = (name: string, checkSoftNg: boolean) => {
+    const filterFn = (name: string, checkSoftNg: boolean, checkConsec: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
+      if (checkConsec && prevDayMembers.includes(name)) return false;
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false;
       return true;
     };
     
-    for (const name of uniqueList.filter(n => filterFn(n, true))) { result.push(name); if (result.length >= n) return result; }
-    for (const name of uniqueList.filter(n => filterFn(n, false))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, true, true))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, false, true))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, true, false))) { result.push(name); if (result.length >= n) return result; }
+    for (const name of uniqueList.filter(n => filterFn(n, false, false))) { result.push(name); if (result.length >= n) return result; }
     return result;
   }
 
@@ -654,7 +659,7 @@ class AutoAssigner {
              
              scoreA -= (this.roomCounts[a]?.[section] || 0) * 100; scoreB -= (this.roomCounts[b]?.[section] || 0) * 100;
              if (needTag === "") { if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; else if (bA === 'AM' || bA === 'PM') scoreA += 150; else if (bA === 'NONE') scoreA += 100; } else { if (needTag === "(AM)" && bA === 'PM') scoreA += 200; if (needTag === "(PM)" && bA === 'AM') scoreA += 200; if (bA === 'NONE') scoreA += 100; }
-             if (needTag === "") { if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreB += 200; else if (bB === 'AM' || bB === 'PM') scoreB += 150; else if (bB === 'NONE') scoreB += 100; } else { if (needTag === "(AM)" && bB === 'PM') scoreB += 200; if (needTag === "(PM)" && bB === 'AM') scoreB += 200; if (bB === 'NONE') scoreB += 100; }
+             if (needTag === "") { if (hasAmFree && hasPmFree && (bB === 'AM' || bB === 'PM')) scoreB += 200; else if (bB === 'AM' || bB === 'PM') scoreB += 150; else if (bB === 'NONE') scoreB += 100; } else { if (needTag === "(AM)" && bB === 'PM') scoreB += 200; if (needTag === "(PM)" && bB === 'AM') scoreB += 200; if (bB === 'NONE') scoreB += 100; }
              if (scoreA !== scoreB) return scoreB - scoreA;
              if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
              if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0);
@@ -1239,6 +1244,13 @@ export default function App() {
     return stats;
   }, [targetMonday, allDays, activeGeneralStaff]);
 
+  const priorityRoomsList = useMemo(() => {
+    const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
+    const list = [...base];
+    ROOM_SECTIONS.forEach(r => { if (!list.includes(r)) list.push(r); });
+    return list;
+  }, [customRules.priorityRooms]);
+
   const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
     const baseStaff = section === "受付" ? (activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff) : (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section) ? allStaff : activeGeneralStaff);
     if (REST_SECTIONS.includes(section)) return baseStaff;
@@ -1815,8 +1827,8 @@ export default function App() {
                 <th style={{...cellStyle(true, false, false, true), borderRight: "3px solid #e2e8f0", borderBottom: "3px solid #e2e8f0"}}>区分</th>
                 {days.map(day => {
                   const dayWarnings = getDayWarnings(day.id);
-                  const errorCount = dayWarnings.filter(w => w.type === 'error').length;
-                  const alertCount = dayWarnings.filter(w => w.type === 'alert').length;
+                  const errorCount = dayWarnings.filter((w: {type: string}) => w.type === 'error').length;
+                  const alertCount = dayWarnings.filter((w: {type: string}) => w.type === 'alert').length;
                   return (
                     <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
