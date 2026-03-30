@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v190"; 
-const KEY_MONTHLY = "shifto_monthly_v190"; 
-const KEY_RULES = "shifto_rules_v190";
+const KEY_ALL_DAYS = "shifto_alldays_v200"; 
+const KEY_MONTHLY = "shifto_monthly_v200"; 
+const KEY_RULES = "shifto_rules_v200";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -1192,13 +1192,6 @@ export default function App() {
     return stats;
   }, [targetMonday, allDays, activeGeneralStaff]);
 
-  const priorityRoomsList = useMemo(() => {
-    const base = customRules.priorityRooms && customRules.priorityRooms.length > 0 ? customRules.priorityRooms : DEFAULT_PRIORITY_ROOMS;
-    const list = [...base];
-    ROOM_SECTIONS.forEach(r => { if (!list.includes(r)) list.push(r); });
-    return list;
-  }, [customRules.priorityRooms]);
-
   const getAvailableStaffForDay = (section: string, currentDayCells: any) => {
     const baseStaff = section === "受付" ? (activeReceptionStaff.length > 0 ? activeReceptionStaff : activeGeneralStaff) : (REST_SECTIONS.includes(section) || ["待機", "昼当番", "受付ヘルプ"].includes(section) ? allStaff : activeGeneralStaff);
     if (REST_SECTIONS.includes(section)) return baseStaff;
@@ -1221,8 +1214,8 @@ export default function App() {
       const baseDay = { ...days[idx], cells: nextAll[days[idx].id] || days[idx].cells };
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const res = worker.execute();
+      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const res: DayData = worker.execute();
       nextAll[res.id] = res.cells;
       setAssignLogs(logState => ({...logState, [res.id]: res.logInfo || []}));
       return nextAll;
@@ -1238,8 +1231,8 @@ export default function App() {
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const res = worker.execute();
+        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const res: DayData = worker.execute();
         nextAll[res.id] = res.cells;
         newLogs[res.id] = res.logInfo || [];
         prevDayObj = res;
@@ -1407,7 +1400,7 @@ export default function App() {
             <div style={{ background: "#fffbeb", padding: 32, borderRadius: 16, border: "2px solid #fde68a" }}>
               <h4 style={{ margin: "0 0 16px 0", color: "#b45309", fontSize: 28, fontWeight: 800 }}>👑 部屋の割り当て優先順位</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-                {priorityRoomsList.map((room, idx, arr) => (
+                {(customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS).map((room, idx, arr) => (
                   <div key={room} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", padding: "12px 16px", borderRadius: 10, border: "2px solid #fcd34d" }}>
                     <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 20, fontWeight: 800, color: "#92400e", marginRight: 12 }}>{idx + 1}.</span><span style={{ fontSize: 24, fontWeight: 700, color: "#b45309" }}>{room}</span></div>
                     <div style={{ display: "flex", gap: 4 }}>
@@ -1705,7 +1698,7 @@ export default function App() {
             </div>
 
             <div style={{ paddingTop: 32, borderTop: "2px dashed #cbd5e1" }}>
-              <h4 style={{ fontSize: 28, fontWeight: 800 }}>📅 月間担当者の設定</h4>
+              <h4 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "0.02em" }}>📅 月間担当者の設定</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 24 }}>
                 {MONTHLY_CATEGORIES.map(({ key, label }) => {
                   const opts = key === "受付ヘルプ" ? GENERAL_ROOMS : [];
@@ -1781,7 +1774,6 @@ export default function App() {
                     <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                         {day.label}
-                        {/* 🌟 週間一覧のアラートバッジ */}
                         {errorCount > 0 && <div style={{ background: "#fef2f2", border: "2px solid #ef4444", color: "#ef4444", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>🚨 エラー {errorCount}</div>}
                         {errorCount === 0 && alertCount > 0 && <div style={{ background: "#fffbeb", border: "2px solid #f59e0b", color: "#b45309", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>⚠️ 注意 {alertCount}</div>}
                         {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && (
