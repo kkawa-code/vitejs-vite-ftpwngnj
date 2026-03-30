@@ -326,7 +326,7 @@ class AutoAssigner {
     this.applyDailyAdditions(); this.evaluateEmergencies(); this.initCounts(); this.cleanUpDayCells();
     this.prepareAvailability();
 
-    // ★ 欠員補充モード時の超シンプル割付
+    // ★ 改善点：欠員補充モード時の超シンプル割付
     if (this.isSmartFix) {
       this.log(`⚠️ 欠員補充モード：現在の配置を維持し、空き枠にのみフリーのスタッフを補充します`);
       const priority = this.ctx.customRules.priorityRooms || SECTIONS;
@@ -339,18 +339,7 @@ class AutoAssigner {
          const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
          
          while (getAmt(current) < cap) {
-            const remaining = cap - getAmt(current);
-            const candidates = this.initialAvailGeneral.filter(s => !this.isUsed(s) && !this.isForbidden(s, room));
-            if (remaining === 0.5) {
-              candidates.sort((a, b) => {
-                const bA = this.blockMap.get(a);
-                const bB = this.blockMap.get(b);
-                if (bA !== 'NONE' && bB === 'NONE') return -1;
-                if (bB !== 'NONE' && bA === 'NONE') return 1;
-                return 0;
-              });
-            }
-            const freeStaff = candidates[0];
+            const freeStaff = this.initialAvailGeneral.find(s => !this.isUsed(s) && !this.isForbidden(s, room));
             if (!freeStaff) break; 
             const block = this.blockMap.get(freeStaff);
             let tag = ""; let p = 1;
@@ -491,12 +480,16 @@ class AutoAssigner {
          if (this.isForbidden(name, section)) return { hard: true, msg: "担当不可設定" };
          const b = this.blockMap.get(name);
          
+         // ★ 改善点：ドミノ倒し防止。0.5枠を埋めるためだけに、終日空き(NONE)の人を使わない。
          if (needTag && b === 'NONE') return { hard: true, msg: "半端枠への終日スタッフ割当禁止(連鎖防止)" };
 
          if (b === 'ALL') return { hard: true, msg: "全日ブロック" };
          if (needTag === "(AM)" && b === 'AM') return { hard: true, msg: "AMブロック" };
          if (needTag === "(PM)" && b === 'PM') return { hard: true, msg: "PMブロック" };
          if (fullDayOnlyList.includes(section) && b !== 'NONE') return { hard: true, msg: "終日専任室だが半休" };
+         
+         // ★ 改善点: 玉突きルール対策。ここで `isUsed` が true の人を候補から除外しているが、
+         // 玉突きの時は強制的に移動させるので、ここでは `isUsed` チェックは既に行われている。
          
          if (this.hasNGPair(name, current.map(extractStaffName), false)) return { hard: true, msg: "絶対NGペア" };
          if (this.hasNGPair(name, current.map(extractStaffName), true)) return { hard: false, msg: "なるべくNGペア" };
@@ -531,6 +524,7 @@ class AutoAssigner {
              if (mainStaff.includes(a)) scoreA += 10000; else if (subPrioStaff.includes(a)) scoreA += 5000; else if (subStaff.includes(a)) scoreA += 2000;
              if (mainStaff.includes(b)) scoreB += 10000; else if (subPrioStaff.includes(b)) scoreB += 5000; else if (subStaff.includes(b)) scoreB += 2000;
              
+             // ★ 改善点：前日と同じ部屋の人にはペナルティ（固定化防止）
              if (prevDayMembers.includes(a)) scoreA -= 500;
              if (prevDayMembers.includes(b)) scoreB -= 500;
 
@@ -571,6 +565,7 @@ class AutoAssigner {
     (this.ctx.customRules.substitutes || []).forEach((sub: any) => { 
       const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; 
       const currentSec = split(this.dayCells[sub.section]).map(extractStaffName);
+      // ★ 改善点：代打の暴走防止（ターゲットが既にその部屋にいるなら代打不要）
       if (targets.some(t => currentSec.includes(t))) return;
       
       const trigger = targets.every(t => !availAll.includes(t) || this.isUsed(t)); 
@@ -593,6 +588,7 @@ class AutoAssigner {
             if (this.hasNGPair(s2, currentRoom.map(extractStaffName), false)) continue; 
             const actualCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); 
             const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
+            // ★ 改善点：玉突き発動条件の修正（s2が既にisUsedかどうかのチェックを外す）
             if (getAmt(currentRoom) < actualCap) { 
               this.dayCells[tSec] = join(split(this.dayCells[tSec]).filter(m => extractStaffName(m) !== s2));
               const b = this.blockMap.get(s2); let tag = ""; 
@@ -1051,9 +1047,9 @@ export default function App() {
     <div style={{ maxWidth: "98%", margin: "0 auto", padding: "40px", boxSizing: "border-box" }}>
       <style>{globalStyle}</style>
       
-      <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)", flexWrap: "wrap", gap: 20 }}>
+      <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.3</h2>
-        <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()+7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>来週 ▶</button>
@@ -1125,8 +1121,8 @@ export default function App() {
         </div>
 
         <div className="no-print" style={{ ...panelStyle() }}>
-          <div className="scroll-container hide-scrollbar sticky-header-panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "3px solid #e2e8f0", paddingBottom: 28, marginBottom: 40, flexWrap: "wrap", gap: 20 }}>
-             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <div className="scroll-container hide-scrollbar sticky-header-panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "3px solid #e2e8f0", paddingBottom: 28, marginBottom: 40 }}>
+             <div style={{ display: "flex", gap: 16 }}>
                 {days.map(d => <button key={d.id} onClick={() => setSel(d.id)} style={{ padding: "18px 36px", borderRadius: 16, border: "none", background: d.id === sel ? "#2563eb" : "#fff", color: d.id === sel ? "#fff" : "#64748b", fontWeight: 800, fontSize: 28, cursor: "pointer", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>{d.label}</button>)}
              </div>
              <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
@@ -1139,22 +1135,22 @@ export default function App() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: 32 }}>
              {RENDER_GROUPS.map(group => (
                <div key={group.title} style={{ gridColumn: "1 / -1" }}>
-                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 16, borderBottom: "3px solid #e2e8f0", flexWrap: "wrap", gap: 16 }}>
+                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 16, borderBottom: "3px solid #e2e8f0" }}>
                    <h4 style={{ fontSize: 32, fontWeight: 900, borderLeft: `10px solid ${group.color}`, paddingLeft: 16, margin: 0 }}>{group.title}</h4>
                    {group.title === "休務・夜勤" && (
-                      <div style={{display: "flex", gap: 16, flexWrap: "wrap"}}>
+                      <div style={{display: "flex", gap: 16}}>
                         <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
                         <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
                       </div>
                     )}
                     {group.title === "モダリティ" && (
-                      <div style={{display: "flex", gap: 16, flexWrap: "wrap"}}>
+                      <div style={{display: "flex", gap: 16}}>
                         <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務1日クリア</button>
                         <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務週間クリア</button>
                       </div>
                     )}
                     {group.title === "待機・その他" && (
-                      <div style={{display: "flex", gap: 16, flexWrap: "wrap"}}>
+                      <div style={{display: "flex", gap: 16}}>
                         <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
                         <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
                       </div>
@@ -1242,41 +1238,6 @@ export default function App() {
 
         <div style={{ ...panelStyle() }}>
           <h3 style={{ fontSize: 32, fontWeight: 900, marginBottom: 24, color: "#0f766e" }}>📋 各種ルール設定</h3>
-
-          <div style={{ background: "#fef2f2", padding: 32, borderRadius: 16, border: "2px solid #fecaca", marginBottom: 32 }}>
-            <h4 style={{ margin: "0 0 16px 0", color: "#b91c1c", fontSize: 28, fontWeight: 800 }}>🚨 緊急ルール（人数不足時の対応）</h4>
-            {(customRules.emergencies || []).map((em: any, idx: number) => (
-              <div key={idx} className="rule-row" style={{ borderColor: "#fca5a5" }}>
-                <span className="rule-label">出勤者が</span>
-                <input type="number" value={em.threshold} onChange={(e: any) => updateRule("emergencies", idx, "threshold", Number(e.target.value))} className="rule-num" />
-                <span className="rule-label">名以下のとき➔</span>
-                <select value={em.type} onChange={(e: any) => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel">
-                  <option value="change_capacity">定員変更</option>
-                  <option value="clear">空室（クローズ）</option>
-                  <option value="role_assign">役割(月間)を優先配置</option>
-                </select>
-                {em.type === 'change_capacity' && (
-                  <>
-                    <select value={em.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel"><option value="">部屋</option>{ROOM_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                    <span className="rule-label">を</span>
-                    <input type="number" value={em.newCapacity} onChange={(e: any) => updateRule("emergencies", idx, "newCapacity", Number(e.target.value))} className="rule-num" />
-                    <span className="rule-label">名にする</span>
-                  </>
-                )}
-                {em.type === 'clear' && <select value={em.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel"><option value="">部屋</option>{ROOM_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select>}
-                {em.type === 'role_assign' && (
-                  <>
-                    <select value={em.role} onChange={(e: any) => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel"><option value="">役割</option>{MONTHLY_CATEGORIES.map(m=><option key={m.key} value={m.key}>{m.label}</option>)}</select>
-                    <span className="rule-label">を</span>
-                    <select value={em.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel"><option value="">部屋</option>{ROOM_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                    <span className="rule-label">に優先配置</span>
-                  </>
-                )}
-                <button onClick={() => removeRule("emergencies", idx)} className="rule-del">✖</button>
-              </div>
-            ))}
-            <button className="rule-add" onClick={() => addRule("emergencies", { threshold: 24, type: "change_capacity", section: "CT", newCapacity: 3 })} style={{color: "#ef4444", borderColor: "#fca5a5"}}>＋ 緊急ルールを追加</button>
-          </div>
           
           <div style={{ background: "#f8fafc", padding: 32, borderRadius: 16, border: "2px solid #e2e8f0", marginBottom: 32 }}>
             <h4 style={{ margin: "0 0 16px 0", fontSize: 28, fontWeight: 800 }}>👥 絶対優先の定員設定</h4>
@@ -1674,4 +1635,3 @@ export default function App() {
     </div>
   );
 }
-```
