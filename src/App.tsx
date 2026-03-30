@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v270"; 
-const KEY_MONTHLY = "shifto_monthly_v270"; 
-const KEY_RULES = "shifto_rules_v270";
+const KEY_ALL_DAYS = "shifto_alldays_v290"; 
+const KEY_MONTHLY = "shifto_monthly_v290"; 
+const KEY_RULES = "shifto_rules_v290";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -522,6 +522,17 @@ class AutoAssigner {
     return rule ? split(rule.sections).length : 0;
   }
 
+  // 🌟 修正: 残り・待機 の互換性対応
+  isForbidden(staff: string, section: string): boolean { 
+    return (this.ctx.customRules.forbidden || []).some((rule: any) => {
+        if (rule.staff !== staff) return false;
+        const secs = split(rule.sections);
+        if (secs.includes(section)) return true;
+        if (section === "待機" && secs.includes("残り・待機")) return true; 
+        return false;
+    }); 
+  }
+
   prepareAvailability() {
     const supportStaffList = split(this.ctx.customRules.supportStaffList || "");
     const effectiveReceptionStaff = this.ctx.activeReceptionStaff.length > 0 ? this.ctx.activeReceptionStaff : this.ctx.activeGeneralStaff;
@@ -539,7 +550,6 @@ class AutoAssigner {
 
   isUsed(name: string): boolean { return (this.assignCounts[name] || 0) >= (this.maxAssigns[name] || 1); }
   addU(name: string, f = 1): void { this.assignCounts[name] = (this.assignCounts[name] || 0) + f; }
-  isForbidden(staff: string, section: string): boolean { return (this.ctx.customRules.forbidden || []).some((rule: any) => rule.staff === staff && split(rule.sections).includes(section)); }
   hasNGPair(candidate: string, members: string[], checkSoft: boolean): boolean { return members.some(member => (this.ctx.customRules.ngPairs || []).some((ng: any) => { const match = (ng.s1 === candidate && ng.s2 === member) || (ng.s1 === member && ng.s2 === candidate); if (!match) return false; if ((ng.level || "hard") === "hard") return true; if ((ng.level || "hard") === "soft" && checkSoft) return true; return false; })); }
 
   pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = []): string[] {
@@ -738,6 +748,8 @@ class AutoAssigner {
     const PRIORITY_LIST = ["治療", ...basePriorityList.filter((r: string) => r !== "治療")];
 
     const linkedTargetRooms = (this.ctx.customRules.linkedRooms || []).map((r: any) => r.target);
+    // 🌟 修正: 常時兼務ペアの右側（s2）は、専任割当から外して後で兼務として埋める
+    const kenmuTargetRooms = (this.ctx.customRules.kenmuPairs || []).map((r: any) => r.s2);
 
     PRIORITY_LIST.forEach((room: string) => {
       if (this.skipSections.includes(room)) return;
@@ -762,7 +774,7 @@ class AutoAssigner {
         }
         const currentUketsukeAmount = currentUketsuke.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
         let neededUketsuke = targetCount - currentUketsukeAmount;
-        if (neededUketsuke > 0 && !linkedTargetRooms.includes(room)) { 
+        if (neededUketsuke > 0 && !linkedTargetRooms.includes(room) && !kenmuTargetRooms.includes(room)) { 
           const pickedUketsuke = this.pick(availReception, availReception, Math.ceil(neededUketsuke), "受付", currentUketsuke);
           pickedUketsuke.forEach((name: string) => {
             const b = this.blockMap.get(name); let tag = ""; let f = 1;
@@ -779,10 +791,10 @@ class AutoAssigner {
         const strictRooms = ["治療", "RI", "MMG"];
         if (strictRooms.includes(room)) { candidates = preferredList.length > 0 ? preferredList : availGeneral; }
         
-        if (!linkedTargetRooms.includes(room)) {
+        if (!linkedTargetRooms.includes(room) && !kenmuTargetRooms.includes(room)) {
            this.fill(candidates, room, preferredList, targetCount);
         } else {
-           this.log(`⏭️ [専任スキップ] ${room} は基本兼務ルール（セット配置）の対象のため、専任スタッフの自動割当をスキップしました`);
+           this.log(`⏭️ [専任スキップ] ${room} は兼務ルールの対象のため、専任スタッフの自動割当をスキップしました`);
         }
       }
     });
@@ -1137,6 +1149,7 @@ export default function App() {
   const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { const saved = localStorage.getItem(KEY_ALL_DAYS); if (saved) return JSON.parse(saved); } catch {} return {}; });
   const [assignLogs, setAssignLogs] = useState<Record<string, string[]>>({});
   const [selectedLogDay, setSelectedLogDay] = useState<string | null>(null);
+  const [selectedWarningsDay, setSelectedWarningsDay] = useState<string | null>(null); // 🌟 追加: 警告表示用
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
@@ -1880,10 +1893,13 @@ export default function App() {
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                         {day.label}
                         {/* 🌟 週間一覧のアラートバッジ */}
-                        {errorCount > 0 && <div style={{ background: "#fef2f2", border: "2px solid #ef4444", color: "#ef4444", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>🚨 エラー {errorCount}</div>}
-                        {errorCount === 0 && alertCount > 0 && <div style={{ background: "#fffbeb", border: "2px solid #f59e0b", color: "#b45309", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>⚠️ 注意 {alertCount}</div>}
+                        {(errorCount > 0 || alertCount > 0) && (
+                          <button className="no-print btn-hover" onClick={(e) => { e.stopPropagation(); setSelectedWarningsDay(day.id); }} style={{ background: "#fffbeb", border: "2px solid #f59e0b", color: "#b45309", borderRadius: "12px", padding: "4px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold", cursor: "pointer" }}>
+                            ⚠️ 注意 {errorCount + alertCount}
+                          </button>
+                        )}
                         {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && (
-                          <button className="no-print" onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "4px 8px", fontSize: 16, color: "#0369a1", fontWeight: "bold", cursor: "pointer" }}>🤔 根拠</button>
+                          <button className="no-print btn-hover" onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "4px 8px", fontSize: 16, color: "#0369a1", fontWeight: "bold", cursor: "pointer" }}>🤔 根拠</button>
                         )}
                       </div>
                       {day.isPublicHoliday && <div style={{ fontSize: 18, color: "#ef4444", marginTop: 4 }}>🎌 {day.holidayName}</div>}
@@ -2022,6 +2038,30 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* 🌟 週間一覧用 アラート（注意）モーダル */}
+      {selectedWarningsDay && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedWarningsDay(null)}>
+          <div className="modal-animate" style={{ background: "#fff", padding: 40, borderRadius: 24, width: "90%", maxWidth: 600, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, paddingBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
+              <h3 style={{ margin: 0, fontSize: 32, color: "#0f172a", fontWeight: 800 }}>⚠️ {selectedWarningsDay} の注意・確認事項</h3>
+              <button onClick={() => setSelectedWarningsDay(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 56, height: 56, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 28 }}>✖</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {getDayWarnings(selectedWarningsDay).map((w, i) => (
+                <div key={i} style={{ background: w.type === 'error' ? "#fef2f2" : "#f0f9ff", border: `1px solid ${w.type === 'error' ? "#fca5a5" : "#bae6fd"}`, padding: "16px 20px", borderRadius: 10, fontSize: 22, fontWeight: 700, color: w.type === 'error' ? "#b91c1c" : "#0369a1" }}>
+                  {w.msg}
+                </div>
+              ))}
+              {getDayWarnings(selectedWarningsDay).length === 0 && (
+                <div style={{ textAlign: "center", color: "#64748b", fontSize: 22, padding: "20px 0" }}>現在、注意が必要な項目はありません。</div>
+              )}
+            </div>
+            <div style={{ textAlign: "center", marginTop: 32 }}><button onClick={() => setSelectedWarningsDay(null)} style={btnStyle("#2563eb")}>閉じる</button></div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
