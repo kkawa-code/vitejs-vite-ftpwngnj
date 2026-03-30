@@ -53,6 +53,12 @@ const globalStyle = `
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 24px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   
+  /* Tabs System */
+  .tabs-header { display: flex; gap: 12px; border-bottom: 3px solid #e2e8f0; margin-bottom: 32px; padding: 0 16px; }
+  .tab-btn { background: none; border: none; padding: 16px 32px; font-size: 26px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 4px solid transparent; margin-bottom: -3px; transition: 0.2s; }
+  .tab-btn:hover { color: #3b82f6; }
+  .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
+
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
 
@@ -379,9 +385,10 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
 const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [] }: { section: string, value: string, activeStaff: string[], onChange: (v: string) => void, noTime?: boolean, customOptions?: string[] }) => {
   const members = split(value);
   const isTaiki = section === "待機";
+  const isFuzai = section === "不在";
   const handleAdd = (name: string) => { if (name) { const newName = isTaiki ? `${name}(17:00〜19:00)` : name; onChange(join([...members, newName])); } };
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
-  const handleTimeChange = (idx: number, newTime: string) => { if (noTime) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
+  const handleTimeChange = (idx: number, newTime: string) => { if (noTime && !isFuzai) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
 
   return (
     <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "24px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
@@ -392,12 +399,25 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
           const currentMod = m.substring(coreName.length);
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
           return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime ? "#334155" : "#0369a1"), borderRadius: 20, padding: "14px 20px 14px 22px", fontSize: 22, display: "flex", alignItems: "center", gap: 10, border: `2px solid ${isPlaceholder ? "#fde047" : (noTime ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
+            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 20, padding: "14px 20px 14px 22px", fontSize: 22, display: "flex", alignItems: "center", gap: 10, border: `2px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
               <span style={{ userSelect: "none" }}>{coreName}</span>
-              {!noTime && (
+              {(!noTime || isFuzai) && (
                 <select value={currentMod} onChange={(e) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 22, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 28px 0 8px" }}>
-                  <option value="">終日</option>{!isTaiki && <option value="(AM)">AM</option>}{!isTaiki && <option value="(PM)">PM</option>}
-                  {isTaiki ? (<><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></>) : (<>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>)}
+                  {isFuzai ? (
+                    <>
+                      <option value="">全休</option>
+                      <option value="(AM)">AM休</option>
+                      <option value="(PM)">PM休</option>
+                    </>
+                  ) : isTaiki ? (
+                    <><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></>
+                  ) : (
+                    <>
+                      <option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>
+                      {currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}
+                      {TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}
+                    </>
+                  )}
                 </select>
               )}
               <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 10, fontSize: 24 }}>✖</span>
@@ -451,6 +471,15 @@ class AutoAssigner {
       this.log(`🎌 祝日（休診日）のため、全ての配置をスキップしました`);
       return { ...this.day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])), logInfo: this.logInfo };
     }
+
+    // 冪等性の担保: 自動割当前に、固定枠（プレースホルダー）以外の一般配置をリセットする
+    ROOM_SECTIONS.forEach(sec => {
+      const current = split(this.dayCells[sec]);
+      this.dayCells[sec] = join(current.filter(m => ROLE_PLACEHOLDERS.includes(extractStaffName(m))));
+    });
+    this.dayCells["昼当番"] = "";
+    this.dayCells["受付ヘルプ"] = "";
+    this.dayCells["待機"] = "";
 
     this.buildBlockMap(); this.applyDailyAdditions(); this.evaluateEmergencies(); this.initCounts(); this.cleanUpDayCells();
     this.prepareAvailability(); this.assignRooms(); this.processPostTasks();
@@ -919,13 +948,6 @@ class AutoAssigner {
       }
     });
 
-    let helpMembers: string[] = [];
-    const tempAvailCountForHelp = this.ctx.activeGeneralStaff.filter((s: string) => this.blockMap.get(s) !== 'ALL').length;
-    if (tempAvailCountForHelp <= (this.ctx.customRules.helpThreshold ?? 17)) {
-      helpMembers = [...split(this.dayCells["RI"]).map(extractStaffName)];
-      if (split(this.dayCells["CT"]).length >= 4) { helpMembers.push(extractStaffName(split(this.dayCells["CT"])[split(this.dayCells["CT"]).length - 1])); }
-    }
-
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
       if (!rule.section || !rule.lateTime || !rule.dayEndTime) return;
       if (this.skipSections.includes(rule.section)) return;
@@ -1082,9 +1104,11 @@ class AutoAssigner {
 
 // ===================== 🌟 メインコンポーネント =====================
 export default function App() {
+  const [activeTab, setActiveTab] = useState<'calendar' | 'stats' | 'rules'>('calendar');
   const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { const saved = localStorage.getItem(KEY_ALL_DAYS); if (saved) return JSON.parse(saved); } catch {} return {}; });
   const [assignLogs, setAssignLogs] = useState<Record<string, string[]>>({});
   const [selectedLogDay, setSelectedLogDay] = useState<string | null>(null);
+  const [selectedErrorDay, setSelectedErrorDay] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
@@ -1206,6 +1230,24 @@ export default function App() {
     });
   };
 
+  const updateDay = (k: string, v: string) => { 
+    setAllDaysWithHistory((prev: any) => {
+      const nextState = { ...prev, [cur.id]: { ...(prev[cur.id] || cur.cells), [k]: v } };
+      
+      // 改善点：当直入り連動
+      if (k === "入り") {
+        const curIdx = days.findIndex(d => d.id === cur.id);
+        if (curIdx >= 0 && curIdx < days.length - 1) {
+          const nextDayId = days[curIdx + 1].id;
+          const nextDayCells = prev[nextDayId] || days[curIdx + 1].cells;
+          const currentAke = split(nextDayCells["明け"]).filter(m => !split(v).includes(m));
+          nextState[nextDayId] = { ...nextDayCells, "明け": join([...currentAke, ...split(v)]) };
+        }
+      }
+      return nextState;
+    });
+  };
+
   const handleAutoOne = () => {
     if(!cur || cur.isPublicHoliday) return;
     setAllDaysWithHistory((prev: any) => {
@@ -1244,7 +1286,6 @@ export default function App() {
   };
 
   const handleUndo = () => { if (history.length > 0) { const last = history[history.length - 1]; setAllDays(last); setHistory(h => h.slice(0, -1)); } };
-  const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...(prev[cur.id] || cur.cells), [k]: v } })); };
   const updateMonthly = (k: string, v: string) => { setMonthlyAssign(prev => ({ ...prev, [k]: v })); };
   const updateRule = (type: keyof CustomRules, idx: number, key: string, val: any) => { setCustomRules(r => { const arr = [...(r[type] as any[])]; arr[idx] = { ...arr[idx], [key]: val }; return { ...r, [type]: arr }; }); };
   const removeRule = (type: keyof CustomRules, idx: number) => { setCustomRules(r => { const arr = [...(r[type] as any[])]; arr.splice(idx, 1); return { ...r, [type]: arr }; }); };
@@ -1340,25 +1381,207 @@ export default function App() {
         </div>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 32, padding: "28px 40px" }}>
-        <details>
-          <summary style={{ fontWeight: 800, color: "#be185d", fontSize: 26, display: "flex", alignItems: "center", gap: 12 }}>
-            📱 スマホ連携（テキストコピー）
-          </summary>
-          <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
-            <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, justifyContent: "center" }}>📋 コピー</button>
-            <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 2, padding: "20px 24px", fontSize: 24, borderRadius: 12, border: "2px solid #f9a8d4" }} />
-            <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1, justifyContent: "center" }}>✨ 復元</button>
-          </div>
-        </details>
+      <div className="tabs-header no-print">
+        <button className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>📅 週間予定表</button>
+        <button className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`} onClick={() => setActiveTab('stats')}>📊 月間集計</button>
+        <button className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`} onClick={() => setActiveTab('rules')}>⚙️ ルール・名簿設定</button>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 32 }}>
-        <details>
-          <summary style={{ fontWeight: 800, color: "#0f766e", fontSize: 28, display: "flex", alignItems: "center", gap: 12 }}>
-            ⚙️ スタッフ名簿・特殊ルール
-          </summary>
-          <div style={{ marginTop: 24, display: "grid", gap: 32, paddingTop: 32, borderTop: "2px dashed #e2e8f0" }}>
+      {/* ===================== 📅 カレンダー タブ ===================== */}
+      <div style={{ display: activeTab === 'calendar' ? 'block' : 'none' }}>
+        <div className="print-area" style={{ ...panelStyle(), marginBottom: 32, padding: "36px 24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+            <h3 style={{ margin: 0, fontSize: 32, fontWeight: 800 }}>週間一覧</h3>
+            <div className="no-print"><WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} /></div>
+          </div>
+          <div className="scroll-container" style={{ borderRadius: 12, border: "2px solid #e2e8f0" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400, background: "#fff" }}>
+              <thead style={{ position: "sticky", top: 0, zIndex: 20 }}>
+                <tr>
+                  <th style={{...cellStyle(true, false, false, true), borderRight: "3px solid #e2e8f0", borderBottom: "3px solid #e2e8f0"}}>区分</th>
+                  {days.map(day => {
+                    const dayWarnings = getDayWarnings(day.id);
+                    const errorCount = dayWarnings.filter(w => w.type === 'error').length;
+                    const alertCount = dayWarnings.filter(w => w.type === 'alert').length;
+                    return (
+                      <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
+                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                          {day.label}
+                          {/* 改善点: エラークリックで詳細表示 */}
+                          {errorCount > 0 && <div onClick={(e) => { e.stopPropagation(); setSelectedErrorDay(day.id); }} style={{ background: "#fef2f2", border: "2px solid #ef4444", color: "#ef4444", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold", cursor: "pointer" }}>🚨 エラー {errorCount}</div>}
+                          {errorCount === 0 && alertCount > 0 && <div onClick={(e) => { e.stopPropagation(); setSelectedErrorDay(day.id); }} style={{ background: "#fffbeb", border: "2px solid #f59e0b", color: "#b45309", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold", cursor: "pointer" }}>⚠️ 注意 {alertCount}</div>}
+                          {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && (
+                            <button className="no-print" onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "4px 8px", fontSize: 16, color: "#0369a1", fontWeight: "bold", cursor: "pointer" }}>🤔 根拠</button>
+                          )}
+                        </div>
+                        {day.isPublicHoliday && <div style={{ fontSize: 18, color: "#ef4444", marginTop: 4 }}>🎌 {day.holidayName}</div>}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {SECTIONS.map((section, sIdx) => (
+                  <tr key={section}>
+                    <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "3px solid #e2e8f0"}}>{section}</td>
+                    {days.map((day, dIdx) => {
+                      const currentMems = split(day.cells[section]);
+                      const prevDayId = dIdx > 0 ? days[dIdx-1].id : null;
+                      const prevMems = prevDayId ? split(allDays[prevDayId]?.[section] || days[dIdx-1].cells[section] || "").map(extractStaffName) : [];
+
+                      return (
+                        <td key={day.id + section} style={cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1)}>
+                          {!day.isPublicHoliday && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                              {currentMems.map((m, mIdx) => {
+                                // 改善点: 連日アサインのハイライト
+                                const isConsecutive = WORK_SECTIONS.includes(section) && prevMems.includes(extractStaffName(m));
+                                return (
+                                  <span key={mIdx} style={{ color: isConsecutive ? "#ef4444" : "inherit", fontWeight: isConsecutive ? 900 : "inherit" }}>
+                                    {m}{mIdx < currentMems.length - 1 ? "、" : ""}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="no-print" style={{ ...panelStyle() }}>
+          <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", background: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(4px)", paddingBottom: 16, borderBottom: "2px solid #e2e8f0" }}>
+            <div style={{ display: "flex", gap: 12 }}>
+              {days.map(d => (
+                <button key={d.id} onClick={() => setSel(d.id)} style={{ padding: "16px 28px", borderRadius: 12, border: "none", background: d.id === sel ? "#2563eb" : "#fff", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: 800, fontSize: 24, cursor: "pointer", boxShadow: d.id === sel ? "0 4px 6px rgba(0,0,0,0.1)" : "0 2px 4px rgba(0,0,0,0.05)" }}>{d.label}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 16 }}>
+              <button className="btn-hover" onClick={handleAutoOne} style={{...btnStyle("#10b981"), padding: "16px 24px", fontSize: 22}}>✨ 1日自動割当</button>
+              <button className="btn-hover" onClick={handleAutoAll} style={{...btnStyle("#0ea5e9"), padding: "16px 24px", fontSize: 22}}>⚡ 全日程自動割当</button>
+              <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "2px solid #cbd5e1", padding: "16px 24px", fontSize: 22 }} disabled={cur.isPublicHoliday}>📋 昨日をコピー</button>
+              <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), padding: "16px 24px", fontSize: 22}}>↩️ 戻る</button>
+            </div>
+          </div>
+
+          {cur.isPublicHoliday ? (
+            <div style={{ padding: 80, textAlign: "center", background: "#f8fafc", borderRadius: 20, border: "3px dashed #cbd5e1", marginTop: 32 }}>
+              <h3 style={{ color: "#64748b", fontSize: 32 }}>🎌 この日は休診日です</h3>
+            </div>
+          ) : (
+            <div style={{ marginTop: 32 }}>
+              {warnings.length > 0 && (
+                <div style={{ background: "#fffbeb", border: "2px dashed #fcd34d", padding: 32, borderRadius: 16, display: "flex", gap: 24, marginBottom: 40 }}>
+                  <div style={{ fontSize: 40 }}>💡</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                    {warnings.map((w, i) => (
+                      <div key={i} style={{ background: w.type === 'error' ? "#fef2f2" : "#f0f9ff", border: `1px solid ${w.type === 'error' ? "#fca5a5" : "#bae6fd"}`, padding: "12px 20px", borderRadius: 10, fontSize: 22, fontWeight: 700, color: w.type === 'error' ? "#b91c1c" : "#0369a1" }}>{w.msg}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {RENDER_GROUPS.map(group => (
+                <div key={group.title} style={{ marginBottom: 48 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 16, borderBottom: "3px solid #e2e8f0" }}>
+                    <h4 style={{ fontSize: 30, fontWeight: 800, borderLeft: `10px solid ${group.color}`, paddingLeft: 16, margin: 0 }}>{group.title}</h4>
+                    {group.title === "休務・夜勤" && (
+                      <div style={{display: "flex", gap: 16}}>
+                        <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
+                        <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                      </div>
+                    )}
+                    {group.title === "モダリティ" && (
+                      <div style={{display: "flex", gap: 16}}>
+                        <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務1日クリア</button>
+                        <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務週間クリア</button>
+                      </div>
+                    )}
+                    {group.title === "待機・その他" && (
+                      <div style={{display: "flex", gap: 16}}>
+                        <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
+                        <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 24 }}>
+                    {group.sections.map(s => {
+                      const noTimeSections = ["明け","入り","不在","土日休日代休","昼当番"];
+                      return <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getAvailableStaffForDay(s, cur.cells)} onChange={v => updateDay(s, v)} noTime={noTimeSections.includes(s)} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} />
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ===================== 📊 マトリックス タブ ===================== */}
+      <div className="no-print" style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
+        <div style={{ ...panelStyle(), marginBottom: 32 }}>
+          <h3 style={{ fontWeight: 800, color: "#3b82f6", fontSize: 28, marginTop: 0 }}>配置マトリックス（月間集計）</h3>
+          <div style={{ marginTop: 24, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
+            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
+              <thead>
+                <tr>
+                  <th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 800 }}>スタッフ</th>
+                  {ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 800 }}>{r}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {allStaff.filter(s => activeGeneralStaff.includes(s)).map((staff, sIdx) => {
+                  const isZebra = sIdx % 2 === 1;
+                  const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
+                  return (
+                    <tr key={staff} className="calendar-row">
+                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
+                      {ROOM_SECTIONS.map(r => {
+                        const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 };
+                        let bg = rowBg; let color = "#334155";
+                        if (["CT", "MRI"].includes(r)) {
+                          if (stat.total > 0) { bg = `rgba(59, 130, 246, ${Math.min(0.1 + stat.total * 0.15, 0.9)})`; if(stat.total >= 3) color = "#fff"; }
+                          else if (isMonthlyMainStaff(r, staff, monthlyAssign)) bg = "#fef08a";
+                        }
+                        return (
+                          <td key={r} style={{ padding: 8, background: bg, color: color, fontWeight: stat.total > 0 ? 800 : 500, borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                              {stat.total > 0 ? <span style={{fontSize:20}}>{stat.total}</span> : <span style={{ width: "20px" }}></span>}
+                              {stat.late > 0 && <span style={{ fontSize: "14px", background: "#fef08a", color: "#b45309", padding: "2px 6px", borderRadius: "12px", border: "1px solid #fde047" }}>遅 {stat.late}</span>}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* ===================== ⚙️ ルール タブ ===================== */}
+      <div className="no-print" style={{ display: activeTab === 'rules' ? 'block' : 'none' }}>
+        <div style={{ ...panelStyle(), marginBottom: 32, padding: "28px 40px" }}>
+          <details>
+            <summary style={{ fontWeight: 800, color: "#be185d", fontSize: 26, display: "flex", alignItems: "center", gap: 12 }}>📱 スマホ連携（テキストコピー）</summary>
+            <div style={{ display: "flex", gap: 16, marginTop: 24 }}>
+              <button className="btn-hover" onClick={handleCopyToClipboard} style={{ ...btnStyle("#db2777"), flex: 1, justifyContent: "center" }}>📋 コピー</button>
+              <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 2, padding: "20px 24px", fontSize: 24, borderRadius: 12, border: "2px solid #f9a8d4" }} />
+              <button className="btn-hover" onClick={handleTextImport} style={{ ...btnStyle("#be185d"), flex: 1, justifyContent: "center" }}>✨ 復元</button>
+            </div>
+          </details>
+        </div>
+
+        <div style={{ ...panelStyle(), marginBottom: 32 }}>
+          <h3 style={{ fontWeight: 800, color: "#0f766e", fontSize: 28, marginTop: 0 }}>⚙️ スタッフ名簿・特殊ルール</h3>
+          <div style={{ marginTop: 24, display: "grid", gap: 32 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 32 }}>
               <div><label style={{fontWeight:800, color:"#475569", marginBottom:12, display:"block"}}>一般スタッフ</label><textarea value={customRules.staffList} onChange={e=>setCustomRules({...customRules, staffList:e.target.value})} placeholder="例: 山田(やまだ), 佐藤(さとう)" style={{width:"100%", padding:20, border:"2px solid #cbd5e1", borderRadius:12, fontSize:24, minHeight:140}}/></div>
               <div><label style={{fontWeight:800, color:"#475569", marginBottom:12, display:"block"}}>受付スタッフ</label><textarea value={customRules.receptionStaffList} onChange={e=>setCustomRules({...customRules, receptionStaffList:e.target.value})} placeholder="例: 伊藤(いとう), 鈴木(すずき)" style={{width:"100%", padding:20, border:"2px solid #cbd5e1", borderRadius:12, fontSize:24, minHeight:140}}/></div>
@@ -1440,7 +1663,8 @@ export default function App() {
               ))}
               <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("kenmuPairs", { s1: "", s2: "" })}>＋ ペアを追加</button>
 
-              <h5 style={{ fontSize: 24, color: "#047857", marginTop: 32, marginBottom: 12 }}>■ 基本兼務（セット配置）</h5>
+              {/* 改善点: 左から優先の注意書き追加 */}
+              <h5 style={{ fontSize: 24, color: "#047857", marginTop: 32, marginBottom: 12 }}>■ 基本兼務（セット配置）<span style={{fontSize: 18, color: "#065f46", fontWeight: "normal", marginLeft: 16}}>※ 左に書いた部屋の担当者から優先して兼務されます</span></h5>
               {(customRules.linkedRooms || []).map((rule: any, idx: number, arr: any[]) => (
                   <div key={idx} style={{ background: "#fff", padding: "20px 24px", border: "2px solid #a7f3d0", borderRadius: 12, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
                     <div style={{ flex: 1 }}>
@@ -1710,165 +1934,10 @@ export default function App() {
             </div>
 
           </div>
-        </details>
-      </div>
-
-      <div className="no-print" style={{ ...panelStyle(), marginBottom: 32 }}>
-        <details>
-          <summary style={{ fontWeight: 800, color: "#3b82f6", fontSize: 28 }}>📊 配置マトリックス（月間集計）</summary>
-          <div style={{ marginTop: 24, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
-            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "18px", textAlign: "center", minWidth: 1000 }}>
-              <thead>
-                <tr>
-                  <th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 800 }}>スタッフ</th>
-                  {ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: 12, borderRight: "1px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 800 }}>{r}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {allStaff.filter(s => activeGeneralStaff.includes(s)).map((staff, sIdx) => {
-                  const isZebra = sIdx % 2 === 1;
-                  const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
-                  return (
-                    <tr key={staff} className="calendar-row">
-                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 800, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
-                      {ROOM_SECTIONS.map(r => {
-                        const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 };
-                        let bg = rowBg; let color = "#334155";
-                        if (["CT", "MRI"].includes(r)) {
-                          if (stat.total > 0) { bg = `rgba(59, 130, 246, ${Math.min(0.1 + stat.total * 0.15, 0.9)})`; if(stat.total >= 3) color = "#fff"; }
-                          else if (isMonthlyMainStaff(r, staff, monthlyAssign)) bg = "#fef08a";
-                        }
-                        return (
-                          <td key={r} style={{ padding: 8, background: bg, color: color, fontWeight: stat.total > 0 ? 800 : 500, borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                              {stat.total > 0 ? <span style={{fontSize:20}}>{stat.total}</span> : <span style={{ width: "20px" }}></span>}
-                              {stat.late > 0 && <span style={{ fontSize: "14px", background: "#fef08a", color: "#b45309", padding: "2px 6px", borderRadius: "12px", border: "1px solid #fde047" }}>遅 {stat.late}</span>}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      </div>
-
-      <div className="print-area" style={{ ...panelStyle(), marginBottom: 32, padding: "36px 24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h3 style={{ margin: 0, fontSize: 32, fontWeight: 800 }}>週間一覧</h3>
-          <div className="no-print"><WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} /></div>
-        </div>
-        <div className="scroll-container" style={{ borderRadius: 12, border: "2px solid #e2e8f0" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400, background: "#fff" }}>
-            <thead style={{ position: "sticky", top: 0, zIndex: 20 }}>
-              <tr>
-                <th style={{...cellStyle(true, false, false, true), borderRight: "3px solid #e2e8f0", borderBottom: "3px solid #e2e8f0"}}>区分</th>
-                {days.map(day => {
-                  const dayWarnings = getDayWarnings(day.id);
-                  const errorCount = dayWarnings.filter(w => w.type === 'error').length;
-                  const alertCount = dayWarnings.filter(w => w.type === 'alert').length;
-                  return (
-                    <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
-                      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                        {day.label}
-                        {errorCount > 0 && <div style={{ background: "#fef2f2", border: "2px solid #ef4444", color: "#ef4444", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>🚨 エラー {errorCount}</div>}
-                        {errorCount === 0 && alertCount > 0 && <div style={{ background: "#fffbeb", border: "2px solid #f59e0b", color: "#b45309", borderRadius: "12px", padding: "2px 8px", fontSize: 16, display: "flex", alignItems: "center", gap: 4, fontWeight: "bold" }}>⚠️ 注意 {alertCount}</div>}
-                        {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && (
-                          <button className="no-print" onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "4px 8px", fontSize: 16, color: "#0369a1", fontWeight: "bold", cursor: "pointer" }}>🤔 根拠</button>
-                        )}
-                      </div>
-                      {day.isPublicHoliday && <div style={{ fontSize: 18, color: "#ef4444", marginTop: 4 }}>🎌 {day.holidayName}</div>}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {SECTIONS.map((section, sIdx) => (
-                <tr key={section}>
-                  <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "3px solid #e2e8f0"}}>{section}</td>
-                  {days.map(day => (
-                    <td key={day.id + section} style={cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1)}>
-                      {!day.isPublicHoliday && split(day.cells[section]).join("、")}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
 
-      <div className="no-print" style={{ ...panelStyle() }}>
-        <div className="scroll-container hide-scrollbar sticky-header" style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "center", background: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(4px)", paddingBottom: 16, borderBottom: "2px solid #e2e8f0" }}>
-          <div style={{ display: "flex", gap: 12 }}>
-            {days.map(d => (
-              <button key={d.id} onClick={() => setSel(d.id)} style={{ padding: "16px 28px", borderRadius: 12, border: "none", background: d.id === sel ? "#2563eb" : "#fff", color: d.id === sel ? "#fff" : (d.isPublicHoliday ? "#ef4444" : "#64748b"), fontWeight: 800, fontSize: 24, cursor: "pointer", boxShadow: d.id === sel ? "0 4px 6px rgba(0,0,0,0.1)" : "0 2px 4px rgba(0,0,0,0.05)" }}>{d.label}</button>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 16 }}>
-            <button className="btn-hover" onClick={handleAutoOne} style={{...btnStyle("#10b981"), padding: "16px 24px", fontSize: 22}}>✨ 1日自動割当</button>
-            <button className="btn-hover" onClick={handleAutoAll} style={{...btnStyle("#0ea5e9"), padding: "16px 24px", fontSize: 22}}>⚡ 全日程自動割当</button>
-            <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "2px solid #cbd5e1", padding: "16px 24px", fontSize: 22 }} disabled={cur.isPublicHoliday}>📋 昨日をコピー</button>
-            <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), padding: "16px 24px", fontSize: 22}}>↩️ 戻る</button>
-          </div>
-        </div>
-
-        {cur.isPublicHoliday ? (
-          <div style={{ padding: 80, textAlign: "center", background: "#f8fafc", borderRadius: 20, border: "3px dashed #cbd5e1", marginTop: 32 }}>
-            <h3 style={{ color: "#64748b", fontSize: 32 }}>🎌 この日は休診日です</h3>
-          </div>
-        ) : (
-          <div style={{ marginTop: 32 }}>
-            {warnings.length > 0 && (
-              <div style={{ background: "#fffbeb", border: "2px dashed #fcd34d", padding: 32, borderRadius: 16, display: "flex", gap: 24, marginBottom: 40 }}>
-                <div style={{ fontSize: 40 }}>💡</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                  {warnings.map((w, i) => (
-                    <div key={i} style={{ background: w.type === 'error' ? "#fef2f2" : "#f0f9ff", border: `1px solid ${w.type === 'error' ? "#fca5a5" : "#bae6fd"}`, padding: "12px 20px", borderRadius: 10, fontSize: 22, fontWeight: 700, color: w.type === 'error' ? "#b91c1c" : "#0369a1" }}>{w.msg}</div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {RENDER_GROUPS.map(group => (
-              <div key={group.title} style={{ marginBottom: 48 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 16, borderBottom: "3px solid #e2e8f0" }}>
-                  <h4 style={{ fontSize: 30, fontWeight: 800, borderLeft: `10px solid ${group.color}`, paddingLeft: 16, margin: 0 }}>{group.title}</h4>
-                  {group.title === "休務・夜勤" && (
-                    <div style={{display: "flex", gap: 16}}>
-                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
-                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
-                    </div>
-                  )}
-                  {group.title === "モダリティ" && (
-                    <div style={{display: "flex", gap: 16}}>
-                      <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務1日クリア</button>
-                      <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務週間クリア</button>
-                    </div>
-                  )}
-                  {group.title === "待機・その他" && (
-                    <div style={{display: "flex", gap: 16}}>
-                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
-                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "2px solid #cbd5e1", borderRadius: 10, padding: "10px 20px", fontSize: 20, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 24 }}>
-                  {group.sections.map(s => {
-                    const noTimeSections = ["明け","入り","不在","土日休日代休","昼当番"];
-                    return <SectionEditor key={s} section={s} value={cur.cells[s] || ""} activeStaff={getAvailableStaffForDay(s, cur.cells)} onChange={v => updateDay(s, v)} noTime={noTimeSections.includes(s)} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} />
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+      {/* ===================== モーダル類 ===================== */}
       {selectedStaffForStats && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedStaffForStats(null)}>
           <div className="modal-animate" style={{ background: "#fff", padding: 40, borderRadius: 24, width: "90%", maxWidth: 600, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }} onClick={e => e.stopPropagation()}>
@@ -1916,6 +1985,26 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {selectedErrorDay && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setSelectedErrorDay(null)}>
+          <div className="modal-animate" style={{ background: "#fff", padding: 40, borderRadius: 24, width: "90%", maxWidth: 800, maxHeight: "80vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, paddingBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
+              <h3 style={{ margin: 0, fontSize: 32, color: "#0f172a", fontWeight: 800 }}>🚨 {selectedErrorDay} の警告詳細</h3>
+              <button onClick={() => setSelectedErrorDay(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 56, height: 56, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 28 }}>✖</button>
+            </div>
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {getDayWarnings(selectedErrorDay).map((w, i) => (
+                <li key={i} style={{ padding: "16px 20px", marginBottom: "12px", background: w.type === 'error' ? "#fef2f2" : "#f0f9ff", border: `2px solid ${w.type === 'error' ? "#fca5a5" : "#bae6fd"}`, borderRadius: "12px", fontSize: 22, fontWeight: 700, color: w.type === 'error' ? "#b91c1c" : "#0369a1" }}>
+                  {w.msg}
+                </li>
+              ))}
+            </ul>
+            <div style={{ textAlign: "center", marginTop: 32 }}><button onClick={() => setSelectedErrorDay(null)} style={btnStyle("#2563eb")}>閉じる</button></div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
