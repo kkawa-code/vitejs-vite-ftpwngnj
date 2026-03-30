@@ -174,9 +174,9 @@ const DEFAULT_RULES: CustomRules = {
   linkedRooms: []
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v250"; 
-const KEY_MONTHLY = "shifto_monthly_v250"; 
-const KEY_RULES = "shifto_rules_v250";
+const KEY_ALL_DAYS = "shifto_alldays_v260"; 
+const KEY_MONTHLY = "shifto_monthly_v260"; 
+const KEY_RULES = "shifto_rules_v260";
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -1273,8 +1273,8 @@ export default function App() {
       const baseDay = { ...days[idx], cells: nextAll[days[idx].id] || days[idx].cells };
       const prevDayObj = idx > 0 ? { ...days[idx-1], cells: nextAll[days[idx-1].id] || days[idx-1].cells } : null;
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
-      const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
-      const res: DayData = worker.execute();
+      const worker = new AutoAssigner(baseDay, prevDayObj, days.slice(0, idx).map(d => ({...d, cells: nextAll[d.id] || d.cells})), ctx);
+      const res = worker.execute();
       nextAll[res.id] = res.cells;
       setAssignLogs(logState => ({...logState, [res.id]: res.logInfo || []}));
       return nextAll;
@@ -1290,8 +1290,8 @@ export default function App() {
       const ctx: AutoAssignContext = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
       for (let i = 0; i < 5; i++) {
         const baseDay = { ...days[i], cells: nextAll[days[i].id] || days[i].cells };
-        const worker: AutoAssigner = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
-        const res: DayData = worker.execute();
+        const worker = new AutoAssigner(baseDay, prevDayObj, tempDays, ctx);
+        const res = worker.execute();
         nextAll[res.id] = res.cells;
         newLogs[res.id] = res.logInfo || [];
         prevDayObj = res;
@@ -1363,7 +1363,24 @@ export default function App() {
     reader.onload = (event: any) => {
       try {
         const dataObj = JSON.parse(event.target.result);
-        if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(dataObj.customRules); alert("データを復元しました！"); } else { alert("正しいデータ形式ではありません。"); }
+        if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { 
+          setAllDaysWithHistory(dataObj.allDays); 
+          setMonthlyAssign(dataObj.monthlyAssign); 
+          setCustomRules(dataObj.customRules); 
+          
+          const dates = Object.keys(dataObj.allDays).sort();
+          if (dates.length > 0) {
+            const firstDate = dates[0];
+            const dObj = new Date(firstDate + "T12:00:00");
+            const day = dObj.getDay();
+            const diff = dObj.getDate() - day + (day === 0 ? -6 : 1);
+            const mon = new Date(dObj.getTime());
+            mon.setDate(diff);
+            setTargetMonday(`${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`);
+            setSel(firstDate);
+          }
+          alert("データを復元しました！"); 
+        } else { alert("正しいデータ形式ではありません。"); }
       } catch (err) { alert("読み込みに失敗しました。"); }
     };
     reader.readAsText(file); e.target.value = "";
@@ -1378,6 +1395,7 @@ export default function App() {
     if(!importText) return;
     try {
       let cleanText = importText.trim().replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+      cleanText = cleanText.replace(/[\r\n]+/g, ""); 
       const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
       if (jsonMatch) cleanText = jsonMatch[0];
       
@@ -1387,7 +1405,20 @@ export default function App() {
         if (dataObj.monthlyAssign) setMonthlyAssign({ ...DEFAULT_MONTHLY_ASSIGN, ...dataObj.monthlyAssign }); 
         if (dataObj.customRules) setCustomRules({ ...DEFAULT_RULES, ...dataObj.customRules }); 
         else if (dataObj.rules) setCustomRules({ ...DEFAULT_RULES, ...dataObj.rules });
-        alert("テキストからデータを復元しました！"); 
+        
+        const dates = Object.keys(dataObj.allDays).sort();
+        if (dates.length > 0) {
+          const firstDate = dates[0];
+          const dObj = new Date(firstDate + "T12:00:00");
+          const day = dObj.getDay();
+          const diff = dObj.getDate() - day + (day === 0 ? -6 : 1);
+          const mon = new Date(dObj.getTime());
+          mon.setDate(diff);
+          setTargetMonday(`${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`);
+          setSel(firstDate);
+        }
+        
+        alert("テキストからデータを復元しました！\n（該当する週のカレンダーに自動移動しました）"); 
         setImportText(""); 
       } else { 
         alert("正しいデータ形式ではありません。（allDaysが見つかりません）"); 
@@ -1842,8 +1873,8 @@ export default function App() {
                 <th style={{...cellStyle(true, false, false, true), borderRight: "3px solid #e2e8f0", borderBottom: "3px solid #e2e8f0"}}>区分</th>
                 {days.map(day => {
                   const dayWarnings = getDayWarnings(day.id);
-                  const errorCount = dayWarnings.filter(w => w.type === 'error').length;
-                  const alertCount = dayWarnings.filter(w => w.type === 'alert').length;
+                  const errorCount = dayWarnings.filter((w: {type: string}) => w.type === 'error').length;
+                  const alertCount = dayWarnings.filter((w: {type: string}) => w.type === 'alert').length;
                   return (
                     <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "3px solid #e2e8f0", cursor: "pointer"}}>
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
