@@ -107,7 +107,7 @@ const DEFAULT_RULES: CustomRules = {
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v280"; const KEY_MONTHLY = "shifto_monthly_v280"; const KEY_RULES = "shifto_rules_v280";
+const KEY_ALL_DAYS = "shifto_alldays_v290"; const KEY_MONTHLY = "shifto_monthly_v290"; const KEY_RULES = "shifto_rules_v290";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -308,7 +308,6 @@ class AutoAssigner {
     }
     if (this.day.isPublicHoliday) { this.log(`🎌 祝日（休診日）のためスキップしました`); return { ...this.day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])), logInfo: this.logInfo }; }
 
-    // 【通常割当】全員リセット
     if (!this.isSmartFix) {
       ROOM_SECTIONS.forEach(sec => { this.dayCells[sec] = join(split(this.dayCells[sec]).filter(m => ROLE_PLACEHOLDERS.includes(extractStaffName(m)))); });
       this.dayCells["昼当番"] = ""; this.dayCells["受付ヘルプ"] = ""; this.dayCells["待機"] = "";
@@ -316,7 +315,6 @@ class AutoAssigner {
 
     this.buildBlockMap();
     
-    // 【欠員補充】: 休みになった人を現在の配置から除外し、その分だけ穴を空ける
     if (this.isSmartFix) {
       WORK_SECTIONS.forEach(sec => {
         let current = split(this.dayCells[sec]);
@@ -335,7 +333,6 @@ class AutoAssigner {
     this.applyDailyAdditions(); this.evaluateEmergencies(); this.initCounts(); this.cleanUpDayCells();
     this.prepareAvailability();
 
-    // 欠員補充モード時の超シンプル割付
     if (this.isSmartFix) {
       this.log(`⚠️ 欠員補充モード：現在の配置を維持し、空き枠にのみフリーのスタッフを補充します`);
       const priority = this.ctx.customRules.priorityRooms || SECTIONS;
@@ -489,7 +486,6 @@ class AutoAssigner {
          if (this.isForbidden(name, section)) return { hard: true, msg: "担当不可設定" };
          const b = this.blockMap.get(name);
          
-         // ドミノ倒し防止
          if (needTag && b === 'NONE') return { hard: true, msg: "半端枠への終日スタッフ割当禁止(連鎖防止)" };
 
          if (b === 'ALL') return { hard: true, msg: "全日ブロック" };
@@ -532,16 +528,13 @@ class AutoAssigner {
              if (mainStaff.includes(a)) scoreA += 10000; else if (subPrioStaff.includes(a)) scoreA += 5000; else if (subStaff.includes(a)) scoreA += 2000;
              if (mainStaff.includes(b)) scoreB += 10000; else if (subPrioStaff.includes(b)) scoreB += 5000; else if (subStaff.includes(b)) scoreB += 2000;
              
-             // ★ MRI/CT均等化を強化
              const roomCountWeight = (section === "MRI" || section === "CT") ? 200 : 100;
              scoreA -= (this.roomCounts[a]?.[section] || 0) * roomCountWeight; 
              scoreB -= (this.roomCounts[b]?.[section] || 0) * roomCountWeight;
 
-             // 前日と同じ部屋の人にはペナルティ（固定化防止）
              if (prevDayMembers.includes(a)) scoreA -= 500;
              if (prevDayMembers.includes(b)) scoreB -= 500;
              
-             // ★ ポータブルの週複数回ペナルティ
              if (section === "ポータブル") {
                  let portableCountA = 0; let portableCountB = 0;
                  this.pastDays.forEach(pd => {
@@ -553,7 +546,6 @@ class AutoAssigner {
                  if (portableCountB > 0) scoreB -= 1000 * portableCountB;
              }
 
-             // ★ 半休者の兼務連鎖ペナルティ
              const linkedSources = (this.ctx.customRules.linkedRooms || []).flatMap((r: any) => split(r.sources));
              const kenmuSections = (this.ctx.customRules.kenmuPairs || []).flatMap((r: any) => [r.s1, r.s2]);
              const isChainSource = linkedSources.includes(section) || kenmuSections.includes(section);
@@ -721,7 +713,6 @@ class AutoAssigner {
           if (isFixedToSource) continue;
           if (targetCores.includes(core)) continue; if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; if (this.isForbidden(core, targetRoom)) continue;
           
-          // ★ 絶対NGペアのチェック
           if (this.hasNGPair(core, targetCores, false)) continue;
 
           let pushStr = m; let curAm = 0; let curPm = 0;
@@ -769,7 +760,6 @@ class AutoAssigner {
           const core = extractStaffName(m);
           if (isFixedToAny(core)) return;
           
-          // ★ 絶対NGペアのチェック
           if (this.hasNGPair(core, currentMems.map(extractStaffName), false)) return;
 
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
@@ -833,7 +823,6 @@ class AutoAssigner {
          for (const cand of candidates) {
             if (curAm >= targetCap && curPm >= targetCap) break;
 
-            // ★ 絶対NGペアのチェック
             if (this.hasNGPair(cand.core, currentMems.map(extractStaffName), false)) continue;
 
             let pushStr = cand.fullStr;
@@ -887,7 +876,6 @@ class AutoAssigner {
     });
 
     const assignSupportStaff = () => {
-      // ===== ポータブル↔2号室 交換ロジック =====
       const portableRoom = "ポータブル";
       const room2 = "2号室";
       const swapSources = ["1号室", "5号室"];
@@ -908,7 +896,6 @@ class AutoAssigner {
               const core = extractStaffName(m);
               if (ROLE_PLACEHOLDERS.includes(core)) return false;
               
-              // ★ 絶対NGペアのチェック
               if (this.hasNGPair(core, portableMembers.map(extractStaffName), false)) return false;
               if (this.hasNGPair(core, room2Members.map(extractStaffName), false)) return false;
 
@@ -935,7 +922,6 @@ class AutoAssigner {
           }
         }
       }
-      // ===== 交換ロジックここまで =====
 
       const unassignedSupport = availSupport.filter(s => !this.isUsed(s));
       unassignedSupport.forEach(staff => {
@@ -1037,7 +1023,7 @@ class AutoAssigner {
             return true;
           });
           if (cand.length > 0) { 
-            cand = cand.filter(n => !this.hasNGPair(n, helpMems.map(extractStaffName), false)); // ★ 追加
+            cand = cand.filter(n => !this.hasNGPair(n, helpMems.map(extractStaffName), false));
             cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); 
             return cand[0]; 
           }
@@ -1046,11 +1032,11 @@ class AutoAssigner {
         const lunchHelpCandidate = getHelp(lunchCores);
         if (lunchHelpCandidate) { helpMems.push(`${lunchHelpCandidate}(12:15〜13:00)`); this.log(`🛎️ [受付ヘルプ] 昼枠(12:15〜)に ${lunchHelpCandidate} をアサインしました`); }
         const kenzoCores = split(this.dayCells["検像"]).map(extractStaffName);
-        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false)); // ★ 追加
+        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false));
         let picked16 = validKenzo.length > 0 ? validKenzo[0] : null;
         if (!picked16) {
           const excl = lunchHelpCandidate ? [lunchHelpCandidate] : [];
-          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false)); // ★ 追加
+          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false));
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); picked16 = cand[0]; }
         }
         if (picked16) { helpMems.push(`${picked16}(16:00〜)`); this.log(`🛎️ [受付ヘルプ] 夕枠(16:00〜)に ${picked16} をアサインしました`); }
@@ -1226,7 +1212,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.8</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.9</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1392,14 +1378,22 @@ export default function App() {
         {/* 名簿・データ入出力 */}
         <div style={{ ...panelStyle(), marginBottom: 40 }}>
           <h3 style={{ fontSize: 32, fontWeight: 900, marginBottom: 24, color: "#0f766e" }}>👥 スタッフ名簿</h3>
+          
+          <div style={{ background: "#f0fdf4", padding: "16px 24px", borderRadius: 12, border: "2px solid #bbf7d0", marginBottom: 24 }}>
+            <p style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#166534" }}>
+              💡 順番を自動で「50音順」にするため、名前の後にカッコでふりがなをつけてください。<br/>
+              （例： <span style={{ color: "#047857", fontWeight: 900 }}>山田(やまだ)、佐藤(さとう)</span> ）※カッコは半角・全角どちらでもOKです。
+            </p>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
              <div>
-               <label style={{ fontSize: 26, fontWeight: 800, marginBottom: 12, display: "block" }}>一般スタッフ</label>
-               <textarea value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} style={{ width: "100%", height: 160, padding: 24, fontSize: 26, borderRadius: 16, border: "2px solid #cbd5e1" }} />
+               <label style={{ fontSize: 30, fontWeight: 800, marginBottom: 12, display: "block" }}>一般スタッフ</label>
+               <textarea placeholder="例: 山田(やまだ)、佐藤(さとう)" value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} style={{ width: "100%", height: 240, padding: 24, fontSize: 32, lineHeight: 1.5, borderRadius: 16, border: "2px solid #cbd5e1" }} />
              </div>
              <div>
-               <label style={{ fontSize: 26, fontWeight: 800, marginBottom: 12, display: "block" }}>受付スタッフ</label>
-               <textarea value={customRules.receptionStaffList} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} style={{ width: "100%", height: 160, padding: 24, fontSize: 26, borderRadius: 16, border: "2px solid #cbd5e1" }} />
+               <label style={{ fontSize: 30, fontWeight: 800, marginBottom: 12, display: "block" }}>受付スタッフ</label>
+               <textarea placeholder="例: 鈴木(すずき)、高橋(たかはし)" value={customRules.receptionStaffList} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} style={{ width: "100%", height: 240, padding: 24, fontSize: 32, lineHeight: 1.5, borderRadius: 16, border: "2px solid #cbd5e1" }} />
              </div>
           </div>
         </div>
