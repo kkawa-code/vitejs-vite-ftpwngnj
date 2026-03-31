@@ -119,7 +119,7 @@ const DEFAULT_RULES: CustomRules = {
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2120"; const KEY_MONTHLY = "shifto_monthly_v2120"; const KEY_RULES = "shifto_rules_v2120";
+const KEY_ALL_DAYS = "shifto_alldays_v2130"; const KEY_MONTHLY = "shifto_monthly_v2130"; const KEY_RULES = "shifto_rules_v2130";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -266,7 +266,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   const handleTimeChange = (idx: number, newTime: string) => { if (noTime && !isFuzai) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
   return (
     <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "24px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-      <label style={{ fontSize: 32, fontWeight: 800, color: "#475569", marginBottom: 16 }}>{section}</label>
+      <label style={{ fontSize: 28, fontWeight: 800, color: "#475569", marginBottom: 16 }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = extractStaffName(m); const currentMod = m.substring(coreName.length);
@@ -533,7 +533,6 @@ class AutoAssigner {
          if (this.isForbidden(name, section)) return { hard: true, msg: "担当不可設定" };
          const b = this.blockMap.get(name);
          
-         // ドミノ倒し防止
          if (needTag && b === 'NONE') return { hard: true, msg: "半端枠への終日スタッフ割当禁止(連鎖防止)" };
 
          if (b === 'ALL') return { hard: true, msg: "全日ブロック" };
@@ -576,16 +575,13 @@ class AutoAssigner {
              if (mainStaff.includes(a)) scoreA += 10000; else if (subPrioStaff.includes(a)) scoreA += 5000; else if (subStaff.includes(a)) scoreA += 2000;
              if (mainStaff.includes(b)) scoreB += 10000; else if (subPrioStaff.includes(b)) scoreB += 5000; else if (subStaff.includes(b)) scoreB += 2000;
              
-             // ★ MRI/CT均等化を強化
              const roomCountWeight = (section === "MRI" || section === "CT") ? 200 : 100;
              scoreA -= (this.roomCounts[a]?.[section] || 0) * roomCountWeight; 
              scoreB -= (this.roomCounts[b]?.[section] || 0) * roomCountWeight;
 
-             // 前日と同じ部屋の人にはペナルティ（固定化防止）
              if (prevDayMembers.includes(a)) scoreA -= 500;
              if (prevDayMembers.includes(b)) scoreB -= 500;
              
-             // ★ ポータブルの週複数回ペナルティ
              if (section === "ポータブル") {
                  let portableCountA = 0; let portableCountB = 0;
                  this.pastDays.forEach(pd => {
@@ -597,7 +593,6 @@ class AutoAssigner {
                  if (portableCountB > 0) scoreB -= 1000 * portableCountB;
              }
 
-             // ★ 半休者の兼務連鎖ペナルティ
              const linkedSources = (this.ctx.customRules.linkedRooms || []).flatMap((r: any) => split(r.sources));
              const kenmuSections = (this.ctx.customRules.kenmuPairs || []).flatMap((r: any) => [r.s1, r.s2]);
              const isChainSource = linkedSources.includes(section) || kenmuSections.includes(section);
@@ -772,7 +767,6 @@ class AutoAssigner {
         const mmgCore = extractStaffName(currentMmgStr);
         
         if (!ROLE_PLACEHOLDERS.includes(mmgCore)) {
-          // MMG専任であるか（他の部屋に名前がないか）確認
           const isMmgDedicated = !ROOM_SECTIONS.some(r => r !== mmgRoom && split(this.dayCells[r]).map(extractStaffName).includes(mmgCore));
           
           if (isMmgDedicated) {
@@ -781,7 +775,6 @@ class AutoAssigner {
             
             for (const srcRoom of swapSources) {
               const srcMembers = split(this.dayCells[srcRoom]);
-              // CTの場合は4人以上いる時だけ引き抜く
               if (srcRoom === "CT" && srcMembers.reduce((s,m) => s + getStaffAmount(m), 0) < 4) continue;
               
               for (const srcStr of srcMembers) {
@@ -801,7 +794,6 @@ class AutoAssigner {
             
             if (swapCandidateFullStr) {
               const candCore = extractStaffName(swapCandidateFullStr);
-              // MMG専任スタッフをフリーに戻す
               this.dayCells[mmgRoom] = "";
               this.addU(mmgCore, -getStaffAmount(currentMmgStr));
               
@@ -814,7 +806,6 @@ class AutoAssigner {
                 this.blockMap.set(mmgCore, 'NONE');
               }
               
-              // 見つけた人をMMGに兼務として入れる
               this.dayCells[mmgRoom] = swapCandidateFullStr;
               this.addU(candCore, getStaffAmount(swapCandidateFullStr));
               this.log(`🔄 [MMGスマート兼務] ${mmgCore} を専任から外し、一般/CT担当の ${candCore} をMMGと兼務させました`);
@@ -1376,7 +1367,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.12</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.13</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
