@@ -107,7 +107,7 @@ const DEFAULT_RULES: CustomRules = {
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v270"; const KEY_MONTHLY = "shifto_monthly_v270"; const KEY_RULES = "shifto_rules_v270";
+const KEY_ALL_DAYS = "shifto_alldays_v280"; const KEY_MONTHLY = "shifto_monthly_v280"; const KEY_RULES = "shifto_rules_v280";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -720,6 +720,10 @@ class AutoAssigner {
           const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
           if (isFixedToSource) continue;
           if (targetCores.includes(core)) continue; if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; if (this.isForbidden(core, targetRoom)) continue;
+          
+          // ★ 絶対NGペアのチェック
+          if (this.hasNGPair(core, targetCores, false)) continue;
+
           let pushStr = m; let curAm = 0; let curPm = 0;
           targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
           if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) continue; pushStr = `${core}(AM)`; } 
@@ -764,6 +768,10 @@ class AutoAssigner {
           if (curAm >= targetCap && curPm >= targetCap) return;
           const core = extractStaffName(m);
           if (isFixedToAny(core)) return;
+          
+          // ★ 絶対NGペアのチェック
+          if (this.hasNGPair(core, currentMems.map(extractStaffName), false)) return;
+
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
             if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
                let pushStr = m;
@@ -824,6 +832,10 @@ class AutoAssigner {
          
          for (const cand of candidates) {
             if (curAm >= targetCap && curPm >= targetCap) break;
+
+            // ★ 絶対NGペアのチェック
+            if (this.hasNGPair(cand.core, currentMems.map(extractStaffName), false)) continue;
+
             let pushStr = cand.fullStr;
             if (curAm < targetCap && curPm >= targetCap) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; } 
             else if (curAm >= targetCap && curPm < targetCap) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
@@ -875,6 +887,7 @@ class AutoAssigner {
     });
 
     const assignSupportStaff = () => {
+      // ===== ポータブル↔2号室 交換ロジック =====
       const portableRoom = "ポータブル";
       const room2 = "2号室";
       const swapSources = ["1号室", "5号室"];
@@ -894,6 +907,11 @@ class AutoAssigner {
             const swapCandidate = srcMembers.find(m => {
               const core = extractStaffName(m);
               if (ROLE_PLACEHOLDERS.includes(core)) return false;
+              
+              // ★ 絶対NGペアのチェック
+              if (this.hasNGPair(core, portableMembers.map(extractStaffName), false)) return false;
+              if (this.hasNGPair(core, room2Members.map(extractStaffName), false)) return false;
+
               return !this.isForbidden(core, portableRoom)
                 && !this.isForbidden(core, room2)
                 && !(this.ctx.customRules.fixed || []).some((r: any) => r.staff === core);
@@ -917,6 +935,7 @@ class AutoAssigner {
           }
         }
       }
+      // ===== 交換ロジックここまで =====
 
       const unassignedSupport = availSupport.filter(s => !this.isUsed(s));
       unassignedSupport.forEach(staff => {
@@ -951,12 +970,21 @@ class AutoAssigner {
       const lunchTarget = baseLunchTarget;
 
       const riMembers = split(this.dayCells["RI"]).map(extractStaffName);
-      riMembers.forEach(name => { if (!currentLunch.includes(name) && currentLunch.length < lunchTarget && !this.isForbidden(name, "昼当番")) currentLunch.push(name); });
+      riMembers.forEach(name => { 
+        if (!currentLunch.includes(name) && currentLunch.length < lunchTarget && !this.isForbidden(name, "昼当番") && !this.hasNGPair(name, currentLunch, false)) {
+          currentLunch.push(name); 
+        }
+      });
 
       const prioritySecs = split(this.ctx.customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT");
       for (const sec of prioritySecs) {
         if (currentLunch.length >= lunchTarget) break;
-        split(this.dayCells[sec]).forEach(name => { const core = extractStaffName(name); if (!currentLunch.includes(core) && currentLunch.length < lunchTarget && !this.isForbidden(core, "昼当番")) currentLunch.push(core); });
+        split(this.dayCells[sec]).forEach(name => { 
+          const core = extractStaffName(name); 
+          if (!currentLunch.includes(core) && currentLunch.length < lunchTarget && !this.isForbidden(core, "昼当番") && !this.hasNGPair(core, currentLunch, false)) {
+            currentLunch.push(core); 
+          }
+        });
       }
 
       if (currentLunch.length < lunchTarget) {
@@ -968,7 +996,10 @@ class AutoAssigner {
             for (const name of secMembers) {
               if (picked >= Number(cond.out) || currentLunch.length >= lunchTarget) break;
               const core = extractStaffName(name);
-              if (!currentLunch.includes(core) && !this.isForbidden(core, "昼当番")) { currentLunch.push(core); picked++; }
+              if (!currentLunch.includes(core) && !this.isForbidden(core, "昼当番") && !this.hasNGPair(core, currentLunch, false)) { 
+                currentLunch.push(core); 
+                picked++; 
+              }
             }
           }
         });
@@ -979,11 +1010,11 @@ class AutoAssigner {
         const lastResortMembers: string[] = [];
         lastResortSecs.forEach(sec => { split(this.dayCells[sec]).forEach(name => lastResortMembers.push(extractStaffName(name))); });
 
-        const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.includes(name) && !this.isForbidden(name, "昼当番"));
+        const fallbackCandidates = availGeneral.filter(name => !lastResortMembers.includes(name) && !currentLunch.includes(name) && !this.isForbidden(name, "昼当番") && !this.hasNGPair(name, currentLunch, false));
         for (const name of fallbackCandidates) { if (currentLunch.length < lunchTarget) currentLunch.push(name); }
         
         if (currentLunch.length < lunchTarget) {
-           const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.includes(name) && !this.isForbidden(name, "昼当番"));
+           const finalFallback = availGeneral.filter(name => lastResortMembers.includes(name) && !currentLunch.includes(name) && !this.isForbidden(name, "昼当番") && !this.hasNGPair(name, currentLunch, false));
            for (const name of finalFallback) { if (currentLunch.length < lunchTarget) currentLunch.push(name); }
         }
       }
@@ -1005,17 +1036,21 @@ class AutoAssigner {
             if (isFixedToAny(n)) return false; 
             return true;
           });
-          if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
+          if (cand.length > 0) { 
+            cand = cand.filter(n => !this.hasNGPair(n, helpMems.map(extractStaffName), false)); // ★ 追加
+            cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); 
+            return cand[0]; 
+          }
           return null; 
         };
         const lunchHelpCandidate = getHelp(lunchCores);
         if (lunchHelpCandidate) { helpMems.push(`${lunchHelpCandidate}(12:15〜13:00)`); this.log(`🛎️ [受付ヘルプ] 昼枠(12:15〜)に ${lunchHelpCandidate} をアサインしました`); }
         const kenzoCores = split(this.dayCells["検像"]).map(extractStaffName);
-        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n));
+        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false)); // ★ 追加
         let picked16 = validKenzo.length > 0 ? validKenzo[0] : null;
         if (!picked16) {
           const excl = lunchHelpCandidate ? [lunchHelpCandidate] : [];
-          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n));
+          let cand = availGeneral.filter(n => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false)); // ★ 追加
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); picked16 = cand[0]; }
         }
         if (picked16) { helpMems.push(`${picked16}(16:00〜)`); this.log(`🛎️ [受付ヘルプ] 夕枠(16:00〜)に ${picked16} をアサインしました`); }
@@ -1191,7 +1226,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.7</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.8</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
