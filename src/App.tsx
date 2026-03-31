@@ -120,7 +120,7 @@ const DEFAULT_RULES: CustomRules = {
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2150"; const KEY_MONTHLY = "shifto_monthly_v2150"; const KEY_RULES = "shifto_rules_v2150";
+const KEY_ALL_DAYS = "shifto_alldays_v2160"; const KEY_MONTHLY = "shifto_monthly_v2160"; const KEY_RULES = "shifto_rules_v2160";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -225,28 +225,28 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
   };
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe", padding: "14px 20px", fontSize: 24 }}>📅 {targetMonday} 週 ▼</button>
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe" }}>📅 {targetMonday} 週 ▼</button>
       {isOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setIsOpen(false)}></div>
-          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "2px solid #cbd5e1", borderRadius: 20, padding: 32, zIndex: 50, boxShadow: "0 25px 30px -5px rgba(0, 0, 0, 0.15)", minWidth: 460 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <button onClick={() => setViewDate(new Date(year, month - 2, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 10, padding: "14px 24px", cursor: "pointer", fontSize: 24 }}>◀</button>
-              <div style={{ fontWeight: 800, fontSize: 28 }}>{year}年 {month}月</div>
-              <button onClick={() => setViewDate(new Date(year, month, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 10, padding: "14px 24px", cursor: "pointer", fontSize: 24 }}>▶</button>
+          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "2px solid #cbd5e1", borderRadius: 16, padding: 24, zIndex: 50, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.15)", minWidth: 400 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <button onClick={() => setViewDate(new Date(year, month - 2, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontSize: 20 }}>◀</button>
+              <div style={{ fontWeight: 800, fontSize: 22 }}>{year}年 {month}月</div>
+              <button onClick={() => setViewDate(new Date(year, month, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontSize: 20 }}>▶</button>
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 26 }}>
-              <thead><tr><th style={{ color: "#ef4444", padding: 16 }}>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th style={{ color: "#3b82f6", padding: 16 }}>土</th></tr></thead>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 20 }}>
+              <thead><tr><th style={{ color: "#ef4444", padding: 12 }}>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th style={{ color: "#3b82f6", padding: 12 }}>土</th></tr></thead>
               <tbody>
                 {weeks.map((w, wIdx) => {
                   const isSelectedWeek = w.some(d => { if(!d) return false; const dObj = new Date(year, month - 1, d, 12, 0, 0); const day = dObj.getDay(); const diff = dObj.getDate() - day + (day === 0 ? -6 : 1); const checkMon = new Date(dObj.getTime()); checkMon.setDate(diff); return `${checkMon.getFullYear()}-${pad(checkMon.getMonth()+1)}-${pad(checkMon.getDate())}` === targetMonday; });
                   return (
                     <tr key={wIdx} onClick={() => handleWeekClick(w)} className="calendar-row" style={{ background: isSelectedWeek ? "#eff6ff" : "transparent" }}>
                       {w.map((d, dIdx) => {
-                        if (!d) return <td key={dIdx} style={{ padding: 20 }}></td>;
+                        if (!d) return <td key={dIdx} style={{ padding: 16 }}></td>;
                         const isHoliday = !!(nationalHolidays[`${year}-${pad(month)}-${pad(d)}`] || customHolidays.includes(`${year}-${pad(month)}-${pad(d)}`));
                         let color = "#334155"; if (dIdx === 0 || isHoliday) color = "#ef4444"; else if (dIdx === 6) color = "#3b82f6";
-                        return <td key={dIdx} style={{ padding: 20, color, fontWeight: isHoliday ? 800 : 600, position: "relative" }}>{d}{isHoliday && <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", width: 10, height: 10, background: "#ef4444", borderRadius: "50%" }}></div>}</td>;
+                        return <td key={dIdx} style={{ padding: 16, color, fontWeight: isHoliday ? 800 : 600, position: "relative" }}>{d}{isHoliday && <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)", width: 8, height: 8, background: "#ef4444", borderRadius: "50%" }}></div>}</td>;
                       })}
                     </tr>
                   )
@@ -266,25 +266,25 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
   const handleTimeChange = (idx: number, newTime: string) => { if (noTime && !isFuzai) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "24px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-      <label style={{ fontSize: 24, fontWeight: 800, color: "#475569", marginBottom: 16 }}>{section}</label>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+      <label style={{ fontSize: 24, fontWeight: 800, color: "#475569", marginBottom: 12 }}>{section}</label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = extractStaffName(m); const currentMod = m.substring(coreName.length);
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
           return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 20, padding: "14px 20px 14px 22px", fontSize: 24, display: "flex", alignItems: "center", gap: 10, border: `2px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
+            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 16, padding: "10px 14px 10px 16px", fontSize: 22, display: "flex", alignItems: "center", gap: 8, border: `2px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
               <span>{coreName}</span>
               {(!noTime || isFuzai) && (
-                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 24, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 28px 0 8px" }}>
+                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 22, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 24px 0 6px" }}>
                   {isFuzai ? <><option value="">全休</option><option value="(AM)">AM休</option><option value="(PM)">PM休</option></> : isTaiki ? <><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></> : <><option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>}
                 </select>
               )}
-              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 10 }}>✖</span>
+              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 8 }}>✖</span>
             </div>
           )
         })}
-        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "2px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 24, color: "#64748b", flex: 1, minWidth: 160, cursor: "pointer", fontWeight: 700, borderRadius: 12, padding: "14px 36px 14px 20px" }}>
+        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "2px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 22, color: "#64748b", flex: 1, minWidth: 140, cursor: "pointer", fontWeight: 700, borderRadius: 10, padding: "10px 32px 10px 16px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">{activeStaff.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>
           {customOptions.length > 0 && <optgroup label="担当枠（未定）">{customOptions.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>}
@@ -340,6 +340,18 @@ class AutoAssigner {
     let count = 0; Object.keys(this.dayCells).forEach(sec => { if (REST_SECTIONS.includes(sec) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(sec)) return; if (split(this.dayCells[sec]).map(extractStaffName).includes(staff)) count++; }); return count;
   }
 
+  // ★ 兼務上限のチェック関数
+  canAddKenmu(staff: string): boolean {
+    const limit = this.ctx.customRules.alertMaxKenmu || 3;
+    return this.getTodayRoomCount(staff) < limit;
+  }
+
+  // ★ MMG担当可能かどうかのチェック関数（男性除外のハードルール）
+  isMmgCapable(staff: string): boolean {
+    const mmgStaffList = split(this.ctx.monthlyAssign.MMG || "").map(extractStaffName);
+    return mmgStaffList.includes(extractStaffName(staff));
+  }
+
   constructor(day: DayData, prevDay: DayData | null, pastDays: DayData[], ctx: AutoAssignContext, isSmartFix: boolean = false) {
     this.day = { ...day }; this.prevDay = prevDay; this.pastDays = pastDays; this.ctx = ctx; this.dayCells = { ...day.cells }; this.dynamicCapacity = { ...(ctx.customRules.capacity || {}) }; this.isSmartFix = isSmartFix;
   }
@@ -393,7 +405,12 @@ class AutoAssigner {
          const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
          
          while (getAmt(current) < cap) {
-            const freeStaff = this.initialAvailGeneral.find(s => !this.isUsed(s) && !this.isForbidden(s, room));
+            const freeStaff = this.initialAvailGeneral.find(s => {
+              if (this.isUsed(s)) return false;
+              if (this.isForbidden(s, room)) return false;
+              if (room === "MMG" && !this.isMmgCapable(s)) return false;
+              return true;
+            });
             if (!freeStaff) break; 
             const block = this.blockMap.get(freeStaff);
             let tag = ""; let p = 1;
@@ -532,6 +549,10 @@ class AutoAssigner {
          if (current.map(extractStaffName).includes(name)) return { hard: true, msg: "同室に配置済" };
          if (this.isUsed(name)) return { hard: true, msg: "他業務で配置済" };
          if (this.isForbidden(name, section)) return { hard: true, msg: "担当不可設定" };
+         
+         // ★ MMGには月間担当（女性）しか入れないハード制約
+         if (section === "MMG" && !this.isMmgCapable(name)) return { hard: true, msg: "MMG月間担当者ではない" };
+
          const b = this.blockMap.get(name);
          
          if (needTag && b === 'NONE') return { hard: true, msg: "半端枠への終日スタッフ割当禁止(連鎖防止)" };
@@ -774,7 +795,8 @@ class AutoAssigner {
         const candIdx = unassignedForKenmu.findIndex(s => 
            !this.isForbidden(s, targetRoom) && 
            !this.hasNGPair(s, currentMems.map(extractStaffName), false) && 
-           !(this.ctx.customRules.fixed || []).some((r:any) => r.staff === s)
+           !(this.ctx.customRules.fixed || []).some((r:any) => r.staff === s) &&
+           (targetRoom === "MMG" ? this.isMmgCapable(s) : true)
         );
         
         if (candIdx === -1) break;
@@ -824,6 +846,12 @@ class AutoAssigner {
                 if (this.isForbidden(core, mmgRoom)) continue;
                 if (this.hasNGPair(core, mmgMembers.map(extractStaffName), false)) continue;
                 if ((this.ctx.customRules.fixed || []).some((r:any) => r.staff === core)) continue;
+                
+                // ★ MMG月間担当者しかMMGには入れない
+                if (!this.isMmgCapable(core)) continue;
+                
+                // ★ 兼務上限チェック
+                if (!this.canAddKenmu(core)) continue;
 
                 swapCandidateFullStr = srcStr;
                 break;
@@ -879,6 +907,9 @@ class AutoAssigner {
           if (targetCores.includes(core)) continue; if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; if (this.isForbidden(core, targetRoom)) continue;
           
           if (this.hasNGPair(core, targetCores, false)) continue;
+          
+          // ★ 追加: 兼務上限チェック
+          if (!this.canAddKenmu(core)) continue;
 
           let pushStr = m; let curAm = 0; let curPm = 0;
           targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
@@ -914,6 +945,12 @@ class AutoAssigner {
           if (isFixedToAny(core)) return;
           
           if (this.hasNGPair(core, currentMems.map(extractStaffName), false)) return;
+          
+          // ★ 追加: MMGにはMMG担当しか入れない
+          if (targetRoom === "MMG" && !this.isMmgCapable(core)) return;
+          
+          // ★ 追加: 新規追加になる場合の兼務上限チェック
+          if (!currentMems.map(extractStaffName).includes(core) && !this.canAddKenmu(core)) return;
 
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
             if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
@@ -965,6 +1002,14 @@ class AutoAssigner {
 
          const currentCores = currentMems.map(extractStaffName); 
          candidates = candidates.filter(c => !currentCores.includes(c.core));
+         
+         // ★ 追加: MMGにはMMG担当しか入れない ＆ 兼務上限チェック
+         candidates = candidates.filter(c => {
+             if (targetRoom === "MMG" && !this.isMmgCapable(c.core)) return false;
+             if (!this.canAddKenmu(c.core)) return false;
+             return true;
+         });
+
          candidates.sort((a, b) => { 
              const aRooms = this.getTodayRoomCount(a.core); const bRooms = this.getTodayRoomCount(b.core);
              if (aRooms !== bRooms) return aRooms - bRooms;
@@ -1051,6 +1096,9 @@ class AutoAssigner {
               
               if (this.hasNGPair(core, portableMembers.map(extractStaffName), false)) return false;
               if (this.hasNGPair(core, room2Members.map(extractStaffName), false)) return false;
+
+              // ★ 兼務上限チェック (ポータブルと2号室に追加されるため安全のため)
+              if (!this.canAddKenmu(core)) return false;
 
               return !this.isForbidden(core, portableRoom)
                 && !this.isForbidden(core, room2)
@@ -1404,9 +1452,9 @@ export default function App() {
 
   const handleUndo = () => { if (history.length > 0) { const last = history[history.length - 1]; setAllDays(last); setHistory(h => h.slice(0, -1)); } };
   const updateMonthly = (k: string, v: string) => { setMonthlyAssign(prev => ({ ...prev, [k]: v })); };
-  const updateRule = (type: keyof CustomRules, idx: number, key: string, val: any) => { setCustomRules(r => { const arr = [...(r[type] as any[])]; arr[idx] = { ...arr[idx], [key]: val }; return { ...r, [type]: arr }; }); };
-  const removeRule = (type: keyof CustomRules, idx: number) => { setCustomRules(r => { const arr = [...(r[type] as any[])]; arr.splice(idx, 1); return { ...r, [type]: arr }; }); };
-  const addRule = (type: keyof CustomRules, def: any) => { setCustomRules(r => ({ ...r, [type]: [...(r[type] as any[]), def] })); };
+  const updateRule = (type: keyof CustomRules, idx: number, key: string, val: any) => { setCustomRules(r => { const arr = [...((r[type] as any[]) || [])]; arr[idx] = { ...arr[idx], [key]: val }; return { ...r, [type]: arr }; }); };
+  const removeRule = (type: keyof CustomRules, idx: number) => { setCustomRules(r => { const arr = [...((r[type] as any[]) || [])]; arr.splice(idx, 1); return { ...r, [type]: arr }; }); };
+  const addRule = (type: keyof CustomRules, def: any) => { setCustomRules(r => ({ ...r, [type]: [...((r[type] as any[]) || []), def] })); };
   const handleClearGroupDay = (title: string, sections: string[]) => { if (window.confirm(`${cur.label} の「${title}」をクリアしますか？`)) { setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; sections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
   const handleClearGroupWeek = (title: string, sections: string[]) => { if (window.confirm(`表示中の「${title}」を1週間分すべてクリアしますか？`)) { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev }; days.forEach(d => { const nextCells = { ...(prev[d.id] || d.cells) }; sections.forEach(sec => { nextCells[sec] = ""; }); nextState[d.id] = nextCells; }); return nextState; }); } };
   const handleClearWorkDay = () => { if (window.confirm(`${cur.label} の「モダリティ」と「一般撮影・透視・その他」をクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections]; setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
@@ -1423,7 +1471,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 36, fontWeight: 900 }}>勤務割付システム Ver 2.15</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 36, fontWeight: 900 }}>勤務割付システム Ver 2.16</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -2033,7 +2081,7 @@ export default function App() {
             </div>
             <ul style={{ listStyle: "none", padding: 0 }}>
               {getDayWarnings(selectedErrorDay).map((w, i) => (
-                <li key={i} style={{ padding: "20px 24px", marginBottom: "16px", background: w.type === 'error' ? "#fff7ed" : "#f8fafc", border: `2px solid ${w.type === 'error' ? "#fdba74" : "#cbd5e1"}`, borderRadius: "16px", fontSize: 22, fontWeight: 800, color: w.type === 'error' ? "#c2410c" : "#475569" }}>
+                <li key={i} style={{ padding: "20px 24px", marginBottom: "16px", background: w.type === 'error' ? "#fff7ed" : "#f8fafc", border: `2px solid ${w.type === 'error' ? "#fdba74" : "#cbd5e1"}`, borderRadius: "12px", fontSize: 22, fontWeight: 800, color: w.type === 'error' ? "#c2410c" : "#475569" }}>
                   {w.msg}
                 </li>
               ))}
