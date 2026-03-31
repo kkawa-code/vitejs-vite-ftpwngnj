@@ -91,6 +91,7 @@ const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const WORK_SECTIONS = SECTIONS.filter(s => !REST_SECTIONS.includes(s));
 const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "検像"];
+const EXTENDED_ROOM_SECTIONS = [...ROOM_SECTIONS, "CT(4)", "CT(3)", "MRI(3)", "治療(3)"]; // 条件付き部屋の選択肢
 
 const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日" };
 
@@ -109,10 +110,10 @@ const DEFAULT_RULES: CustomRules = {
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
   noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
   helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
-  lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT、1号室、2号室、3号室、5号室" }],
+  lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" }],
   lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", 
   linkedRooms: [
-    { target: "ポータブル", sources: "2号室、CT" },
+    { target: "ポータブル", sources: "2号室、CT(4)" },
     { target: "DSA", sources: "2号室、1号室、5号室" },
     { target: "検像", sources: "骨塩" },
     { target: "パノラマCT", sources: "透視（6号）、2号室" }
@@ -120,7 +121,7 @@ const DEFAULT_RULES: CustomRules = {
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2200"; const KEY_MONTHLY = "shifto_monthly_v2200"; const KEY_RULES = "shifto_rules_v2200";
+const KEY_ALL_DAYS = "shifto_alldays_v2210"; const KEY_MONTHLY = "shifto_monthly_v2210"; const KEY_RULES = "shifto_rules_v2210";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -134,6 +135,12 @@ for (let h = 8; h <= 19; h++) {
 const split = (v: string) => (v || "").split(/[、,\n]+/).map((s: string) => s.trim()).filter(Boolean);
 const join = (a: string[]) => a.filter(Boolean).join("、");
 const extractStaffName = (fullName: string) => fullName.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
+
+// ★ 部屋名と人数条件をパースする関数
+const parseRoomCond = (str: string) => {
+  const m = str.match(/^(.*?)\((\d+)\)$/);
+  return m ? { r: m[1], min: Number(m[2]) } : { r: str, min: 0 };
+};
 
 function parseAndSortStaff(staffString: string) {
   const list = split(staffString);
@@ -542,6 +549,17 @@ class AutoAssigner {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false;
       if (section && !this.canAddKenmu(name, section)) return false; 
+      
+      // ★ 追加：常時兼務先の担当不可チェック（兼務先が禁止されているなら元の部屋にも入れない）
+      if (section) {
+         const kenmuTargets = (this.ctx.customRules.kenmuPairs || [])
+           .filter((p: any) => p.s1 === section || p.s2 === section)
+           .map((p: any) => p.s1 === section ? p.s2 : p.s1);
+         for (const target of kenmuTargets) {
+           if (this.isForbidden(name, target)) return false;
+         }
+      }
+
       return true;
     };
     for (const name of uniqueList.filter(n => filterFn(n, true))) { result.push(name); if (result.length >= n) return result; }
@@ -578,6 +596,14 @@ class AutoAssigner {
          if (section === "MMG" && !this.isMmgCapable(name)) return { hard: true, msg: "MMG月間担当者ではない" };
 
          if (!this.canAddKenmu(name, section)) return { hard: true, msg: "兼務上限または専念ペア制約" };
+
+         // ★ 追加：常時兼務先の担当不可チェック（5号室に入ってDSAが空く問題の解決）
+         const kenmuTargets = (this.ctx.customRules.kenmuPairs || [])
+           .filter((p: any) => p.s1 === section || p.s2 === section)
+           .map((p: any) => p.s1 === section ? p.s2 : p.s1);
+         for (const target of kenmuTargets) {
+           if (this.isForbidden(name, target)) return { hard: true, msg: `兼務先(${target})が不可` };
+         }
 
          const b = this.blockMap.get(name);
          if (needTag && b === 'NONE') return { hard: true, msg: "半端枠への終日スタッフ割当禁止(連鎖防止)" };
@@ -640,7 +666,7 @@ class AutoAssigner {
                  if (portableCountB > 0) scoreB -= 1000 * portableCountB;
              }
 
-             const linkedSources = (this.ctx.customRules.linkedRooms || []).flatMap((r: any) => split(r.sources));
+             const linkedSources = (this.ctx.customRules.linkedRooms || []).flatMap((r: any) => split(r.sources).map(s => parseRoomCond(s).r));
              const kenmuSections = (this.ctx.customRules.kenmuPairs || []).flatMap((r: any) => [r.s1, r.s2]);
              const isChainSource = linkedSources.includes(section) || kenmuSections.includes(section);
              if (isChainSource) {
@@ -964,12 +990,14 @@ class AutoAssigner {
       currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
       const sourceRooms = split(rule.sources);
       
-      for (const srcRoom of sourceRooms) {
+      for (const srcStr of sourceRooms) {
         if (curAm >= targetCap && curPm >= targetCap) break; 
         
-        if (srcRoom === "CT") {
-          const ctAmt = split(this.dayCells["CT"]).reduce((sum, m) => sum + getStaffAmount(m), 0);
-          if (ctAmt < 4) continue;
+        // ★ 条件付き部屋のパース (例: CT(4) ならCTが4人以上いるかチェック)
+        const { r: srcRoom, min } = parseRoomCond(srcStr);
+        if (min > 0) {
+          const amt = split(this.dayCells[srcRoom]).reduce((sum, m) => sum + getStaffAmount(m), 0);
+          if (amt < min) continue;
         }
 
         split(this.dayCells[srcRoom]).forEach(m => {
@@ -1018,12 +1046,15 @@ class AutoAssigner {
       if (rescueRule && rescueRule.sourceRooms) {
          const sourceRooms = split(rescueRule.sourceRooms);
          let candidates: { core: string, fullStr: string, srcIdx: number }[] = [];
-         sourceRooms.forEach((srcRoom, idx) => {
+         
+         sourceRooms.forEach((srcStr, idx) => {
+            const { r: srcRoom, min } = parseRoomCond(srcStr);
             if (srcRoom === targetRoom) return;
 
-            if (srcRoom === "CT") {
-              const ctAmt = split(this.dayCells["CT"]).reduce((sum, m) => sum + getStaffAmount(m), 0);
-              if (ctAmt < 4) return;
+            // ★ 条件付き部屋のパース
+            if (min > 0) {
+              const amt = split(this.dayCells[srcRoom]).reduce((sum, m) => sum + getStaffAmount(m), 0);
+              if (amt < min) return;
             }
 
             split(this.dayCells[srcRoom]).forEach(m => {
@@ -1198,12 +1229,15 @@ class AutoAssigner {
           let selectedLunch: string | null = null;
 
           const sourceRooms = split(rule.sourceRooms);
-          for (const room of sourceRooms) {
-            const roomMembers = split(this.dayCells[room] || "");
-            const cap = this.dynamicCapacity[room] || 1;
+          for (const srcStr of sourceRooms) {
+            // ★ 追加: 条件付き部屋のパース (例: CT(4)ならCTが4人いるかチェック)
+            const { r: srcRoom, min } = parseRoomCond(srcStr);
+            const roomMembers = split(this.dayCells[srcRoom] || "");
+            const cap = this.dynamicCapacity[srcRoom] || 1;
             const currentAmount = roomMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
             
-            if (currentAmount >= cap) {
+            const reqCount = min > 0 ? min : cap; // 条件がなければ定員を満たしているか
+            if (currentAmount >= reqCount) {
               selectedLunch = roomMembers.map(extractStaffName).find(name => 
                 roleStaffList.includes(name) && !todayRoleMembers.includes(name) && !this.isForbidden(name, "昼当番") && !this.hasNGPair(name, currentLunch, false)
               ) || null;
@@ -1501,7 +1535,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 36, fontWeight: 900 }}>勤務割付システム Ver 2.20</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 36, fontWeight: 900 }}>勤務割付システム Ver 2.21</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1955,7 +1989,7 @@ export default function App() {
                         <span style={{ fontSize: 20, fontWeight: 700, color: "#065f46" }}>] には専任を置かず、[</span>
                       </div>
                       <div style={{ marginLeft: 20, marginTop: 8, marginBottom: 8 }}>
-                        <MultiPicker selected={rule.sources} onChange={(v: string) => updateRule("linkedRooms", idx, "sources", v)} options={ROOM_SECTIONS} />
+                        <MultiPicker selected={rule.sources} onChange={(v: string) => updateRule("linkedRooms", idx, "sources", v)} options={EXTENDED_ROOM_SECTIONS} />
                       </div>
                       <span style={{ fontSize: 20, fontWeight: 700, color: "#065f46" }}>] の担当者をセットで配置する</span>
                     </div>
@@ -1981,7 +2015,7 @@ export default function App() {
                         <span style={{ fontSize: 20, fontWeight: 700, color: "#854d0e" }}>が不足なら ➔ 以下の部屋から兼務を探す</span>
                       </div>
                       <div style={{ marginLeft: 20, marginTop: 8 }}>
-                        <MultiPicker selected={rule.sourceRooms} onChange={(v: string) => updateRule("rescueRules", idx, "sourceRooms", v)} options={ROOM_SECTIONS} />
+                        <MultiPicker selected={rule.sourceRooms} onChange={(v: string) => updateRule("rescueRules", idx, "sourceRooms", v)} options={EXTENDED_ROOM_SECTIONS} />
                       </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignItems: "center" }}>
@@ -2038,11 +2072,11 @@ export default function App() {
                     <span className="rule-label">は</span>
                     <select value={rule.role} onChange={(e: any) => updateRule("lunchRoleRules", idx, "role", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", minWidth: "160px"}}><option value="">役割を選択</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
                     <span className="rule-label">担当を優先。引抜元（定員を満たしている場合のみ。※左から優先）:</span>
-                    <MultiPicker selected={rule.sourceRooms} onChange={(v: string) => updateRule("lunchRoleRules", idx, "sourceRooms", v)} options={ROOM_SECTIONS} />
+                    <MultiPicker selected={rule.sourceRooms} onChange={(v: string) => updateRule("lunchRoleRules", idx, "sourceRooms", v)} options={EXTENDED_ROOM_SECTIONS} />
                     <button onClick={() => removeRule("lunchRoleRules", idx)} className="rule-del">✖</button>
                   </div>
                 ))}
-                <button className="rule-add" onClick={() => addRule("lunchRoleRules", { day: "火", role: "MMG", sourceRooms: "CT、1号室、2号室、3号室、5号室" })}>＋ 役割確保ルールを追加</button>
+                <button className="rule-add" onClick={() => addRule("lunchRoleRules", { day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" })}>＋ 役割確保ルールを追加</button>
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
