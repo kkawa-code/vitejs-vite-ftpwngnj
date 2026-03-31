@@ -95,12 +95,19 @@ const DEFAULT_RULES: CustomRules = {
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", 
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, 
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
-  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
+  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
   helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
-  lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", linkedRooms: [], alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
+  lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", 
+  linkedRooms: [
+    { target: "ポータブル", sources: "2号室、CT" },
+    { target: "DSA", sources: "2号室、1号室、5号室" },
+    { target: "検像", sources: "骨塩" },
+    { target: "パノラマCT", sources: "透視（6号）、2号室" }
+  ], 
+  alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v270"; const KEY_MONTHLY = "shifto_monthly_v270"; const KEY_RULES = "shifto_rules_v270";
+const KEY_ALL_DAYS = "shifto_alldays_v260"; const KEY_MONTHLY = "shifto_monthly_v260"; const KEY_RULES = "shifto_rules_v260";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -533,6 +540,18 @@ class AutoAssigner {
              // 前日と同じ部屋の人にはペナルティ（固定化防止）
              if (prevDayMembers.includes(a)) scoreA -= 500;
              if (prevDayMembers.includes(b)) scoreB -= 500;
+             
+             // ★ 追加：ポータブルの週複数回ペナルティ
+             if (section === "ポータブル") {
+                 let portableCountA = 0; let portableCountB = 0;
+                 this.pastDays.forEach(pd => {
+                     const mems = split(pd.cells["ポータブル"] || "").map(extractStaffName);
+                     if (mems.includes(a)) portableCountA++;
+                     if (mems.includes(b)) portableCountB++;
+                 });
+                 if (portableCountA > 0) scoreA -= 1000 * portableCountA;
+                 if (portableCountB > 0) scoreB -= 1000 * portableCountB;
+             }
 
              // ★ 半休者の兼務連鎖ペナルティ
              const linkedSources = (this.ctx.customRules.linkedRooms || []).flatMap((r: any) => split(r.sources));
@@ -670,7 +689,6 @@ class AutoAssigner {
         const strictRooms = ["治療", "RI", "MMG"];
         if (strictRooms.includes(room)) { candidates = preferredList.length > 0 ? preferredList : availGeneral; }
         
-        // ★ 改善点: 兼務ペアの相方が既に埋まっている場合は専任を置かずスキップする（後で兼務コピーされるため）
         const partnerRooms = (this.ctx.customRules.kenmuPairs || [])
           .filter((p: any) => p.s1 === room || p.s2 === room)
           .map((p: any) => p.s1 === room ? p.s2 : p.s1);
@@ -749,8 +767,16 @@ class AutoAssigner {
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
             if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
                let pushStr = m;
-               if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } 
-               else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; }
+               
+               // ★ パノラマCTに6号室から来る場合はAM固定
+               if (targetRoom === "パノラマCT" && srcRoom === "透視（6号）") {
+                 if (m.includes("(PM)")) return; // PMしかいないならスキップ
+                 pushStr = `${core}(AM)`;
+               } else {
+                 if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } 
+                 else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; }
+               }
+               
                currentMems.push(pushStr);
                if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; }
                this.addU(core, getStaffAmount(pushStr));
@@ -1069,6 +1095,23 @@ export default function App() {
         split(cells[room]).map(extractStaffName).filter(n => prev.includes(n)).forEach(n => w.push({ type: 'error', msg: `【連日注意】${n}さんが「${room}」に連日入っています` }));
       });
     }
+
+    // ★ 追加：ポータブルの週複数回アラート
+    const portableStaffMap: Record<string, number> = {};
+    for (let i = 0; i <= curIdx; i++) {
+      const dId = days[i].id;
+      const mems = split((allDays[dId] || {})["ポータブル"]).map(extractStaffName);
+      mems.forEach(m => { portableStaffMap[m] = (portableStaffMap[m] || 0) + 1; });
+    }
+    Object.entries(portableStaffMap).forEach(([staff, count]) => {
+      if (count >= 2) {
+        const todayMems = split((allDays[dayId] || {})["ポータブル"]).map(extractStaffName);
+        if (todayMems.includes(staff)) {
+          w.push({ type: 'alert', msg: `【ポータブル多】${staff}さんが今週${count}回目のポータブルです` });
+        }
+      }
+    });
+
     return w;
   };
 
@@ -1152,7 +1195,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.5</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.6</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
