@@ -100,7 +100,7 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", linkedRooms: [], alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v260"; const KEY_MONTHLY = "shifto_monthly_v260"; const KEY_RULES = "shifto_rules_v260";
+const KEY_ALL_DAYS = "shifto_alldays_v270"; const KEY_MONTHLY = "shifto_monthly_v270"; const KEY_RULES = "shifto_rules_v270";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -670,7 +670,24 @@ class AutoAssigner {
         const strictRooms = ["治療", "RI", "MMG"];
         if (strictRooms.includes(room)) { candidates = preferredList.length > 0 ? preferredList : availGeneral; }
         
-        this.fill(candidates, room, preferredList, targetCount);
+        // ★ 改善点: 兼務ペアの相方が既に埋まっている場合は専任を置かずスキップする（後で兼務コピーされるため）
+        const partnerRooms = (this.ctx.customRules.kenmuPairs || [])
+          .filter((p: any) => p.s1 === room || p.s2 === room)
+          .map((p: any) => p.s1 === room ? p.s2 : p.s1);
+        const hasPartnerFilled = partnerRooms.some(pr => split(this.dayCells[pr]).reduce((sum, m) => sum + getStaffAmount(m), 0) > 0);
+        
+        const isLinkedTarget = linkedTargetRooms.includes(room);
+        const shouldSkipFill = isLinkedTarget || hasPartnerFilled;
+
+        if (!shouldSkipFill) { 
+          this.fill(candidates, room, preferredList, targetCount); 
+        } else {
+          if (isLinkedTarget) {
+            this.log(`⏭️ [専任スキップ] ${room} は基本兼務ルールの対象のため、専任スタッフ割当をスキップしました`);
+          } else {
+            this.log(`⏭️ [専任スキップ] ${room} は常時兼務ペアに配置済みのため、専任スタッフ割当をスキップしました`);
+          }
+        }
       }
     });
 
