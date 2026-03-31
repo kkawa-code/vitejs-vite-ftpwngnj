@@ -95,12 +95,12 @@ const DEFAULT_RULES: CustomRules = {
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", 
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, 
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
-  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
+  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
   helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", linkedRooms: [], alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v250"; const KEY_MONTHLY = "shifto_monthly_v250"; const KEY_RULES = "shifto_rules_v250";
+const KEY_ALL_DAYS = "shifto_alldays_v260"; const KEY_MONTHLY = "shifto_monthly_v260"; const KEY_RULES = "shifto_rules_v260";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -579,9 +579,8 @@ class AutoAssigner {
     (this.ctx.customRules.substitutes || []).forEach((sub: any) => { 
       const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; 
       const currentSec = split(this.dayCells[sub.section]).map(extractStaffName);
-      if (targets.some(t => currentSec.includes(t))) return; 
-      
-      const trigger = targets.every(t => !availAll.includes(t) || this.isUsed(t)); 
+      // ★ バグ修正：代打の誤発動防止
+      const trigger = targets.every(t => !availAll.includes(t)); 
       if (trigger) { const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); if (fallbackStaff.length > 0) { const currentSec = split(this.dayCells[sub.section]); for (const f of fallbackStaff) { if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; if (!this.hasNGPair(f, currentSec.map(extractStaffName), false) && currentSec.length < 6) { const b = this.blockMap.get(f); let tag = ""; let fr = 1; if (b === 'AM') { tag = "(PM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } this.dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); this.addU(f, fr); this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); break; } } } } 
     });
 
@@ -820,12 +819,12 @@ class AutoAssigner {
       this.dayCells[rule.section] = join(current);
     });
 
+    // ★ 追加: ポータブル↔2号室 交換ロジック
     const assignSupportStaff = () => {
       // ===== ポータブル↔2号室 交換ロジック =====
       const portableRoom = "ポータブル";
       const room2 = "2号室";
       const swapSources = ["1号室", "5号室"];
-      
       const portableMembers = split(this.dayCells[portableRoom]);
       const room3Members = split(this.dayCells["3号室"]);
       const portableCap = this.dynamicCapacity[portableRoom] !== undefined ? this.dynamicCapacity[portableRoom] : 1;
@@ -1156,9 +1155,8 @@ export default function App() {
                             {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && <span onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} className="btn-hover" style={{ background: "#f0f9ff", color: "#0369a1", padding: "6px 14px", borderRadius: 12, fontSize: 20, border: "2px solid #bae6fd" }}>🤔 根拠</span>}
                           </div>
                           {!day.isPublicHoliday && (
-                            <div onClick={(e) => { e.stopPropagation(); setShowUnassignedList(day.id); }} className="btn-hover" style={{ fontSize: 18, background: stats.unassigned.length > 0 ? "#fee2e2" : "#d1fae5", color: stats.unassigned.length > 0 ? "#ef4444" : "#065f46", padding: "8px 12px", borderRadius: 12, fontWeight: 800 }}>
-                              出勤:{stats.workingCount}名 (不在:{stats.absentCount}名)<br/>
-                              未配置:<span style={{fontSize:24, textDecoration:"underline"}}>{stats.unassigned.length}</span>名
+                            <div onClick={(e) => { e.stopPropagation(); setShowUnassignedList(day.id); }} className="btn-hover" style={{ fontSize: 20, background: stats.unassigned.length > 0 ? "#fee2e2" : "#d1fae5", color: stats.unassigned.length > 0 ? "#ef4444" : "#065f46", padding: "6px 12px", borderRadius: 12, fontWeight: 800 }}>
+                              出勤:{stats.workingCount}名 / 未配置:<span style={{fontSize:24, textDecoration:"underline"}}>{stats.unassigned.length}</span>名
                             </div>
                           )}
                           {day.isPublicHoliday && <div style={{ fontSize: 22, color: "#ef4444" }}>🎌 {day.holidayName}</div>}
