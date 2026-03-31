@@ -57,6 +57,7 @@ const globalStyle = `
   }
 `;
 
+// ===================== 🌟 型定義 =====================
 type RenderGroup = { title: string; color: string; sections: string[] };
 type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
 type RejectReason = { hard: boolean, msg: string };
@@ -95,7 +96,7 @@ const DEFAULT_RULES: CustomRules = {
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", 
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, 
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
-  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
+  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
   helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", linkedRooms: [], alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
@@ -578,10 +579,26 @@ class AutoAssigner {
 
     (this.ctx.customRules.substitutes || []).forEach((sub: any) => { 
       const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; 
-      const currentSec = split(this.dayCells[sub.section]).map(extractStaffName);
-      // ★ バグ修正：代打の誤発動防止
+      const currentRoomStaff = split(this.dayCells[sub.section]).map(extractStaffName);
+      if (targets.some(t => currentRoomStaff.includes(t))) return; 
+      
       const trigger = targets.every(t => !availAll.includes(t)); 
-      if (trigger) { const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); if (fallbackStaff.length > 0) { const currentSec = split(this.dayCells[sub.section]); for (const f of fallbackStaff) { if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; if (!this.hasNGPair(f, currentSec.map(extractStaffName), false) && currentSec.length < 6) { const b = this.blockMap.get(f); let tag = ""; let fr = 1; if (b === 'AM') { tag = "(PM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } this.dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); this.addU(f, fr); this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); break; } } } } 
+      if (trigger) { 
+        const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); 
+        if (fallbackStaff.length > 0) { 
+          const currentRoomMembers = split(this.dayCells[sub.section]); 
+          for (const f of fallbackStaff) { 
+            if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; 
+            if (!this.hasNGPair(f, currentRoomMembers.map(extractStaffName), false) && currentRoomMembers.length < 6) { 
+              const b = this.blockMap.get(f); let tag = ""; let fr = 1; 
+              if (b === 'AM') { tag = "(PM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } 
+              this.dayCells[sub.section] = join([...currentRoomMembers, `${f}${tag}`]); this.addU(f, fr); 
+              this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); 
+              break; 
+            } 
+          } 
+        } 
+      } 
     });
 
     (this.ctx.customRules.pushOuts || []).forEach((po: any) => { 
@@ -1030,7 +1047,6 @@ export default function App() {
     const w: any[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {};
     ROOM_SECTIONS.forEach(room => split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }));
     Object.entries(staffMap).forEach(([staff, rms]) => { if(rms.length >= (customRules.alertMaxKenmu || 3)) w.push({ type: 'error', msg: `【兼務過多】${staff}さんが ${rms.length}部屋（${rms.join('、')}）を担当中` }); });
-    
     ROOM_SECTIONS.forEach(room => { if (split(cells[room]).length === 0) w.push({type: 'alert', msg: `【空室】${room}`}); });
 
     const curIdx = days.findIndex(d => d.id === dayId);
