@@ -57,6 +57,7 @@ const globalStyle = `
   }
 `;
 
+type RenderGroup = { title: string; color: string; sections: string[] };
 type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
 type RejectReason = { hard: boolean, msg: string };
 
@@ -98,7 +99,7 @@ const DEFAULT_RULES: CustomRules = {
   lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", linkedRooms: [], alertMaxKenmu: 3, alertEmptyRooms: ""
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v231"; const KEY_MONTHLY = "shifto_monthly_v231"; const KEY_RULES = "shifto_rules_v231";
+const KEY_ALL_DAYS = "shifto_alldays_v232"; const KEY_MONTHLY = "shifto_monthly_v232"; const KEY_RULES = "shifto_rules_v232";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -146,7 +147,7 @@ function getStaffAmount(name: string) {
   return (name.includes("(AM)") || name.includes("(PM)") || name.match(/\(〜/) || name.match(/〜\)/)) ? 0.5 : 1;
 }
 
-const btnStyle = (bg: string, color: string = "#fff"): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "12px", padding: "16px 24px", cursor: "pointer", fontWeight: 800, fontSize: 24, whiteSpace: "nowrap", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 10 });
+const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 24): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "12px", padding: "14px 20px", cursor: "pointer", fontWeight: 800, fontSize, whiteSpace: "nowrap", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 10 });
 const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "24px", padding: "40px", boxShadow: "0 6px 12px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" });
 const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
@@ -155,14 +156,13 @@ const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSt
   return { border: "1px solid #e2e8f0", padding: "24px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 26, minWidth: isHeader && !isSticky ? "200px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 };
 
-const RENDER_GROUPS: { title: string; color: string; sections: string[] }[] = [
+const RENDER_GROUPS: RenderGroup[] = [
   { title: "休務・夜勤", color: "#94a3b8", sections: ["明け","入り","土日休日代休","不在"] },
   { title: "モダリティ", color: "#3b82f6", sections: ["CT","MRI","RI","治療"] },
   { title: "一般撮影・透視・その他", color: "#10b981", sections: ["MMG","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","骨塩","パノラマCT","ポータブル","DSA","検像","受付","受付ヘルプ","昼当番"] },
   { title: "待機・その他", color: "#f59e0b", sections: ["待機"] } 
 ];
 
-// ===================== 🌟 UI コンポーネント =====================
 const MultiPicker = ({ selected, onChange, options, placeholder }: any) => {
   const current = split(selected);
   const handleAdd = (val: string) => { if (val && !current.includes(val)) onChange(join([...current, val])); };
@@ -203,7 +203,7 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
   };
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe", padding: "14px 20px", fontSize: 24 }}>📅 {targetMonday} 週 ▼</button>
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe", padding: "14px 20px" }}>📅 {targetMonday} 週 ▼</button>
       {isOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setIsOpen(false)}></div>
@@ -326,7 +326,7 @@ class AutoAssigner {
     this.applyDailyAdditions(); this.evaluateEmergencies(); this.initCounts(); this.cleanUpDayCells();
     this.prepareAvailability();
 
-    // ★ 改善点：欠員補充モード時の超シンプル割付
+    // 欠員補充モード時の超シンプル割付
     if (this.isSmartFix) {
       this.log(`⚠️ 欠員補充モード：現在の配置を維持し、空き枠にのみフリーのスタッフを補充します`);
       const priority = this.ctx.customRules.priorityRooms || SECTIONS;
@@ -480,17 +480,16 @@ class AutoAssigner {
          if (this.isForbidden(name, section)) return { hard: true, msg: "担当不可設定" };
          const b = this.blockMap.get(name);
          
-         // ★ 改善点：ドミノ倒し防止。0.5枠を埋めるためだけに、終日空き(NONE)の人を使わない。
+         // ドミノ倒し防止
          if (needTag && b === 'NONE') return { hard: true, msg: "半端枠への終日スタッフ割当禁止(連鎖防止)" };
 
          if (b === 'ALL') return { hard: true, msg: "全日ブロック" };
          if (needTag === "(AM)" && b === 'AM') return { hard: true, msg: "AMブロック" };
          if (needTag === "(PM)" && b === 'PM') return { hard: true, msg: "PMブロック" };
          if (fullDayOnlyList.includes(section) && b !== 'NONE') return { hard: true, msg: "終日専任室だが半休" };
-         
-         // ★ 改善点: 玉突きルール対策。ここで `isUsed` が true の人を候補から除外しているが、
-         // 玉突きの時は強制的に移動させるので、ここでは `isUsed` チェックは既に行われている。
-         
+         const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
+         const prevDayMembers = (this.prevDay && section && noConsecutiveRooms.includes(section)) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
+         if (prevDayMembers.includes(name)) return { hard: false, msg: "連日担当禁止ルール" };
          if (this.hasNGPair(name, current.map(extractStaffName), false)) return { hard: true, msg: "絶対NGペア" };
          if (this.hasNGPair(name, current.map(extractStaffName), true)) return { hard: false, msg: "なるべくNGペア" };
          return null; 
@@ -524,7 +523,7 @@ class AutoAssigner {
              if (mainStaff.includes(a)) scoreA += 10000; else if (subPrioStaff.includes(a)) scoreA += 5000; else if (subStaff.includes(a)) scoreA += 2000;
              if (mainStaff.includes(b)) scoreB += 10000; else if (subPrioStaff.includes(b)) scoreB += 5000; else if (subStaff.includes(b)) scoreB += 2000;
              
-             // ★ 改善点：前日と同じ部屋の人にはペナルティ（固定化防止）
+             // 前日と同じ部屋の人にはペナルティ（固定化防止）
              if (prevDayMembers.includes(a)) scoreA -= 500;
              if (prevDayMembers.includes(b)) scoreB -= 500;
 
@@ -565,8 +564,7 @@ class AutoAssigner {
     (this.ctx.customRules.substitutes || []).forEach((sub: any) => { 
       const targets = split(sub.target); if (targets.length === 0 || this.skipSections.includes(sub.section)) return; 
       const currentSec = split(this.dayCells[sub.section]).map(extractStaffName);
-      // ★ 改善点：代打の暴走防止（ターゲットが既にその部屋にいるなら代打不要）
-      if (targets.some(t => currentSec.includes(t))) return;
+      if (targets.some(t => currentSec.includes(t))) return; // 既に配置済みなら暴走を防ぐ
       
       const trigger = targets.every(t => !availAll.includes(t) || this.isUsed(t)); 
       if (trigger) { const fallbackStaff = split(sub.subs).filter(s => availGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section)); if (fallbackStaff.length > 0) { const currentSec = split(this.dayCells[sub.section]); for (const f of fallbackStaff) { if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; if (!this.hasNGPair(f, currentSec.map(extractStaffName), false) && currentSec.length < 6) { const b = this.blockMap.get(f); let tag = ""; let fr = 1; if (b === 'AM') { tag = "(PM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } this.dayCells[sub.section] = join([...currentSec, `${f}${tag}`]); this.addU(f, fr); this.log(`🔄 [代打] ${sub.target} が不在のため、${f} を ${sub.section} に配置しました`); break; } } } } 
@@ -588,7 +586,6 @@ class AutoAssigner {
             if (this.hasNGPair(s2, currentRoom.map(extractStaffName), false)) continue; 
             const actualCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); 
             const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
-            // ★ 改善点：玉突き発動条件の修正（s2が既にisUsedかどうかのチェックを外す）
             if (getAmt(currentRoom) < actualCap) { 
               this.dayCells[tSec] = join(split(this.dayCells[tSec]).filter(m => extractStaffName(m) !== s2));
               const b = this.blockMap.get(s2); let tag = ""; 
@@ -643,8 +640,10 @@ class AutoAssigner {
         const strictRooms = ["治療", "RI", "MMG"];
         if (strictRooms.includes(room)) { candidates = preferredList.length > 0 ? preferredList : availGeneral; }
         
-        if (!linkedTargetRooms.includes(room)) { this.fill(candidates, room, preferredList, targetCount); } 
-        else { this.log(`⏭️ [専任スキップ] ${room} は基本兼務ルール対象のため、専任スタッフ割当をスキップしました`); }
+        this.fill(candidates, room, preferredList, targetCount);
+        if (linkedTargetRooms.includes(room)) {
+          this.log(`💡 [柔軟配置] ${room} は基本兼務対象ですが、余力があるため専任スタッフを配置しました`); 
+        }
       }
     });
 
@@ -933,6 +932,7 @@ export default function App() {
   const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
 
   useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
+
   useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); localStorage.setItem(KEY_RULES, JSON.stringify(customRules)); localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [allDays, customRules, monthlyAssign]);
 
   const activeGeneralStaff = useMemo(() => parseAndSortStaff(customRules.staffList), [customRules.staffList]);
@@ -958,15 +958,14 @@ export default function App() {
     REST_SECTIONS.forEach(s => split(cells[s]).forEach(m => absent.add(extractStaffName(m))));
     const working = allStaff.filter(s => !absent.has(s)); const assigned = new Set<string>();
     WORK_SECTIONS.forEach(s => split(cells[s]).forEach(m => assigned.add(extractStaffName(m))));
-    return { workingCount: working.length, absentCount: absent.size, unassigned: working.filter(s => !assigned.has(s)) };
+    return { workingCount: working.length, unassigned: working.filter(s => !assigned.has(s)) };
   };
 
   const getDayWarnings = (dayId: string) => {
     const w: any[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {};
     ROOM_SECTIONS.forEach(room => split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }));
     Object.entries(staffMap).forEach(([staff, rms]) => { if(rms.length >= (customRules.alertMaxKenmu || 3)) w.push({ type: 'error', msg: `【兼務過多】${staff}さんが ${rms.length}部屋（${rms.join('、')}）を担当中` }); });
-    ROOM_SECTIONS.forEach(room => { if (split(cells[room]).length === 0) w.push({type: 'alert', msg: `【空室】${room}`}); });
-
+    
     const curIdx = days.findIndex(d => d.id === dayId);
     if (curIdx > 0 && !days[curIdx-1].isPublicHoliday) {
       split(customRules.consecutiveAlertRooms).forEach(room => {
@@ -1080,9 +1079,8 @@ export default function App() {
                             {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && <span onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} className="btn-hover" style={{ background: "#f0f9ff", color: "#0369a1", padding: "6px 14px", borderRadius: 12, fontSize: 20, border: "2px solid #bae6fd" }}>🤔 根拠</span>}
                           </div>
                           {!day.isPublicHoliday && (
-                            <div onClick={(e) => { e.stopPropagation(); setShowUnassignedList(day.id); }} className="btn-hover" style={{ fontSize: 18, background: stats.unassigned.length > 0 ? "#fee2e2" : "#d1fae5", color: stats.unassigned.length > 0 ? "#ef4444" : "#065f46", padding: "8px 12px", borderRadius: 12, fontWeight: 800 }}>
-                              出勤:{stats.workingCount}名 (不在:{stats.absentCount}名)<br/>
-                              未配置:<span style={{fontSize:24, textDecoration:"underline"}}>{stats.unassigned.length}</span>名
+                            <div onClick={(e) => { e.stopPropagation(); setShowUnassignedList(day.id); }} className="btn-hover" style={{ fontSize: 20, background: stats.unassigned.length > 0 ? "#fee2e2" : "#d1fae5", color: stats.unassigned.length > 0 ? "#ef4444" : "#065f46", padding: "6px 12px", borderRadius: 12, fontWeight: 800 }}>
+                              出勤:{stats.workingCount}名 / 未配置:<span style={{fontSize:24, textDecoration:"underline"}}>{stats.unassigned.length}</span>名
                             </div>
                           )}
                           {day.isPublicHoliday && <div style={{ fontSize: 22, color: "#ef4444" }}>🎌 {day.holidayName}</div>}
@@ -1129,6 +1127,7 @@ export default function App() {
                 <button className="btn-hover" onClick={() => handleAutoAssign(false, false)} style={btnStyle("#10b981")}>✨ 1日自動割当</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(false, true)} style={btnStyle("#0ea5e9")}>⚡ 週間自動割当</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(true, false)} style={btnStyle("#f59e0b")}>🔄 欠員補充(1日)</button>
+                <button className="btn-hover" onClick={() => handleAutoAssign(true, true)} style={btnStyle("#d97706")}>🔄 欠員補充(週間)</button>
              </div>
           </div>
 
