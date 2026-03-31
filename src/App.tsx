@@ -120,7 +120,7 @@ const DEFAULT_RULES: CustomRules = {
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2180"; const KEY_MONTHLY = "shifto_monthly_v2180"; const KEY_RULES = "shifto_rules_v2180";
+const KEY_ALL_DAYS = "shifto_alldays_v2190"; const KEY_MONTHLY = "shifto_monthly_v2190"; const KEY_RULES = "shifto_rules_v2190";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -340,13 +340,11 @@ class AutoAssigner {
     let count = 0; Object.keys(this.dayCells).forEach(sec => { if (REST_SECTIONS.includes(sec) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(sec)) return; if (split(this.dayCells[sec]).map(extractStaffName).includes(staff)) count++; }); return count;
   }
 
-  // ★ 兼務上限（および専任ペア）のチェック関数
   canAddKenmu(staff: string, targetRoom: string): boolean {
     const limit = this.ctx.customRules.alertMaxKenmu || 3;
     const currentRoomCount = this.getTodayRoomCount(staff);
     const isAlreadyInTarget = split(this.dayCells[targetRoom] || "").map(extractStaffName).includes(staff);
     
-    // 現在の部屋数が上限以上で、かつターゲット部屋が新しい部屋ならブロック
     if (!isAlreadyInTarget && currentRoomCount >= limit) return false;
 
     const exclusivePairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive);
@@ -354,12 +352,10 @@ class AutoAssigner {
       const inS1 = split(this.dayCells[p.s1] || "").map(extractStaffName).includes(staff);
       const inS2 = split(this.dayCells[p.s2] || "").map(extractStaffName).includes(staff);
       
-      // 既に専念ペアのどちらかにいる場合、ペアのもう片方以外への追加は不可
       if (inS1 || inS2) {
         if (targetRoom !== p.s1 && targetRoom !== p.s2) return false;
       }
       
-      // ターゲット部屋が専念ペアの一部である場合、既にペア以外の部屋にいるなら追加不可
       if (targetRoom === p.s1 || targetRoom === p.s2) {
         const currentRooms = ROOM_SECTIONS.filter(r => split(this.dayCells[r] || "").map(extractStaffName).includes(staff));
         const hasOutsideRoom = currentRooms.some(r => r !== p.s1 && r !== p.s2);
@@ -540,7 +536,7 @@ class AutoAssigner {
     const filterFn = (name: string, checkSoftNg: boolean) => {
       if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false;
       if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false;
-      if (section && !this.canAddKenmu(name, section)) return false; // ★ 兼務上限＆専念ペアのチェック
+      if (section && !this.canAddKenmu(name, section)) return false; 
       return true;
     };
     for (const name of uniqueList.filter(n => filterFn(n, true))) { result.push(name); if (result.length >= n) return result; }
@@ -576,7 +572,6 @@ class AutoAssigner {
          
          if (section === "MMG" && !this.isMmgCapable(name)) return { hard: true, msg: "MMG月間担当者ではない" };
 
-         // ★ 兼務上限＆専念ペアのチェック
          if (!this.canAddKenmu(name, section)) return { hard: true, msg: "兼務上限または専念ペア制約" };
 
          const b = this.blockMap.get(name);
@@ -695,7 +690,7 @@ class AutoAssigner {
           for (const f of fallbackStaff) { 
             if (fullDayOnlyList.includes(sub.section) && this.blockMap.get(f) !== 'NONE') continue; 
             if (!this.hasNGPair(f, currentRoomMembers.map(extractStaffName), false) && currentRoomMembers.length < 6) { 
-              if (!this.canAddKenmu(f, sub.section)) continue; // ★ 代打時も専念ペア・上限を考慮
+              if (!this.canAddKenmu(f, sub.section)) continue; 
               const b = this.blockMap.get(f); let tag = ""; let fr = 1; 
               if (b === 'AM') { tag = "(PM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; fr = 0.5; this.blockMap.set(f, 'ALL'); } else { this.blockMap.set(f, 'ALL'); } 
               this.dayCells[sub.section] = join([...currentRoomMembers, `${f}${tag}`]); this.addU(f, fr); 
@@ -722,7 +717,7 @@ class AutoAssigner {
             if (fullDayOnlyList.includes(room) && this.blockMap.get(s2) !== 'NONE') continue; 
             const currentRoom = split(this.dayCells[room]); 
             if (this.hasNGPair(s2, currentRoom.map(extractStaffName), false)) continue; 
-            if (!this.canAddKenmu(s2, room)) continue; // ★ 玉突き時も上限・専念を考慮
+            if (!this.canAddKenmu(s2, room)) continue; 
             const actualCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); 
             const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
             if (getAmt(currentRoom) < actualCap) { 
@@ -955,6 +950,13 @@ class AutoAssigner {
       
       for (const srcRoom of sourceRooms) {
         if (curAm >= targetCap && curPm >= targetCap) break; 
+        
+        // ★ 追加: CTから兼務させるのはCTが4人以上の時だけ
+        if (srcRoom === "CT") {
+          const ctAmt = split(this.dayCells["CT"]).reduce((sum, m) => sum + getStaffAmount(m), 0);
+          if (ctAmt < 4) continue;
+        }
+
         split(this.dayCells[srcRoom]).forEach(m => {
           if (curAm >= targetCap && curPm >= targetCap) return;
           const core = extractStaffName(m);
@@ -1003,6 +1005,13 @@ class AutoAssigner {
          let candidates: { core: string, fullStr: string, srcIdx: number }[] = [];
          sourceRooms.forEach((srcRoom, idx) => {
             if (srcRoom === targetRoom) return;
+
+            // ★ 追加: CTから兼務させるのはCTが4人以上の時だけ
+            if (srcRoom === "CT") {
+              const ctAmt = split(this.dayCells["CT"]).reduce((sum, m) => sum + getStaffAmount(m), 0);
+              if (ctAmt < 4) return;
+            }
+
             split(this.dayCells[srcRoom]).forEach(m => {
                const core = extractStaffName(m);
                if (isFixedToAny(core)) return;
@@ -1107,6 +1116,7 @@ class AutoAssigner {
               
               if (this.hasNGPair(core, portableMembers.map(extractStaffName), false)) return false;
               if (this.hasNGPair(core, room2Members.map(extractStaffName), false)) return false;
+
               if (!this.canAddKenmu(core, portableRoom)) return false;
 
               return !this.isForbidden(core, portableRoom)
@@ -1477,7 +1487,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 36, fontWeight: 900 }}>勤務割付システム Ver 2.18</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 36, fontWeight: 900 }}>勤務割付システム Ver 2.19</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -2140,4 +2150,15 @@ export default function App() {
           <div className="modal-animate" style={{ background: "#fff", padding: 48, borderRadius: 28, width: "90%", maxWidth: 1000, maxHeight: "80vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, paddingBottom: 20, borderBottom: "2px solid #e2e8f0" }}>
               <h3 style={{ margin: 0, fontSize: 36, color: "#0f172a", fontWeight: 800 }}>🤔 {selectedLogDay} の割当根拠</h3>
-              <button onClick={() => setSelectedLogDay(null)} className="btn-hover" style={{
+              <button onClick={() => setSelectedLogDay(null)} className="btn-hover" style={{ background: "#f1f5f9", border: "none", width: 56, height: 56, borderRadius: "50%", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 28 }}>✖</button>
+            </div>
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {assignLogs[selectedLogDay]?.map((log, i) => renderLog(log, i))}
+            </ul>
+            <div style={{ textAlign: "center", marginTop: 32 }}><button onClick={() => setSelectedLogDay(null)} style={{ ...btnStyle("#2563eb", "#fff"), width: "100%", justifyContent: "center", padding: "20px" }}>閉じる</button></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
