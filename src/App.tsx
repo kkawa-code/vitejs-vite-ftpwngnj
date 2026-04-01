@@ -2,29 +2,18 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
   body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 15px; overflow-x: hidden; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
-  
-  select { 
-    appearance: none; 
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
-    background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; 
-    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; 
-  }
-  
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
-  
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; }
-  
   .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; box-shadow: 0 2px 4px -1px rgba(0,0,0,0.05); }
   .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 16px; margin-top: -16px; box-shadow: 0 4px 6px -4px rgba(0,0,0,0.1); }
-
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -32,7 +21,6 @@ const globalStyle = `
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-  
   .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; width: 100%; }
   .rule-sel { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1 1 120px; font-size: 14px; transition: border-color 0.2s; }
   .rule-num { width: 60px; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 14px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
@@ -41,27 +29,14 @@ const globalStyle = `
   .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 10px 16px; font-size: 15px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 14px; font-weight: 700; color: #64748b; flex-shrink: 0; }
-  
   .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid #e2e8f0; margin-bottom: 24px; padding: 0 12px; flex-wrap: wrap; }
   .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 16px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
-
-  .name-textarea {
-    width: 100%;
-    height: 120px;
-    padding: 12px;
-    font-size: 14px !important;
-    border-radius: 8px;
-    border: 1px solid #cbd5e1;
-    font-weight: 600;
-    line-height: 1.5;
-  }
+  .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 14px !important; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; line-height: 1.5; }
   .name-textarea::placeholder { color: #94a3b8; font-weight: 400; }
-
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
-
   @media print {
     body { background: #fff; overflow: visible; font-size: 12pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
@@ -92,7 +67,6 @@ const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const WORK_SECTIONS = SECTIONS.filter(s => !REST_SECTIONS.includes(s));
 const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "検像"];
-
 const EXTENDED_ROOM_SECTIONS = [...ROOM_SECTIONS, "CT(4)", "CT(3)", "MRI(3)", "治療(3)"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日" };
@@ -105,15 +79,8 @@ const DEFAULT_RULES: CustomRules = {
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, 
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
   noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
-  swapRules: [
-    { targetRoom: "ポータブル", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" },
-    { targetRoom: "パノラマCT", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" }
-  ],
-  kenmuPairs: [], rescueRules: [
-    { targetRoom: "ポータブル", sourceRooms: "3号室、2号室、1号室、5号室、CT(4)" },
-    { targetRoom: "DSA", sourceRooms: "5号室、2号室、検像、CT(4)" },
-    { targetRoom: "骨塩", sourceRooms: "1号室、5号室、2号室、CT(4)" }
-  ], lateShifts: [], 
+  swapRules: [{ targetRoom: "ポータブル", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" }, { targetRoom: "パノラマCT", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" }],
+  kenmuPairs: [], rescueRules: [{ targetRoom: "ポータブル", sourceRooms: "3号室、2号室、1号室、5号室、CT(4)" }, { targetRoom: "DSA", sourceRooms: "5号室、2号室、検像、CT(4)" }, { targetRoom: "骨塩", sourceRooms: "1号室、5号室、2号室、CT(4)" }], lateShifts: [], 
   lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" }],
   lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", 
@@ -122,15 +89,15 @@ const DEFAULT_RULES: CustomRules = {
   smartKenmu: [{ targetRoom: "MMG", sourceRooms: "1号室、2号室、3号室、5号室、CT(4)" }]
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2430"; const KEY_MONTHLY = "shifto_monthly_v2430"; const KEY_RULES = "shifto_rules_v2430";
+const KEY_ALL_DAYS = "shifto_alldays_v2440"; const KEY_MONTHLY = "shifto_monthly_v2440"; const KEY_RULES = "shifto_rules_v2440";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
 for (let h = 8; h <= 19; h++) { for (let m = 0; m < 60; m += 15) { if (h === 8 && m === 0) continue; TIME_OPTIONS.push(`(${h}:${pad(m)}〜)`); TIME_OPTIONS.push(`(〜${h}:${pad(m)})`); } }
 
-const split = (v: string) => (v || "").split(/[、,\n]+/).map((s: string) => s.trim()).filter(Boolean);
+const split = (v: string) => (v || "").split(/[、,\n]+/).map(s => s.trim()).filter(Boolean);
 const join = (a: string[]) => a.filter(Boolean).join("、");
-const extractStaffName = (fullName: string) => fullName.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
+const extractStaffName = (f: string) => f.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
 const parseRoomCond = (str: string) => { const m = str.match(/^(.*?)\((\d+)\)$/); return m ? { r: m[1], min: Number(m[2]) } : { r: str, min: 0 }; };
 
 function parseAndSortStaff(staffString: string) {
@@ -277,7 +244,7 @@ const renderLog = (logStr: string, i: number) => {
     return <li key={i} style={{ marginTop: 16, marginBottom: 8, paddingBottom: 4, borderBottom: "2px solid #cbd5e1", fontSize: 18, fontWeight: 800, color: "#334155" }}>{logStr.substring(2)}</li>;
   }
   const match = logStr.match(/^・(.*?)\s\[(.*?)\]\s(.*)$/);
-  if (!match) return <li key={i} style={{ padding: "8px 12px", marginBottom: "4px", background: "#f8fafc", borderRadius: "6px", fontSize: 14, color: "#475569" }}>{logStr.substring(1)}</li>;
+  if (!match) return <li key={i} style={{ padding: "8px 12px", marginBottom: "4px", background: "#f8fafc", borderRadius: "6px", fontSize: 14, color: "#475569", lineHeight: 1.6, wordBreak: "break-word" }}>{logStr.substring(1)}</li>;
   const [_, icon, category, text] = match;
   let bg = "#f8fafc"; let border = "#e2e8f0"; let color = "#475569"; let badgeBg = "#e2e8f0"; let badgeColor = "#475569";
   if (category.includes("配置決定") || category.includes("増枠")) { bg = "#eff6ff"; border = "#bfdbfe"; color = "#1e3a8a"; badgeBg = "#dbeafe"; badgeColor = "#1d4ed8"; }
@@ -1162,6 +1129,106 @@ class AutoAssigner {
       this.dayCells[rule.section] = join(current);
     });
 
+    // ★ 兼務解消（De-Kenmu）ロジック
+    const deKenmuTargets = ["ポータブル", "DSA", "パノラマCT", "検像", "骨塩", "MMG", "透視（11号）", "透視（6号）"];
+    let unassignedGeneral = this.initialAvailGeneral.filter((s: string) => !this.isUsed(s));
+
+    unassignedGeneral.forEach((staff: string) => {
+      const b = this.blockMap.get(staff); 
+      if (b === 'ALL') return;
+      
+      let tag = ""; let f = 1;
+      if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } 
+      else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } 
+      else { this.blockMap.set(staff, 'ALL'); }
+      
+      let assigned = false;
+
+      for (const room of deKenmuTargets) {
+        if (this.skipSections.includes(room) || this.clearSections.includes(room) || this.isForbidden(staff, room)) continue;
+        if (room === "MMG" && !this.isMmgCapable(staff)) continue;
+        
+        let currentMems = split(this.dayCells[room]);
+        const candidateToReplaceIdx = currentMems.findIndex(m => {
+          const core = extractStaffName(m);
+          if (ROLE_PLACEHOLDERS.includes(core)) return false;
+          if (isFixedToAny(core)) return false;
+          if (this.getTodayRoomCount(core) <= 1) return false;
+          
+          const otherCores = currentMems.filter(x => x !== m).map(extractStaffName);
+          if (this.hasNGPair(staff, otherCores, false)) return false;
+          
+          let curAm = m.includes("(AM)"); let curPm = m.includes("(PM)");
+          if (!curAm && !curPm) { curAm = true; curPm = true; } 
+          let newAm = tag === "(AM)"; let newPm = tag === "(PM)";
+          if (!newAm && !newPm) { newAm = true; newPm = true; } 
+          
+          if (curAm && !newAm) return false;
+          if (curPm && !newPm) return false;
+          
+          return true;
+        });
+
+        if (candidateToReplaceIdx !== -1) {
+          const oldStr = currentMems[candidateToReplaceIdx];
+          const oldCore = extractStaffName(oldStr);
+          
+          let replaceTag = "";
+          if (oldStr.includes("(AM)")) replaceTag = "(AM)";
+          else if (oldStr.includes("(PM)")) replaceTag = "(PM)";
+          else replaceTag = tag; 
+
+          currentMems[candidateToReplaceIdx] = `${staff}${replaceTag}`;
+          this.dayCells[room] = join(currentMems);
+          
+          this.addU(staff, f);
+          
+          // 古い担当者の「今日の割当数」のみ減算
+          this.assignCounts[oldCore] = Math.max(0, (this.assignCounts[oldCore] || 1) - getStaffAmount(oldStr));
+          
+          // 古い担当者の blockMap を再計算
+          let amBusy = false; let pmBusy = false;
+          ["明け","入り","土日休日代休"].forEach(sec => {
+            if (split(this.dayCells[sec]).map(extractStaffName).includes(oldCore)) { amBusy = true; pmBusy = true; }
+          });
+          split(this.dayCells["不在"]).forEach(m => {
+            if (extractStaffName(m) === oldCore) {
+              if (m.includes("(AM)")) amBusy = true;
+              else if (m.includes("(PM)")) pmBusy = true;
+              else { amBusy = true; pmBusy = true; }
+            }
+          });
+          WORK_SECTIONS.forEach(sec => {
+            split(this.dayCells[sec]).forEach(m => {
+              if (extractStaffName(m) === oldCore) {
+                if (m.includes("(AM)")) amBusy = true;
+                else if (m.includes("(PM)")) pmBusy = true;
+                else { amBusy = true; pmBusy = true; }
+              }
+            });
+          });
+
+          if (amBusy && pmBusy) this.blockMap.set(oldCore, 'ALL');
+          else if (amBusy) this.blockMap.set(oldCore, 'AM');
+          else if (pmBusy) this.blockMap.set(oldCore, 'PM');
+          else this.blockMap.set(oldCore, 'NONE');
+          
+          this.log(`🪄 [兼務解消] 余剰の ${staff} を ${room} に専任配置し、${oldCore} の兼務を解消しました`);
+          assigned = true;
+          break;
+        }
+      }
+
+      if (!assigned && !this.skipSections.includes("3号室") && !this.isForbidden(staff, "3号室")) {
+        let current = split(this.dayCells["3号室"]);
+        if (!this.hasNGPair(staff, current.map(extractStaffName), false)) {
+          this.dayCells["3号室"] = join([...current, `${staff}${tag}`]);
+          this.addU(staff, f);
+          this.log(`♻️ [余剰配置] 兼務解消できる部屋がなかったため、${staff} を 3号室 に追加しました`);
+        }
+      }
+    });
+
     this.logPhase("フェーズ5：仕上げ（最後に配置）");
 
     if (!this.skipSections.includes("昼当番")) {
@@ -1282,120 +1349,15 @@ class AutoAssigner {
       }
       this.dayCells["受付ヘルプ"] = join(helpMems);
     }
-    
-    // ★ 兼務解消（De-Kenmu）ロジック
-    const deKenmuTargets = ["ポータブル", "DSA", "パノラマCT", "検像", "骨塩", "MMG", "透視（11号）", "透視（6号）"];
-    let unassignedGeneral = this.initialAvailGeneral.filter((s: string) => !this.isUsed(s));
-
-    unassignedGeneral.forEach((staff: string) => {
-      const b = this.blockMap.get(staff); 
-      if (b === 'ALL') return;
-      
-      let tag = ""; let f = 1;
-      if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } 
-      else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } 
-      else { this.blockMap.set(staff, 'ALL'); }
-      
-      let assigned = false;
-
-      for (const room of deKenmuTargets) {
-        if (this.skipSections.includes(room) || this.clearSections.includes(room) || this.isForbidden(staff, room)) continue;
-        if (room === "MMG" && !this.isMmgCapable(staff)) continue;
-        
-        let currentMems = split(this.dayCells[room]);
-        const candidateToReplaceIdx = currentMems.findIndex(m => {
-          const core = extractStaffName(m);
-          if (ROLE_PLACEHOLDERS.includes(core)) return false;
-          if (isFixedToAny(core)) return false;
-          if (this.getTodayRoomCount(core) <= 1) return false;
-          
-          const otherCores = currentMems.filter(x => x !== m).map(extractStaffName);
-          if (this.hasNGPair(staff, otherCores, false)) return false;
-          
-          let curAm = m.includes("(AM)"); let curPm = m.includes("(PM)");
-          if (!curAm && !curPm) { curAm = true; curPm = true; } 
-          let newAm = tag === "(AM)"; let newPm = tag === "(PM)";
-          if (!newAm && !newPm) { newAm = true; newPm = true; } 
-          
-          if (curAm && !newAm) return false;
-          if (curPm && !newPm) return false;
-          
-          return true;
-        });
-
-        if (candidateToReplaceIdx !== -1) {
-          const oldStr = currentMems[candidateToReplaceIdx];
-          const oldCore = extractStaffName(oldStr);
-          
-          let replaceTag = "";
-          if (oldStr.includes("(AM)")) replaceTag = "(AM)";
-          else if (oldStr.includes("(PM)")) replaceTag = "(PM)";
-          else replaceTag = tag; 
-
-          currentMems[candidateToReplaceIdx] = `${staff}${replaceTag}`;
-          this.dayCells[room] = join(currentMems);
-          
-          this.addU(staff, f);
-          
-          // 古い担当者の「今日の割当数」のみ減算する
-          this.assignCounts[oldCore] = Math.max(0, (this.assignCounts[oldCore] || 1) - getStaffAmount(oldStr));
-          
-          // 古い担当者の「今日の残りの業務」を調べて blockMap を再計算
-          let amBusy = false; let pmBusy = false;
-          ["明け","入り","土日休日代休"].forEach(sec => {
-            if (split(this.dayCells[sec]).map(extractStaffName).includes(oldCore)) { amBusy = true; pmBusy = true; }
-          });
-          split(this.dayCells["不在"]).forEach(m => {
-            if (extractStaffName(m) === oldCore) {
-              if (m.includes("(AM)")) amBusy = true;
-              else if (m.includes("(PM)")) pmBusy = true;
-              else { amBusy = true; pmBusy = true; }
-            }
-          });
-          WORK_SECTIONS.forEach(sec => {
-            split(this.dayCells[sec]).forEach(m => {
-              if (extractStaffName(m) === oldCore) {
-                if (m.includes("(AM)")) amBusy = true;
-                else if (m.includes("(PM)")) pmBusy = true;
-                else { amBusy = true; pmBusy = true; }
-              }
-            });
-          });
-
-          if (amBusy && pmBusy) this.blockMap.set(oldCore, 'ALL');
-          else if (amBusy) this.blockMap.set(oldCore, 'AM');
-          else if (pmBusy) this.blockMap.set(oldCore, 'PM');
-          else this.blockMap.set(oldCore, 'NONE');
-          
-          this.log(`🪄 [兼務解消] 余剰の ${staff} を ${room} に専任配置し、${oldCore} の兼務を解消しました`);
-          assigned = true;
-          break;
-        }
-      }
-
-      if (!assigned && !this.skipSections.includes("3号室") && !this.isForbidden(staff, "3号室")) {
-        let current = split(this.dayCells["3号室"]);
-        if (!this.hasNGPair(staff, current.map(extractStaffName), false)) {
-          this.dayCells["3号室"] = join([...current, `${staff}${tag}`]);
-          this.addU(staff, f);
-          this.log(`♻️ [余剰配置] 兼務解消できる部屋がなかったため、${staff} を 3号室 に追加しました`);
-        }
-      }
-    });
-
   }
 }
-
 // ===================== 🌟 メインコンポーネント =====================
 export default function App() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'stats' | 'rules'>('calendar');
   const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { return JSON.parse(localStorage.getItem(KEY_ALL_DAYS) || "{}"); } catch { return {}; } });
   const [customRules, setCustomRules] = useState<CustomRules>(() => { try { return { ...DEFAULT_RULES, ...JSON.parse(localStorage.getItem(KEY_RULES) || "{}") }; } catch { return DEFAULT_RULES; } });
   const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => { try { return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(localStorage.getItem(KEY_MONTHLY) || "{}") }; } catch { return DEFAULT_MONTHLY_ASSIGN; } });
-  const [targetMonday, setTargetMonday] = useState(() => {
-    const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff));
-    return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
-  });
+  const [targetMonday, setTargetMonday] = useState(() => { const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff)); return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`; });
   const [sel, setSel] = useState("");
   const [assignLogs, setAssignLogs] = useState<Record<string, string[]>>({});
   const [selectedErrorDay, setSelectedErrorDay] = useState<string | null>(null);
@@ -1438,12 +1400,7 @@ export default function App() {
 
   const getDayWarnings = (dayId: string) => {
     const w: any[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {};
-    ROOM_SECTIONS.forEach(room => {
-      if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return;
-      split(cells[room]).forEach(m => { 
-        const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); 
-      })
-    });
+    ROOM_SECTIONS.forEach(room => { if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return; split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }) });
     Object.entries(staffMap).forEach(([staff, rms]) => { if(rms.length >= (customRules.alertMaxKenmu || 3)) w.push({ type: 'error', msg: `【兼務限界】${staff}さんが ${rms.length}部屋（${rms.join('、')}）を担当中` }); });
     ROOM_SECTIONS.forEach(room => { if (split(cells[room]).length === 0) w.push({type: 'alert', msg: `【空室】${room}`}); });
     const curIdx = days.findIndex(d => d.id === dayId);
@@ -1453,6 +1410,13 @@ export default function App() {
         split(cells[room]).map(extractStaffName).filter(n => prev.includes(n)).forEach(n => w.push({ type: 'error', msg: `【連日注意】${n}さんが「${room}」に連日入っています` }));
       });
     }
+    const portableStaffMap: Record<string, number> = {};
+    for (let i = 0; i <= curIdx; i++) {
+      const dId = days[i].id;
+      const mems = split((allDays[dId] || {})["ポータブル"]).map(extractStaffName);
+      mems.forEach(m => { portableStaffMap[m] = (portableStaffMap[m] || 0) + 1; });
+    }
+    Object.entries(portableStaffMap).forEach(([staff, count]) => { if (count >= 2) { const todayMems = split((allDays[dayId] || {})["ポータブル"]).map(extractStaffName); if (todayMems.includes(staff)) { w.push({ type: 'alert', msg: `【ポータブル多】${staff}さんが今週${count}回目のポータブルです` }); } } });
     return w;
   };
 
@@ -1476,13 +1440,7 @@ export default function App() {
     return stats;
   }, [targetMonday, allDays, activeGeneralStaff]);
 
-  const setAllDaysWithHistory = (updater: any) => {
-    setAllDays(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      if (JSON.stringify(prev) !== JSON.stringify(next)) { setHistory(h => [...h, prev].slice(-20)); } return next;
-    });
-  };
-
+  const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) { setHistory(h => [...h, prev].slice(-20)); } return next; }); };
   const updateDay = (k: string, v: string) => {
     setAllDaysWithHistory((prev: any) => {
       const nextState = { ...prev, [sel]: { ...(prev[sel] || {}), [k]: v } };
@@ -1548,7 +1506,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.43</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.44</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1562,7 +1520,6 @@ export default function App() {
         <button className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`} onClick={() => setActiveTab('rules')}>⚙️ 設定・データ入出力</button>
       </div>
 
-      {/* 週間予定表 */}
       <div style={{ display: activeTab === 'calendar' ? 'block' : 'none' }}>
         <div className="print-area" style={{ ...panelStyle(), marginBottom: 32, padding: "16px" }}>
           <div className="scroll-container">
@@ -1597,13 +1554,18 @@ export default function App() {
                 {SECTIONS.map((section, sIdx) => (
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "2px solid #e2e8f0"}}>{section}</td>
-                    {days.map((day) => {
+                    {days.map((day, dIdx) => {
                       const currentMems = split(allDays[day.id]?.[section]);
+                      const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : [];
+                      const isAlertRoom = split(customRules.consecutiveAlertRooms).includes(section);
                       return (
                         <td key={day.id + section} style={cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1)}>
                           {!day.isPublicHoliday && (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.6" }}>
-                              {currentMems.map((m, mIdx) => <span key={mIdx}>{m}{mIdx < currentMems.length - 1 ? "、" : ""}</span>)}
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4" }}>
+                              {currentMems.map((m, mIdx) => {
+                                const isConsecutive = isAlertRoom && prevMems.includes(extractStaffName(m));
+                                return <span key={mIdx} style={{ color: isConsecutive ? "#ef4444" : "inherit", fontWeight: isConsecutive ? 900 : "inherit" }}>{m}{mIdx < currentMems.length - 1 ? "、" : ""}</span>;
+                              })}
                             </div>
                           )}
                         </td>
@@ -1626,6 +1588,7 @@ export default function App() {
                 <button className="btn-hover" onClick={() => handleAutoAssign(false, true)} style={btnStyle("#0ea5e9")}>⚡ 週間自動割当</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(true, false)} style={btnStyle("#f59e0b")}>🔄 欠員補充(1日)</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(true, true)} style={btnStyle("#d97706")}>🔄 欠員補充(週間)</button>
+                <button className="btn-hover" onClick={handleCopyYesterday} style={{ ...btnStyle("#f8fafc", "#475569"), border: "1px solid #cbd5e1" }} disabled={cur.isPublicHoliday}>📋 昨日をコピー</button>
                 <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6")}}>↩️ 戻る</button>
              </div>
           </div>
@@ -1635,10 +1598,24 @@ export default function App() {
                <div key={group.title} style={{ gridColumn: "1 / -1" }}>
                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #e2e8f0" }}>
                    <h4 style={{ fontSize: 20, fontWeight: 900, borderLeft: `6px solid ${group.color}`, paddingLeft: 12, margin: 0 }}>{group.title}</h4>
-                   <div style={{display: "flex", gap: 8}}>
-                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
-                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
-                    </div>
+                   {group.title === "休務・夜勤" && (
+                      <div style={{display: "flex", gap: 8}}>
+                        <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
+                        <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                      </div>
+                    )}
+                    {group.title === "モダリティ" && (
+                      <div style={{display: "flex", gap: 8}}>
+                        <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務1日クリア</button>
+                        <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務週間クリア</button>
+                      </div>
+                    )}
+                    {group.title === "待機・その他" && (
+                      <div style={{display: "flex", gap: 8}}>
+                        <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
+                        <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                      </div>
+                    )}
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
                    {group.sections.map(s => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} />)}
