@@ -2,28 +2,18 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
   body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
-  
-  select { 
-    appearance: none; 
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
-    background-repeat: no-repeat; background-position: right 16px center; background-size: 1.6em; 
-    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 56px !important; 
-  }
-  
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 1.6em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 56px !important; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
-  
   .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
   .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 24px; margin-top: -24px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
-
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -39,27 +29,14 @@ const globalStyle = `
   .rule-add { background: #fff; color: #4f46e5; border: 3px dashed #a5b4fc; padding: 14px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 22px; font-weight: 700; color: #64748b; flex-shrink: 0; }
-  
   .tabs-header { display: flex; gap: 12px; border-bottom: 4px solid #e2e8f0; margin-bottom: 32px; padding: 0 16px; flex-wrap: wrap; }
   .tab-btn { background: none; border: none; padding: 16px 32px; font-size: 26px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 5px solid transparent; margin-bottom: -4px; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
-
-  .name-textarea {
-    width: 100%;
-    height: 200px;
-    padding: 20px;
-    font-size: 26px !important;
-    border-radius: 16px;
-    border: 3px solid #cbd5e1;
-    font-weight: 700;
-    line-height: 1.6;
-  }
+  .name-textarea { width: 100%; height: 200px; padding: 20px; font-size: 26px !important; border-radius: 16px; border: 3px solid #cbd5e1; font-weight: 700; line-height: 1.6; }
   .name-textarea::placeholder { color: #94a3b8; font-weight: 400; }
-
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
-
   @media print {
     body { background: #fff; overflow: visible; font-size: 16pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
@@ -76,7 +53,7 @@ type RejectReason = { hard: boolean, msg: string };
 interface CustomRules {
   staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; customHolidays: string;
   capacity: Record<string, number>; dailyCapacities: any[]; dailyAdditions: any[]; priorityRooms: string[]; fullDayOnlyRooms: string; noConsecutiveRooms: string; 
-  consecutiveAlertRooms: string; noLateShiftStaff: string; noLateShiftRooms: string; ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[];
+  consecutiveAlertRooms: string; noLateShiftStaff: string; noLateShiftRooms: string; ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; swapRules: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[];
   helpThreshold: number; lunchBaseCount: number; lunchSpecialDays: any[]; lunchConditional: any[]; lunchRoleRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[]; 
   alertMaxKenmu: number; alertEmptyRooms: string; smartKenmu: any[];
 }
@@ -90,7 +67,6 @@ const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 const WORK_SECTIONS = SECTIONS.filter(s => !REST_SECTIONS.includes(s));
 const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
 const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "検像"];
-
 const EXTENDED_ROOM_SECTIONS = [...ROOM_SECTIONS, "CT(4)", "CT(3)", "MRI(3)", "治療(3)"];
 
 const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日" };
@@ -101,8 +77,9 @@ const DEFAULT_RULES: CustomRules = {
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", 
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, 
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
-  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], kenmuPairs: [], rescueRules: [], lateShifts: [], 
-  helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
+  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
+  swapRules: [{ targetRoom: "ポータブル", triggerRoom: "2号室", sourceRooms: "1号室、5号室" }],
+  kenmuPairs: [], rescueRules: [], lateShifts: [], helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" }],
   lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", 
   linkedRooms: [ { target: "ポータブル", sources: "2号室、CT(4)" }, { target: "DSA", sources: "2号室、1号室、5号室" }, { target: "検像", sources: "骨塩" }, { target: "パノラマCT", sources: "透視（6号）、2号室" } ], 
@@ -110,7 +87,7 @@ const DEFAULT_RULES: CustomRules = {
   smartKenmu: [{ targetRoom: "MMG", sourceRooms: "1号室、2号室、3号室、5号室、CT(4)" }]
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2270"; const KEY_MONTHLY = "shifto_monthly_v2270"; const KEY_RULES = "shifto_rules_v2270";
+const KEY_ALL_DAYS = "shifto_alldays_v2280"; const KEY_MONTHLY = "shifto_monthly_v2280"; const KEY_RULES = "shifto_rules_v2280";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -665,7 +642,7 @@ class AutoAssigner {
             if (this.hasNGPair(s2, currentRoom.map(extractStaffName), false)) continue; 
             if (!this.canAddKenmu(s2, room)) continue; 
             const actualCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); 
-            const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)), 0 : getStaffAmount(m)), 0);
+            const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
             if (getAmt(currentRoom) < actualCap) { 
               this.dayCells[tSec] = join(split(this.dayCells[tSec]).filter(m => extractStaffName(m) !== s2));
               const b = this.blockMap.get(s2); let tag = ""; 
@@ -755,6 +732,63 @@ class AutoAssigner {
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList, ...noLateShiftRoomMembers]; 
     const isFixedToAny = (staffName: string) => (this.ctx.customRules.fixed || []).some((r:any) => r.staff === staffName);
 
+    // ★ 新機能：メイン配置の交換ルール（ポータブルと2号室の交換など）
+    (this.ctx.customRules.swapRules || []).forEach((rule: any) => {
+      const { targetRoom, triggerRoom, sourceRooms } = rule;
+      if (!targetRoom || !triggerRoom || !sourceRooms) return;
+      if (this.clearSections.includes(targetRoom) || this.clearSections.includes(triggerRoom)) return;
+      
+      const triggerMembers = split(this.dayCells[triggerRoom]);
+      if (triggerMembers.length === 0) return;
+
+      const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
+      const prevDayTarget = (this.prevDay && noConsecutiveRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
+
+      const triggerCanTarget = triggerMembers.some(m => {
+          const c = extractStaffName(m);
+          return !ROLE_PLACEHOLDERS.includes(c) && !this.isForbidden(c, targetRoom) && !prevDayTarget.includes(c) && this.canAddKenmu(c, targetRoom, true);
+      });
+
+      if (!triggerCanTarget) {
+          const swapSources = split(sourceRooms);
+          let swapped = false;
+
+          for (const srcStrRoom of swapSources) {
+              const { r: srcRoom, min } = parseRoomCond(srcStrRoom);
+              if (srcRoom === triggerRoom) continue;
+
+              const srcMembers = split(this.dayCells[srcRoom]);
+              if (min > 0 && srcMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
+
+              for (const srcM of srcMembers) {
+                  const srcCore = extractStaffName(srcM);
+                  if (ROLE_PLACEHOLDERS.includes(srcCore) || isFixedToAny(srcCore)) continue;
+                  if (this.isForbidden(srcCore, targetRoom) || prevDayTarget.includes(srcCore) || !this.canAddKenmu(srcCore, targetRoom, true)) continue;
+                  if (this.isForbidden(srcCore, triggerRoom)) continue;
+                  if (this.hasNGPair(srcCore, triggerMembers.map(extractStaffName), false)) continue;
+
+                  const targetToKick = triggerMembers.find(m => {
+                      const c = extractStaffName(m);
+                      if (isFixedToAny(c)) return false;
+                      if (this.isForbidden(c, srcRoom)) return false;
+                      if (this.hasNGPair(c, srcMembers.map(extractStaffName), false)) return false;
+                      return true;
+                  });
+
+                  if (targetToKick) {
+                      const kickCore = extractStaffName(targetToKick);
+                      this.dayCells[triggerRoom] = join(triggerMembers.map(m => m === targetToKick ? m.replace(kickCore, srcCore) : m));
+                      this.dayCells[srcRoom] = join(srcMembers.map(m => m === srcM ? m.replace(srcCore, kickCore) : m));
+                      
+                      this.log(`🔄 [交換・救済] ${triggerRoom} から ${targetRoom} に出られる人がいないため、${triggerRoom} の ${kickCore} と ${srcRoom} の ${srcCore} を入れ替えました`);
+                      swapped = true;
+                      break;
+                  }
+              }
+              if (swapped) break;
+          }
+      }
+    });
 
     let unassignedForKenmu = this.initialAvailGeneral.filter((s: string) => !this.isUsed(s));
     (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
@@ -1006,42 +1040,6 @@ class AutoAssigner {
     });
 
     const assignSupportStaff = () => {
-      const portableRoom = "ポータブル"; const room2 = "2号室"; const swapSources = ["1号室", "5号室"];
-      const portableMembers = split(this.dayCells[portableRoom]); const room3Members = split(this.dayCells["3号室"]);
-      const portableCap = this.dynamicCapacity[portableRoom] !== undefined ? this.dynamicCapacity[portableRoom] : 1;
-      const getAmt = (arr: string[]) => arr.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
-
-      if (getAmt(portableMembers) < portableCap && getAmt(room3Members) === 0) {
-        const room2Members = split(this.dayCells[room2]);
-        const room2Portable = room2Members.filter(m => !this.isForbidden(extractStaffName(m), portableRoom) && !ROLE_PLACEHOLDERS.includes(extractStaffName(m)));
-        const room2NoPortable = room2Members.filter(m => this.isForbidden(extractStaffName(m), portableRoom) && !ROLE_PLACEHOLDERS.includes(extractStaffName(m)));
-        
-        if (room2Portable.length === 0 && room2NoPortable.length > 0) {
-          for (const srcRoom of swapSources) {
-            const srcMembers = split(this.dayCells[srcRoom]);
-            const swapCandidate = srcMembers.find(m => {
-              const core = extractStaffName(m);
-              const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
-              const prevDayMembers = (this.prevDay && portableRoom && noConsecutiveRooms.includes(portableRoom)) ? split(this.prevDay.cells[portableRoom] || "").map(extractStaffName) : [];
-
-              if (ROLE_PLACEHOLDERS.includes(core) || this.hasNGPair(core, portableMembers.map(extractStaffName), false) || this.hasNGPair(core, room2Members.map(extractStaffName), false) || !this.canAddKenmu(core, portableRoom, true) || this.isForbidden(core, portableRoom) || this.isForbidden(core, room2) || prevDayMembers.includes(core) || isFixedToAny(core)) return false;
-              return true;
-            });
-            
-            if (swapCandidate) {
-              const noPortableStaffFull = room2NoPortable[0]; const noPortableCore = extractStaffName(noPortableStaffFull); const swapCore = extractStaffName(swapCandidate);
-              this.dayCells[room2] = join(room2Members.map(m => m === noPortableStaffFull ? m.replace(noPortableCore, swapCore) : m));
-              this.dayCells[srcRoom] = join(srcMembers.map(m => m === swapCandidate ? m.replace(swapCore, noPortableCore) : m));
-              const newPortableMembers = [...split(this.dayCells[portableRoom]), swapCandidate];
-              this.dayCells[portableRoom] = join(newPortableMembers);
-              this.addU(swapCore, getStaffAmount(swapCandidate));
-              this.log(`🔄 [交換・救済] 3号室が空で2号室からポータブルに出られないため、2号室の ${noPortableCore} と ${srcRoom} の ${swapCore} を交換し、${swapCore} をポータブルに兼務させました`);
-              break;
-            }
-          }
-        }
-      }
-
       const unassignedSupport = availSupport.filter((s: string) => !this.isUsed(s));
       unassignedSupport.forEach((staff: string) => {
         const b = this.blockMap.get(staff); if (b === 'ALL') return;
@@ -1692,6 +1690,28 @@ export default function App() {
                   </div>
               ))}
               <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "CT", newCapacity: 3 })}>＋ 追加</button>
+            </div>
+
+            <div style={{ background: "#f0fdfa", padding: 32, borderRadius: 16, border: "3px solid #bbf7d0", marginBottom: 24 }}>
+              <h5 style={{ margin: "0 0 16px 0", color: "#14532d", fontSize: 26, fontWeight: 800 }}>🔄 メイン配置の交換ルール</h5>
+              <p style={{ fontSize: 20, color: "#166534", marginTop: 0, marginBottom: 20 }}>※ 兼務に行けないスタッフを、別部屋の兼務に行けるスタッフと丸ごと入れ替えます。</p>
+              {(customRules.swapRules || []).map((rule: any, idx: number) => (
+                  <div key={idx} style={{ marginBottom: 28, borderBottom: "3px solid #bbf7d0", paddingBottom: 28 }}>
+                    <div className="rule-row">
+                      <span className="rule-label" style={{color:"#15803d"}}>[</span>
+                      <select value={rule.targetRoom} onChange={(e: any) => updateRule("swapRules", idx, "targetRoom", e.target.value)} className="rule-sel" style={{borderColor:"#86efac"}}><option value="">兼務先</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#15803d"}}>] に [</span>
+                      <select value={rule.triggerRoom} onChange={(e: any) => updateRule("swapRules", idx, "triggerRoom", e.target.value)} className="rule-sel" style={{borderColor:"#86efac"}}><option value="">メイン部屋</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                      <span className="rule-label" style={{color:"#15803d"}}>] の担当者が誰も入れない時➔</span>
+                      <button onClick={() => removeRule("swapRules", idx)} className="rule-del">✖</button>
+                    </div>
+                    <div className="rule-row">
+                      <span className="rule-label" style={{color:"#15803d"}}>以下の部屋の担当者とメイン配置を交換する:</span>
+                      <MultiPicker selected={rule.sourceRooms} onChange={(v: string) => updateRule("swapRules", idx, "sourceRooms", v)} options={EXTENDED_ROOM_SECTIONS} />
+                    </div>
+                  </div>
+              ))}
+              <button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("swapRules", { targetRoom: "ポータブル", triggerRoom: "2号室", sourceRooms: "1号室、5号室" })}>＋ 交換ルールを追加</button>
             </div>
 
             <div style={{ background: "#fff7ed", padding: 32, borderRadius: 16, border: "3px solid #fed7aa", marginBottom: 24 }}>
