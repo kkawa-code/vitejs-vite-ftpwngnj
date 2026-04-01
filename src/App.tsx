@@ -985,7 +985,6 @@ class AutoAssigner {
       currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
       if (curAm >= targetCap && curPm >= targetCap) return; 
       
-      // ★ 修正：find を filter に変更し、複数行の救済ルールに完全対応
       const matchingRescueRules = (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === targetRoom);
       
       if (matchingRescueRules.length > 0) {
