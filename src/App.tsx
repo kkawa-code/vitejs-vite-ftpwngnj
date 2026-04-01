@@ -97,12 +97,16 @@ const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "202
 const MONTHLY_CATEGORIES = [ { key: "CT", label: "CT" }, { key: "MRI", label: "MRI" }, { key: "治療", label: "治療 (メイン)" }, { key: "治療サブ優先", label: "治療 (サブ優先)" }, { key: "治療サブ", label: "治療 (サブ)" }, { key: "RI", label: "RI (メイン)" }, { key: "RIサブ", label: "RI (サブ)" }, { key: "MMG", label: "MMG" }, { key: "受付", label: "受付" }, { key: "受付ヘルプ", label: "受付ヘルプ" } ];
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "" };
 const DEFAULT_PRIORITY_ROOMS = ["治療", "受付", "MMG", "RI", "MRI", "CT", "透視（6号）", "透視（11号）", "1号室", "5号室", "2号室", "骨塩", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部"];
+
 const DEFAULT_RULES: CustomRules = { 
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", 
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, 
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
   noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [], 
-  swapRules: [{ targetRoom: "ポータブル", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" }],
+  swapRules: [
+    { targetRoom: "ポータブル", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" },
+    { targetRoom: "パノラマCT", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" }
+  ],
   kenmuPairs: [], rescueRules: [], lateShifts: [], 
   helpThreshold: 24, lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" }],
@@ -112,7 +116,7 @@ const DEFAULT_RULES: CustomRules = {
   smartKenmu: [{ targetRoom: "MMG", sourceRooms: "1号室、2号室、3号室、5号室、CT(4)" }]
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2290"; const KEY_MONTHLY = "shifto_monthly_v2290"; const KEY_RULES = "shifto_rules_v2290";
+const KEY_ALL_DAYS = "shifto_alldays_v2300"; const KEY_MONTHLY = "shifto_monthly_v2300"; const KEY_RULES = "shifto_rules_v2300";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -745,9 +749,6 @@ class AutoAssigner {
   processPostTasks() {
     this.logPhase("フェーズ4：兼務・交換・救済・遅番");
 
-    // ==========================================
-    // 共通変数の定義
-    // ==========================================
     const availSupport = this.initialAvailSupport; 
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
     const noLateShiftRoomMembers = split(this.ctx.customRules.noLateShiftRooms || "").flatMap(room => split(this.dayCells[room] || "").map(extractStaffName));
@@ -757,7 +758,6 @@ class AutoAssigner {
     const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList, ...noLateShiftRoomMembers]; 
     const isFixedToAny = (staffName: string) => (this.ctx.customRules.fixed || []).some((r:any) => r.staff === staffName);
 
-    // ★ 新機能：メイン配置の交換ルール
     (this.ctx.customRules.swapRules || []).forEach((rule: any) => {
       const { targetRoom, triggerRoom, sourceRooms } = rule;
       if (!targetRoom || !triggerRoom || !sourceRooms) return;
@@ -1064,6 +1064,30 @@ class AutoAssigner {
       this.dayCells[rule.section] = join(current);
     });
 
+    const unassignedSupport = availSupport.filter((s: string) => !this.isUsed(s));
+    unassignedSupport.forEach((staff: string) => {
+      const b = this.blockMap.get(staff); if (b === 'ALL') return;
+      let assigned = false;
+      for (const room of supportTargetRooms) {
+        if (this.skipSections.includes(room) || this.isForbidden(staff, room)) continue;
+        let current = split(this.dayCells[room]); 
+        const currentCores = current.map(extractStaffName);
+        const currentAmount = current.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
+        if (currentAmount > 0 && !currentCores.includes(staff) && !this.hasNGPair(staff, currentCores, false)) {
+          let tag = ""; let f = 1;
+          if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); }
+          this.dayCells[room] = join([...current, `${staff}${tag}`]); this.addU(staff, f); assigned = true; 
+          this.log(`🤝 [サポート] 全ての配置完了後、${staff} を ${room} に追加しました`); break; 
+        }
+      }
+      if (!assigned && !this.skipSections.includes("待機") && !this.isForbidden(staff, "待機")) {
+         let current = split(this.dayCells["待機"]); let tag = ""; let f = 1;
+         if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); }
+         this.dayCells["待機"] = join([...current, `${staff}${tag}`]); this.addU(staff, f);
+         this.log(`🤝 [サポート] 入れる部屋がなかったため、${staff} を 待機 に配置しました`);
+      }
+    });
+
     this.logPhase("フェーズ5：仕上げ（最後に配置）");
 
     if (!this.skipSections.includes("昼当番")) {
@@ -1185,30 +1209,6 @@ class AutoAssigner {
       this.dayCells["受付ヘルプ"] = join(helpMems);
     }
     
-    const unassignedSupport = availSupport.filter((s: string) => !this.isUsed(s));
-    unassignedSupport.forEach((staff: string) => {
-      const b = this.blockMap.get(staff); if (b === 'ALL') return;
-      let assigned = false;
-      for (const room of supportTargetRooms) {
-        if (this.skipSections.includes(room) || this.isForbidden(staff, room)) continue;
-        let current = split(this.dayCells[room]); 
-        const currentCores = current.map(extractStaffName);
-        const currentAmount = current.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
-        if (currentAmount > 0 && !currentCores.includes(staff) && !this.hasNGPair(staff, currentCores, false)) {
-          let tag = ""; let f = 1;
-          if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); }
-          this.dayCells[room] = join([...current, `${staff}${tag}`]); this.addU(staff, f); assigned = true; 
-          this.log(`🤝 [サポート] 全ての配置完了後、${staff} を ${room} に追加しました`); break; 
-        }
-      }
-      if (!assigned && !this.skipSections.includes("待機") && !this.isForbidden(staff, "待機")) {
-         let current = split(this.dayCells["待機"]); let tag = ""; let f = 1;
-         if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); }
-         this.dayCells["待機"] = join([...current, `${staff}${tag}`]); this.addU(staff, f);
-         this.log(`🤝 [サポート] 入れる部屋がなかったため、${staff} を 待機 に配置しました`);
-      }
-    });
-
     const unassignedGeneral = this.initialAvailGeneral.filter((s: string) => !this.isUsed(s));
     unassignedGeneral.forEach((staff: string) => {
       const b = this.blockMap.get(staff); if (b === 'ALL') return;
@@ -1397,7 +1397,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.29</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.28</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1444,7 +1444,7 @@ export default function App() {
               <tbody>
                 {SECTIONS.map((section, sIdx) => (
                   <tr key={section}>
-                    <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "3px solid #e2e8f0"}}>{section}</td>
+                    <td style={{...cellStyle(true, false, false, true), borderRight: "3px solid #e2e8f0"}}>{section}</td>
                     {days.map((day, dIdx) => {
                       const currentMems = split(allDays[day.id]?.[section]);
                       const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : [];
