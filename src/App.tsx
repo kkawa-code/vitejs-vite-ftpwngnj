@@ -2,28 +2,18 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
   body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 24px; overflow-x: clip; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
-  
-  select { 
-    appearance: none; 
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
-    background-repeat: no-repeat; background-position: right 16px center; background-size: 1.6em; 
-    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 56px !important; 
-  }
-  
+  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 1.6em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 56px !important; }
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
-  
   .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
   .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 24px; margin-top: -24px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
-
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -39,27 +29,14 @@ const globalStyle = `
   .rule-add { background: #fff; color: #4f46e5; border: 3px dashed #a5b4fc; padding: 14px 24px; font-size: 24px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
   .rule-label { font-size: 22px; font-weight: 700; color: #64748b; flex-shrink: 0; }
-  
   .tabs-header { display: flex; gap: 12px; border-bottom: 4px solid #e2e8f0; margin-bottom: 32px; padding: 0 16px; flex-wrap: wrap; }
   .tab-btn { background: none; border: none; padding: 16px 32px; font-size: 26px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 5px solid transparent; margin-bottom: -4px; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
-
-  .name-textarea {
-    width: 100%;
-    height: 200px;
-    padding: 20px;
-    font-size: 26px !important;
-    border-radius: 16px;
-    border: 3px solid #cbd5e1;
-    font-weight: 700;
-    line-height: 1.6;
-  }
+  .name-textarea { width: 100%; height: 200px; padding: 20px; font-size: 26px !important; border-radius: 16px; border: 3px solid #cbd5e1; font-weight: 700; line-height: 1.6; }
   .name-textarea::placeholder { color: #94a3b8; font-weight: 400; }
-
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
-
   @media print {
     body { background: #fff; overflow: visible; font-size: 16pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
@@ -97,6 +74,7 @@ const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "202
 const MONTHLY_CATEGORIES = [ { key: "CT", label: "CT" }, { key: "MRI", label: "MRI" }, { key: "治療", label: "治療 (メイン)" }, { key: "治療サブ優先", label: "治療 (サブ優先)" }, { key: "治療サブ", label: "治療 (サブ)" }, { key: "RI", label: "RI (メイン)" }, { key: "RIサブ", label: "RI (サブ)" }, { key: "MMG", label: "MMG" }, { key: "受付", label: "受付" }, { key: "受付ヘルプ", label: "受付ヘルプ" } ];
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "" };
 const DEFAULT_PRIORITY_ROOMS = ["治療", "受付", "MMG", "RI", "MRI", "CT", "透視（6号）", "透視（11号）", "1号室", "5号室", "2号室", "骨塩", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部"];
+
 const DEFAULT_RULES: CustomRules = { 
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "", 
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 }, 
@@ -110,7 +88,7 @@ const DEFAULT_RULES: CustomRules = {
   smartKenmu: [{ targetRoom: "MMG", sourceRooms: "1号室、2号室、3号室、5号室、CT(4)" }]
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2250"; const KEY_MONTHLY = "shifto_monthly_v2250"; const KEY_RULES = "shifto_rules_v2250";
+const KEY_ALL_DAYS = "shifto_alldays_v2260"; const KEY_MONTHLY = "shifto_monthly_v2260"; const KEY_RULES = "shifto_rules_v2260";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -743,6 +721,19 @@ class AutoAssigner {
   processPostTasks() {
     this.logPhase("フェーズ4：兼務・交換・救済・遅番");
 
+    // ==========================================
+    // 共通変数の定義（スコープエラー防止）
+    // ==========================================
+    const availSupport = this.initialAvailSupport; 
+    const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
+    const noLateShiftRoomMembers = split(this.ctx.customRules.noLateShiftRooms || "").flatMap(room => split(this.dayCells[room] || "").map(extractStaffName));
+    const noLateShiftStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
+    const absentAll = [...split(this.dayCells["明け"]), ...split(this.dayCells["入り"]), ...split(this.dayCells["土日休日代休"])].map(extractStaffName);
+    const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
+    const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList, ...noLateShiftRoomMembers]; 
+    const isFixedToAny = (staffName: string) => (this.ctx.customRules.fixed || []).some((r:any) => r.staff === staffName);
+
+
     let unassignedForKenmu = this.initialAvailGeneral.filter((s: string) => !this.isUsed(s));
     (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
       const targetRoom = rule.target;
@@ -841,12 +832,7 @@ class AutoAssigner {
        for (const m of sourceMems) {
           if (currentAmount >= targetCap) break;
           const core = extractStaffName(m);
-          const isFixedToSource = (this.ctx.customRules.fixed || []).some((r:any) => r.staff === core);
-          if (isFixedToSource) continue;
-          if (targetCores.includes(core)) continue; if (m.includes("17:00") || m.includes("19:00") || m.includes("22:00")) continue; if (this.isForbidden(core, targetRoom)) continue;
-          
-          if (this.hasNGPair(core, targetCores, false)) continue;
-          if (!this.canAddKenmu(core, targetRoom)) continue;
+          if (isFixedToAny(core) || targetCores.includes(core) || m.includes("17:00") || m.includes("19:00") || m.includes("22:00") || this.isForbidden(core, targetRoom) || this.hasNGPair(core, targetCores, false) || !this.canAddKenmu(core, targetRoom)) continue;
 
           let pushStr = m; let curAm = 0; let curPm = 0;
           targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
@@ -1359,7 +1345,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, padding: "36px 48px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.25</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 44, fontWeight: 900 }}>勤務割付システム Ver 2.26</h2>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"2px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1877,7 +1863,7 @@ export default function App() {
             </div>
 
             <div style={{ background: "#f5f3ff", padding: 32, borderRadius: 16, border: "3px solid #ddd6fe", marginBottom: 24 }}>
-              <h5 style={{ margin: "0 0 20px 0", color: "#6d28d9", fontSize: 26, fontWeight: 800 }}>🌆 遅番ルール</h5>
+              <h5 style={{ margin: "0 0 16px 0", color: "#6d28d9", fontSize: 26, fontWeight: 800 }}>🌆 遅番ルール</h5>
               {(customRules.lateShifts || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row" style={{background:"#fff", padding:"16px 24px", border:"3px solid #ddd6fe", borderRadius:12}}>
                     <select value={rule.section} onChange={(e: any) => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", minWidth: "180px", flex: "1 1 auto"}}><option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
@@ -1893,7 +1879,7 @@ export default function App() {
             </div>
 
             <div style={{ background: "#fff1f2", padding: 32, borderRadius: 16, border: "3px solid #fecaca" }}>
-              <h5 style={{ margin: "0 0 16px 0", color: "#be185d", fontSize: 26, fontWeight: 800 }}>⚠️ 兼務上限のストッパー設定（過労防止）</h5>
+              <h5 style={{ margin: "0 0 12px 0", color: "#be185d", fontSize: 26, fontWeight: 800 }}>⚠️ 兼務上限のストッパー設定（過労防止）</h5>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <input type="number" min="2" max="10" value={customRules.alertMaxKenmu ?? 3} onChange={(e: any) => setCustomRules({...customRules, alertMaxKenmu: Number(e.target.value)})} style={{ width: 100, padding: "12px", borderRadius: 10, border: "3px solid #fca5a5", textAlign: "center", fontWeight: 800, color: "#be185d", fontSize: 26 }} />
                 <span style={{ fontSize: 24, fontWeight: 700, color: "#9f1239" }}>部屋以上の兼務は自動ブロック（手動時はエラー表示）</span>
@@ -1967,7 +1953,7 @@ export default function App() {
             </div>
 
             <div style={{ background: "#f0fdf4", padding: 32, borderRadius: 16, border: "3px solid #bbf7d0" }}>
-              <h5 style={{ margin: "0 0 16px 0", color: "#15803d", fontSize: 26, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h5>
+              <h5 style={{ margin: "0 0 12px 0", color: "#15803d", fontSize: 26, fontWeight: 800 }}>🤝 サポート専任（2人目要員）ルール</h5>
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
                   <div style={{ flex: 1, minWidth: "320px" }}>
                     <label style={{ fontSize: 24, fontWeight: 700, color: "#166534", display: "block", marginBottom: 10 }}>対象スタッフ名（複数可）</label>
