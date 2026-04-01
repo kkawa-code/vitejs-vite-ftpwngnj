@@ -4,7 +4,7 @@ const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 20px; overflow-x: clip; }
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 26px; overflow-x: clip; }
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
@@ -12,8 +12,8 @@ const globalStyle = `
   select { 
     appearance: none; 
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
-    background-repeat: no-repeat; background-position: right 12px center; background-size: 1.4em; 
-    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 48px !important; 
+    background-repeat: no-repeat; background-position: right 16px center; background-size: 1.8em; 
+    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 64px !important; 
   }
   
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
@@ -22,38 +22,38 @@ const globalStyle = `
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
   .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-  .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 16px; margin-top: -16px; box-shadow: 0 8px 8px -8px rgba(0,0,0,0.05); }
+  .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 24px; margin-top: -24px; box-shadow: 0 10px 10px -10px rgba(0,0,0,0.05); }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 4px 8px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
+  .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 6px 12px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
-  .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; align-items: center; width: 100%; }
-  .rule-sel { padding: 10px 36px 10px 14px; border-radius: 8px; border: 2px solid #cbd5e1; font-weight: 600; flex: 1 1 140px; min-width: 140px; font-size: 18px; transition: border-color 0.2s; }
-  .rule-num { width: 80px; padding: 10px; border-radius: 8px; border: 2px solid #cbd5e1; font-weight: 600; font-size: 18px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 24px; flex-shrink: 0; padding: 0 8px; transition: 0.2s; }
+  .card-hover:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; align-items: center; width: 100%; }
+  .rule-sel { padding: 14px 44px 14px 18px; border-radius: 10px; border: 2px solid #cbd5e1; font-weight: 600; flex: 1 1 160px; min-width: 160px; font-size: 24px; transition: border-color 0.2s; }
+  .rule-num { width: 100px; padding: 14px; border-radius: 10px; border: 2px solid #cbd5e1; font-weight: 600; font-size: 24px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 32px; flex-shrink: 0; padding: 0 12px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
-  .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 12px 20px; font-size: 20px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
+  .rule-add { background: #fff; color: #4f46e5; border: 3px dashed #a5b4fc; padding: 16px 24px; font-size: 26px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 16px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
-  .rule-label { font-size: 20px; font-weight: 700; color: #64748b; flex-shrink: 0; }
+  .rule-label { font-size: 26px; font-weight: 700; color: #64748b; flex-shrink: 0; }
   
-  .tabs-header { display: flex; gap: 8px; border-bottom: 3px solid #e2e8f0; margin-bottom: 24px; padding: 0 12px; flex-wrap: wrap; }
-  .tab-btn { background: none; border: none; padding: 12px 24px; font-size: 22px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 4px solid transparent; margin-bottom: -3px; transition: 0.2s; }
+  .tabs-header { display: flex; gap: 12px; border-bottom: 4px solid #e2e8f0; margin-bottom: 32px; padding: 0 16px; flex-wrap: wrap; }
+  .tab-btn { background: none; border: none; padding: 16px 36px; font-size: 28px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 5px solid transparent; margin-bottom: -4px; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
 
   .name-textarea {
     width: 100%;
-    height: 180px;
-    padding: 16px;
-    font-size: 22px !important;
-    border-radius: 12px;
-    border: 2px solid #cbd5e1;
+    height: 240px;
+    padding: 24px;
+    font-size: 32px !important;
+    border-radius: 16px;
+    border: 3px solid #cbd5e1;
     font-weight: 700;
-    line-height: 1.5;
+    line-height: 1.6;
   }
   .name-textarea::placeholder { color: #94a3b8; font-weight: 400; }
 
@@ -61,11 +61,11 @@ const globalStyle = `
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
 
   @media print {
-    body { background: #fff; overflow: visible; font-size: 14pt; } .no-print { display: none !important; }
+    body { background: #fff; overflow: visible; font-size: 16pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed; }
     tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #000 !important; padding: 8px !important; font-size: 14pt !important; color: #000 !important; position: static !important; max-width: 120px; word-break: break-all; }
+    th, td { border: 1px solid #000 !important; padding: 12px !important; font-size: 16pt !important; color: #000 !important; position: static !important; max-width: 150px; word-break: break-all; }
   }
 `;
 
@@ -122,7 +122,7 @@ const DEFAULT_RULES: CustomRules = {
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2220"; const KEY_MONTHLY = "shifto_monthly_v2220"; const KEY_RULES = "shifto_rules_v2220";
+const KEY_ALL_DAYS = "shifto_alldays_v2230"; const KEY_MONTHLY = "shifto_monthly_v2230"; const KEY_RULES = "shifto_rules_v2230";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -175,13 +175,13 @@ function getStaffAmount(name: string) {
   return (name.includes("(AM)") || name.includes("(PM)") || name.match(/\(〜/) || name.match(/〜\)/)) ? 0.5 : 1;
 }
 
-const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 20): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "10px", padding: "10px 16px", cursor: "pointer", fontWeight: 800, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 8 });
-const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "32px", boxShadow: "0 4px 8px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" });
+const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 24): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "12px", padding: "14px 24px", cursor: "pointer", fontWeight: 800, fontSize, whiteSpace: "nowrap", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 10 });
+const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "24px", padding: "40px", boxShadow: "0 6px 12px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" });
 const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff");
   if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; 
   else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); 
-  return { border: "1px solid #e2e8f0", padding: "16px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 20, minWidth: isHeader && !isSticky ? "160px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 4px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
+  return { border: "1px solid #e2e8f0", padding: "20px", background: bg, fontWeight: isHeader ? 800 : 600, textAlign: isHeader ? "center" : "left", fontSize: 26, minWidth: isHeader && !isSticky ? "200px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "3px 0 6px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 };
 
 const RENDER_GROUPS: RenderGroup[] = [
@@ -197,9 +197,9 @@ const MultiPicker = ({ selected, onChange, options, placeholder }: any) => {
   const handleAdd = (val: string) => { if (val && !current.includes(val)) onChange(join([...current, val])); };
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, marginBottom: 8 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, marginBottom: 12 }}>
       {current.map((item, i) => (
-        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 20, padding: "10px 16px", fontSize: 20, fontWeight: 800, border: "2px solid #bae6fd", display: "flex", alignItems: "center", gap: 8 }}>
+        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 24, padding: "14px 20px", fontSize: 24, fontWeight: 800, border: "2px solid #bae6fd", display: "flex", alignItems: "center", gap: 10 }}>
           <span>{item}</span><span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
         </div>
       ))}
@@ -232,17 +232,17 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
   };
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe", padding: "14px 20px", fontSize: 24 }}>📅 {targetMonday} 週 ▼</button>
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "2px solid #bfdbfe", padding: "16px 24px", fontSize: 26 }}>📅 {targetMonday} 週 ▼</button>
       {isOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setIsOpen(false)}></div>
           <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "2px solid #cbd5e1", borderRadius: 20, padding: 32, zIndex: 50, boxShadow: "0 25px 30px -5px rgba(0, 0, 0, 0.15)", minWidth: 460 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <button onClick={() => setViewDate(new Date(year, month - 2, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 10, padding: "14px 24px", cursor: "pointer", fontSize: 24 }}>◀</button>
-              <div style={{ fontWeight: 800, fontSize: 28 }}>{year}年 {month}月</div>
-              <button onClick={() => setViewDate(new Date(year, month, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 10, padding: "14px 24px", cursor: "pointer", fontSize: 24 }}>▶</button>
+              <button onClick={() => setViewDate(new Date(year, month - 2, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 10, padding: "16px 24px", cursor: "pointer", fontSize: 26 }}>◀</button>
+              <div style={{ fontWeight: 800, fontSize: 32 }}>{year}年 {month}月</div>
+              <button onClick={() => setViewDate(new Date(year, month, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 10, padding: "16px 24px", cursor: "pointer", fontSize: 26 }}>▶</button>
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 26 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 28 }}>
               <thead><tr><th style={{ color: "#ef4444", padding: 16 }}>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th style={{ color: "#3b82f6", padding: 16 }}>土</th></tr></thead>
               <tbody>
                 {weeks.map((w, wIdx) => {
@@ -253,7 +253,7 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
                         if (!d) return <td key={dIdx} style={{ padding: 20 }}></td>;
                         const isHoliday = !!(nationalHolidays[`${year}-${pad(month)}-${pad(d)}`] || customHolidays.includes(`${year}-${pad(month)}-${pad(d)}`));
                         let color = "#334155"; if (dIdx === 0 || isHoliday) color = "#ef4444"; else if (dIdx === 6) color = "#3b82f6";
-                        return <td key={dIdx} style={{ padding: 20, color, fontWeight: isHoliday ? 800 : 600, position: "relative" }}>{d}{isHoliday && <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", width: 10, height: 10, background: "#ef4444", borderRadius: "50%" }}></div>}</td>;
+                        return <td key={dIdx} style={{ padding: 20, color, fontWeight: isHoliday ? 800 : 600, position: "relative" }}>{d}{isHoliday && <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", width: 12, height: 12, background: "#ef4444", borderRadius: "50%" }}></div>}</td>;
                       })}
                     </tr>
                   )
@@ -273,17 +273,17 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
   const handleTimeChange = (idx: number, newTime: string) => { if (noTime && !isFuzai) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "24px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-      <label style={{ fontSize: 24, fontWeight: 800, color: "#475569", marginBottom: 16 }}>{section}</label>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20, padding: "28px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+      <label style={{ fontSize: 32, fontWeight: 800, color: "#475569", marginBottom: 20 }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = extractStaffName(m); const currentMod = m.substring(coreName.length);
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
           return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 20, padding: "14px 20px 14px 22px", fontSize: 24, display: "flex", alignItems: "center", gap: 10, border: `2px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
+            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 24, padding: "14px 20px 14px 22px", fontSize: 26, display: "flex", alignItems: "center", gap: 10, border: `2px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
               <span>{coreName}</span>
               {(!noTime || isFuzai) && (
-                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 24, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 28px 0 8px" }}>
+                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 26, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 28px 0 8px" }}>
                   {isFuzai ? <><option value="">全休</option><option value="(AM)">AM休</option><option value="(PM)">PM休</option></> : isTaiki ? <><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></> : <><option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>}
                 </select>
               )}
@@ -291,7 +291,7 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
             </div>
           )
         })}
-        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "2px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 24, color: "#64748b", flex: 1, minWidth: 160, cursor: "pointer", fontWeight: 700, borderRadius: 12, padding: "14px 36px 14px 20px" }}>
+        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "2px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 26, color: "#64748b", flex: 1, minWidth: 180, cursor: "pointer", fontWeight: 700, borderRadius: 12, padding: "14px 36px 14px 20px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">{activeStaff.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>
           {customOptions.length > 0 && <optgroup label="担当枠（未定）">{customOptions.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>}
@@ -304,10 +304,10 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
 // ===================== 🌟 ログのレンダリング =====================
 const renderLog = (logStr: string, i: number) => {
   if (logStr.startsWith("・■")) {
-    return <li key={i} style={{ marginTop: 24, marginBottom: 12, paddingBottom: 6, borderBottom: "3px solid #cbd5e1", fontSize: 26, fontWeight: 900, color: "#334155" }}>{logStr.substring(2)}</li>;
+    return <li key={i} style={{ marginTop: 32, marginBottom: 16, paddingBottom: 8, borderBottom: "4px solid #cbd5e1", fontSize: 32, fontWeight: 900, color: "#334155" }}>{logStr.substring(2)}</li>;
   }
   const match = logStr.match(/^・(.*?)\s\[(.*?)\]\s(.*)$/);
-  if (!match) return <li key={i} style={{ padding: "10px 16px", marginBottom: "6px", background: "#f8fafc", borderRadius: "10px", fontSize: 22, color: "#475569" }}>{logStr.substring(1)}</li>;
+  if (!match) return <li key={i} style={{ padding: "12px 20px", marginBottom: "8px", background: "#f8fafc", borderRadius: "12px", fontSize: 26, color: "#475569" }}>{logStr.substring(1)}</li>;
   const [_, icon, category, text] = match;
   let bg = "#f8fafc"; let border = "#e2e8f0"; let color = "#475569"; let badgeBg = "#e2e8f0"; let badgeColor = "#475569";
   if (category.includes("配置決定") || category.includes("増枠")) { bg = "#eff6ff"; border = "#bfdbfe"; color = "#1e3a8a"; badgeBg = "#dbeafe"; badgeColor = "#1d4ed8"; }
@@ -319,8 +319,8 @@ const renderLog = (logStr: string, i: number) => {
   else if (category.includes("専従") || category.includes("役割")) { bg = "#f0fdfa"; border = "#bbf7d0"; color = "#14532d"; badgeBg = "#dcfce7"; badgeColor = "#15803d"; }
   else if (category.includes("昼当番") || category.includes("ヘルプ") || category.includes("サポート") || category.includes("余剰")) { bg = "#fdf4ff"; border = "#f5d0fe"; color = "#701a75"; badgeBg = "#fae8ff"; badgeColor = "#86198f"; }
   return (
-    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 16px", marginBottom: "8px", background: bg, borderRadius: "10px", border: `2px solid ${border}`, fontSize: 22, color, lineHeight: "1.5" }}>
-      <span style={{ display: "inline-block", padding: "4px 10px", background: badgeBg, color: badgeColor, borderRadius: "6px", fontWeight: 900, fontSize: 18, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>{icon} {category}</span>
+    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "16px 20px", marginBottom: "12px", background: bg, borderRadius: "12px", border: `2px solid ${border}`, fontSize: 26, color, lineHeight: "1.5" }}>
+      <span style={{ display: "inline-block", padding: "6px 14px", background: badgeBg, color: badgeColor, borderRadius: "8px", fontWeight: 900, fontSize: 22, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>{icon} {category}</span>
       <span style={{ fontWeight: 700 }}>{text}</span>
     </li>
   );
@@ -772,11 +772,8 @@ class AutoAssigner {
         if (!shouldSkipFill) { 
           this.fill(candidates, room, preferredList, targetCount); 
         } else {
-          if (isLinkedTarget) {
-            this.log(`⏭️ [専任スキップ] ${room} は基本兼務ルールの対象のため、専任配置をスキップ`);
-          } else {
-            this.log(`⏭️ [専任スキップ] ${room} は常時兼務ペアに配置済みのため、専任配置をスキップ`);
-          }
+          if (isLinkedTarget) { this.log(`⏭️ [専任スキップ] ${room} は基本兼務ルールの対象のため、専任配置をスキップ`); } 
+          else { this.log(`⏭️ [専任スキップ] ${room} は常時兼務ペアに配置済みのため、専任配置をスキップ`); }
         }
       }
     });
@@ -801,7 +798,8 @@ class AutoAssigner {
            !this.isForbidden(s, targetRoom) && 
            !this.hasNGPair(s, currentMems.map(extractStaffName), false) && 
            !(this.ctx.customRules.fixed || []).some((r:any) => r.staff === s) &&
-           (targetRoom === "MMG" ? this.isMmgCapable(s) : true)
+           (targetRoom === "MMG" ? this.isMmgCapable(s) : true) &&
+           this.canAddKenmu(s, targetRoom)
         );
         
         if (candIdx === -1) break;
@@ -821,77 +819,6 @@ class AutoAssigner {
       }
       this.dayCells[targetRoom] = join(currentMems);
     });
-
-    const mmgRoom = "MMG";
-    if (!this.clearSections.includes(mmgRoom) && !this.skipSections.includes(mmgRoom)) {
-      const mmgMembers = split(this.dayCells[mmgRoom]);
-      if (mmgMembers.length > 0) {
-        const currentMmgStr = mmgMembers[0];
-        const mmgCore = extractStaffName(currentMmgStr);
-        
-        if (!ROLE_PLACEHOLDERS.includes(mmgCore)) {
-          const isMmgDedicated = !ROOM_SECTIONS.some(r => r !== mmgRoom && split(this.dayCells[r]).map(extractStaffName).includes(mmgCore));
-          
-          if (isMmgDedicated) {
-            const swapSources = ["1号室", "2号室", "3号室", "5号室", "CT"];
-            let swapCandidateFullStr: string | null = null;
-            
-            for (const srcRoom of swapSources) {
-              const srcMembers = split(this.dayCells[srcRoom]);
-              if (srcRoom === "CT" && srcMembers.reduce((s,m) => s + getStaffAmount(m), 0) < 4) continue;
-              
-              for (const srcStr of srcMembers) {
-                const core = extractStaffName(srcStr);
-                if (core === mmgCore) continue;
-                if (ROLE_PLACEHOLDERS.includes(core)) continue;
-                
-                if (this.isForbidden(core, mmgRoom)) continue;
-                if (this.hasNGPair(core, mmgMembers.map(extractStaffName), false)) continue;
-                if ((this.ctx.customRules.fixed || []).some((r:any) => r.staff === core)) continue;
-                
-                if (!this.isMmgCapable(core)) continue;
-                if (!this.canAddKenmu(core, mmgRoom)) continue;
-
-                swapCandidateFullStr = srcStr;
-                break;
-              }
-              if (swapCandidateFullStr) break;
-            }
-            
-            if (swapCandidateFullStr) {
-              const candCore = extractStaffName(swapCandidateFullStr);
-              this.dayCells[mmgRoom] = "";
-              this.addU(mmgCore, -getStaffAmount(currentMmgStr));
-              
-              const initialBlock = split(this.dayCells["不在"]).find(m => extractStaffName(m) === mmgCore);
-              if (initialBlock) {
-                if (initialBlock.includes("(AM)")) this.blockMap.set(mmgCore, 'AM');
-                else if (initialBlock.includes("(PM)")) this.blockMap.set(mmgCore, 'PM');
-                else this.blockMap.set(mmgCore, 'ALL');
-              } else {
-                this.blockMap.set(mmgCore, 'NONE');
-              }
-              
-              this.dayCells[mmgRoom] = swapCandidateFullStr;
-              this.addU(candCore, getStaffAmount(swapCandidateFullStr));
-              this.log(`🔄 [MMGスマート兼務] ${mmgCore} を専任から外し、一般/CT担当の ${candCore} をMMGと兼務させました`);
-            }
-          }
-        }
-      }
-    }
-
-
-    const availSupport = this.initialAvailSupport; 
-    const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
-    
-    const noLateShiftRoomMembers = split(this.ctx.customRules.noLateShiftRooms || "").flatMap(room => split(this.dayCells[room] || "").map(extractStaffName));
-    const noLateShiftStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
-    const absentAll = [...split(this.dayCells["明け"]), ...split(this.dayCells["入り"]), ...split(this.dayCells["土日休日代休"])].map(extractStaffName);
-    const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
-    
-    const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList, ...noLateShiftRoomMembers]; 
-    const isFixedToAny = (staffName: string) => (this.ctx.customRules.fixed || []).some((r:any) => r.staff === staffName);
 
     const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
        const targetCap = this.dynamicCapacity[targetRoom] || 1; const targetCores = targetMems.map(extractStaffName);
@@ -974,6 +901,73 @@ class AutoAssigner {
       }
       this.dayCells[targetRoom] = join(currentMems);
     });
+
+    const mmgRoom = "MMG";
+    if (!this.clearSections.includes(mmgRoom) && !this.skipSections.includes(mmgRoom)) {
+      const mmgMembers = split(this.dayCells[mmgRoom]);
+      if (mmgMembers.length > 0) {
+        const currentMmgStr = mmgMembers[0];
+        const mmgCore = extractStaffName(currentMmgStr);
+        
+        if (!ROLE_PLACEHOLDERS.includes(mmgCore)) {
+          const isMmgDedicated = !ROOM_SECTIONS.some(r => r !== mmgRoom && split(this.dayCells[r]).map(extractStaffName).includes(mmgCore));
+          
+          if (isMmgDedicated) {
+            const swapSources = ["1号室", "2号室", "3号室", "5号室", "CT"];
+            let swapCandidateFullStr: string | null = null;
+            let targetSrcRoom: string | null = null;
+            
+            for (const srcStrRoom of swapSources) {
+              const { r: srcRoom, min } = parseRoomCond(srcStrRoom);
+              const srcMembers = split(this.dayCells[srcRoom]);
+              
+              if (min > 0) {
+                  const amt = srcMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
+                  if (amt < min) continue;
+              } else if (srcRoom === "CT") {
+                  const amt = srcMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
+                  if (amt < 4) continue;
+              }
+              
+              for (const srcStr of srcMembers) {
+                const core = extractStaffName(srcStr);
+                if (core === mmgCore) continue;
+                if (ROLE_PLACEHOLDERS.includes(core)) continue;
+                
+                if (this.isForbidden(core, mmgRoom)) continue;
+                if (this.hasNGPair(core, mmgMembers.map(extractStaffName), false)) continue;
+                if ((this.ctx.customRules.fixed || []).some((r:any) => r.staff === core)) continue;
+                
+                if (!this.isMmgCapable(core)) continue;
+                if (!this.canAddKenmu(core, mmgRoom)) continue;
+
+                swapCandidateFullStr = srcStr;
+                targetSrcRoom = srcRoom;
+                break;
+              }
+              if (swapCandidateFullStr) break;
+            }
+            
+            if (swapCandidateFullStr && targetSrcRoom) {
+              const candCore = extractStaffName(swapCandidateFullStr);
+              
+              this.dayCells[targetSrcRoom] = join(split(this.dayCells[targetSrcRoom]).filter(m => m !== swapCandidateFullStr));
+              
+              let currentMmgTags = "";
+              if (currentMmgStr.includes("(AM)")) currentMmgTags = "(AM)";
+              else if (currentMmgStr.includes("(PM)")) currentMmgTags = "(PM)";
+              
+              this.dayCells[targetSrcRoom] = join([...split(this.dayCells[targetSrcRoom]), `${mmgCore}${currentMmgTags}`]);
+              
+              this.dayCells[mmgRoom] = swapCandidateFullStr;
+              this.addU(candCore, getStaffAmount(swapCandidateFullStr));
+              this.log(`🔄 [MMGスマート兼務] ${mmgCore} を専任から外して ${targetSrcRoom} に移動し、代わりに ${candCore} をMMGと兼務させました`);
+            }
+          }
+        }
+      }
+    }
+
 
     ROOM_SECTIONS.forEach(targetRoom => {
       if (this.clearSections.includes(targetRoom)) return;
