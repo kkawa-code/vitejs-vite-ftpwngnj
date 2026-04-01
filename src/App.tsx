@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 
-// ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
@@ -8,7 +7,14 @@ const globalStyle = `
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
-  select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
+  
+  select { 
+    appearance: none; 
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
+    background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; 
+    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; 
+  }
+  
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
   details > summary:hover { color: #0d9488; }
   details > summary::-webkit-details-marker { display: none; }
@@ -16,7 +22,7 @@ const globalStyle = `
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; }
   .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; box-shadow: 0 2px 4px -1px rgba(0,0,0,0.05); }
   .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 16px; margin-top: -16px; box-shadow: 0 4px 6px -4px rgba(0,0,0,0.1); }
-  
+
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -38,10 +44,10 @@ const globalStyle = `
   .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 16px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
-  
+
   .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 14px !important; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; line-height: 1.5; }
   .name-textarea::placeholder { color: #94a3b8; font-weight: 400; }
-  
+
   @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
   .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); }
@@ -61,7 +67,6 @@ const globalStyle = `
   }
 `;
 
-// ===================== 🌟 Types & Constants =====================
 type RenderGroup = { title: string; color: string; sections: string[] };
 type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
 type RejectReason = { hard: boolean, msg: string };
@@ -73,6 +78,7 @@ interface CustomRules {
   lunchBaseCount: number; lunchSpecialDays: any[]; lunchConditional: any[]; lunchRoleRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[]; 
   alertMaxKenmu: number; alertEmptyRooms: string; smartKenmu: any[];
 }
+
 type AutoAssignContext = { allStaff: string[]; activeGeneralStaff: string[]; activeReceptionStaff: string[]; monthlyAssign: Record<string, string>; customRules: CustomRules; };
 
 const SECTIONS = ["明け","入り","土日休日代休","不在","待機","CT","MRI","RI","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","治療","検像","昼当番","受付","受付ヘルプ"];
@@ -104,7 +110,7 @@ const DEFAULT_RULES: CustomRules = {
   smartKenmu: [{ targetRoom: "MMG", sourceRooms: "1号室、2号室、3号室、5号室、CT(4)" }]
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2470"; const KEY_MONTHLY = "shifto_monthly_v2470"; const KEY_RULES = "shifto_rules_v2470";
+const KEY_ALL_DAYS = "shifto_alldays_v2480"; const KEY_MONTHLY = "shifto_monthly_v2480"; const KEY_RULES = "shifto_rules_v2480";
 const pad = (n: number) => String(n).padStart(2, '0');
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
 for (let h = 8; h <= 19; h++) { for (let m = 0; m < 60; m += 15) { if (h === 8 && m === 0) continue; TIME_OPTIONS.push(`(${h}:${pad(m)}〜)`); TIME_OPTIONS.push(`(〜${h}:${pad(m)})`); } }
@@ -135,7 +141,7 @@ const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 14): Re
 const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px", boxShadow: "0 2px 8px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" });
 const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); 
-  return { border: "1px solid #e2e8f0", padding: "10px 12px", background: bg, fontWeight: isHeader ? 700 : 600, textAlign: isHeader ? "center" : "left", fontSize: 15, color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 4px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
+  return { border: "1px solid #e2e8f0", padding: "10px 12px", background: bg, fontWeight: isHeader ? 700 : 600, textAlign: isHeader ? "center" : "left", fontSize: 15, color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "2px 0 4px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s", lineHeight: 1.6 }; 
 };
 
 const RENDER_GROUPS: RenderGroup[] = [
@@ -155,16 +161,16 @@ const Modal = ({ title, onClose, wide, children }: any) => (
       </div>
       {children}
       <div style={{ textAlign: "center", marginTop: 32 }}>
-        <button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "16px" }}>閉じる</button>
+        <button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "12px" }}>閉じる</button>
       </div>
     </div>
   </div>
 );
 
 const RuleCard = ({ bg, border, color, icon, title, desc, children }: any) => (
-  <div style={{ background: bg, padding: 24, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}>
+  <div style={{ background: bg, padding: 20, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}>
     <h5 style={{ margin: "0 0 12px 0", color, fontSize: 18, fontWeight: 800 }}>{icon} {title}</h5>
-    {desc && <p style={{ fontSize: 14, color: "#166534", marginTop: 0, marginBottom: 16 }}>{desc}</p>}
+    {desc && <p style={{ fontSize: 14, color: "#475569", marginTop: 0, marginBottom: 16 }}>{desc}</p>}
     {children}
   </div>
 );
@@ -379,7 +385,6 @@ class AutoAssigner {
 
     this.applyDailyAdditions(); this.evaluateEmergencies(); this.cleanUpDayCells();
     
-    // 今日の実際の配置数（addU）は欠員除外・補正後に集計する
     WORK_SECTIONS.forEach(sec => { split(this.dayCells[sec]).forEach((m: string) => { const core = extractStaffName(m); if (!ROLE_PLACEHOLDERS.includes(core) && this.blockMap.get(core) !== 'ALL') this.addU(core, getStaffAmount(m)); }); });
 
     this.prepareAvailability();
@@ -417,6 +422,7 @@ class AutoAssigner {
             let tag = ""; let p = 1;
             if (block === 'AM') { tag = "(PM)"; p = 0.5; } else if (block === 'PM') { tag = "(AM)"; p = 0.5; }
             current.push(`${freeStaff}${tag}`); this.addU(freeStaff, p);
+            
             sortedAvail = sortedAvail.filter(s => s !== freeStaff);
             this.log(`✅ [配置決定] ${room} の空き枠に ${freeStaff}${tag} を補充しました`);
          }
@@ -788,18 +794,19 @@ class AutoAssigner {
         }
       }
     });
+
   }
 
   processPostTasks() {
     this.logPhase("フェーズ4：兼務・交換・救済・遅番");
 
-    const noLSStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
-    const noLSRooms = split(this.ctx.customRules.noLateShiftRooms || "").flatMap(room => split(this.dayCells[room] || "").map(extractStaffName));
+    const noLateShiftRoomMembers = split(this.ctx.customRules.noLateShiftRooms || "").flatMap(room => split(this.dayCells[room] || "").map(extractStaffName));
+    const noLateShiftStaffList = split(this.ctx.customRules.noLateShiftStaff || "");
     const absentAll = [...split(this.dayCells["明け"]), ...split(this.dayCells["入り"]), ...split(this.dayCells["土日休日代休"])].map(extractStaffName);
     const absentPM = split(this.dayCells["不在"]).filter(m => !m.includes("(AM)")).map(extractStaffName);
-    const cannotLS = [...absentAll, ...absentPM, ...noLSStaffList, ...noLSRooms]; 
-    const isFixed = (sn: string) => (this.ctx.customRules.fixed || []).some((r:any) => r.staff === sn);
-    const noCRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
+    const cannotLateShift = [...absentAll, ...absentPM, ...noLateShiftStaffList, ...noLateShiftRoomMembers]; 
+    const isFixedToAny = (staffName: string) => (this.ctx.customRules.fixed || []).some((r:any) => r.staff === staffName);
+    const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
 
     (this.ctx.customRules.swapRules || []).forEach((rule: any) => {
       const { targetRoom, triggerRoom, sourceRooms } = rule;
@@ -809,11 +816,11 @@ class AutoAssigner {
       const triggerMembers = split(this.dayCells[triggerRoom]);
       if (triggerMembers.length === 0) return;
 
-      const prevDayTarget = (this.prevDay && noCRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
+      const prevDayTarget = (this.prevDay && noConsecutiveRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
 
       const triggerCanTarget = triggerMembers.some(m => {
           const c = extractStaffName(m);
-          if (ROLE_PLACEHOLDERS.includes(c) || this.isForbidden(c, targetRoom) || prevDayTarget.includes(c) || isFixed(c)) return false;
+          if (ROLE_PLACEHOLDERS.includes(c) || this.isForbidden(c, targetRoom) || prevDayTarget.includes(c) || isFixedToAny(c)) return false;
           
           let curAm = m.includes("(AM)"); let curPm = m.includes("(PM)");
           if (!curAm && !curPm) { curAm = true; curPm = true; } 
@@ -842,7 +849,7 @@ class AutoAssigner {
               let srcCands: string[] = [];
               for (const srcM of srcMembers) {
                   const srcCore = extractStaffName(srcM);
-                  if (ROLE_PLACEHOLDERS.includes(srcCore) || isFixed(srcCore)) continue;
+                  if (ROLE_PLACEHOLDERS.includes(srcCore) || isFixedToAny(srcCore)) continue;
                   if (this.isForbidden(srcCore, targetRoom) || prevDayTarget.includes(srcCore) || !this.canAddKenmu(srcCore, targetRoom, true)) continue;
                   if (this.isForbidden(srcCore, triggerRoom)) continue;
                   if (this.hasNGPair(srcCore, triggerMembers.map(extractStaffName), false)) continue;
@@ -854,7 +861,7 @@ class AutoAssigner {
                   const srcCore = extractStaffName(srcM);
                   const targetToKick = triggerMembers.find(m => {
                       const c = extractStaffName(m);
-                      if (isFixed(c)) return false;
+                      if (isFixedToAny(c)) return false;
                       if (this.isForbidden(c, srcRoom)) return false;
                       if (this.hasNGPair(c, srcMembers.map(extractStaffName), false)) return false;
                       
@@ -888,14 +895,14 @@ class AutoAssigner {
       let currentMems = split(this.dayCells[targetRoom]);
       const getAmt = (arr: string[]) => arr.reduce((acc, m) => acc + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
       
-      const prevDayMembers = (this.prevDay && noCRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
+      const prevDayMembers = (this.prevDay && noConsecutiveRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
       uGen1.sort((a, b) => this.getPastRoomCount(a, targetRoom) - this.getPastRoomCount(b, targetRoom));
 
       while (getAmt(currentMems) < targetCap && uGen1.length > 0) {
         const candIdx = uGen1.findIndex((s: string) => 
            !this.isForbidden(s, targetRoom) && 
            !this.hasNGPair(s, currentMems.map(extractStaffName), false) && 
-           !isFixed(s) &&
+           !isFixedToAny(s) &&
            !prevDayMembers.includes(s) && 
            (targetRoom === "MMG" ? this.isMmgCapable(s) : true) &&
            this.canAddKenmu(s, targetRoom)
@@ -947,7 +954,7 @@ class AutoAssigner {
             let srcCands: string[] = [];
             for (const srcStr of srcMembers) {
               const core = extractStaffName(srcStr);
-              if (core === targetCore || ROLE_PLACEHOLDERS.includes(core) || this.isForbidden(core, targetRoom) || this.hasNGPair(core, targetMembers.map(extractStaffName), false) || isFixed(core)) continue;
+              if (core === targetCore || ROLE_PLACEHOLDERS.includes(core) || this.isForbidden(core, targetRoom) || this.hasNGPair(core, targetMembers.map(extractStaffName), false) || isFixedToAny(core)) continue;
               if (targetRoom === "MMG" && !this.isMmgCapable(core)) continue;
               if (!this.canAddKenmu(core, targetRoom)) continue;
               srcCands.push(srcStr);
@@ -987,8 +994,8 @@ class AutoAssigner {
        for (const m of sourceMems) {
           if (currentAmount >= targetCap) break;
           const core = extractStaffName(m);
-          const prevDayMembers = (this.prevDay && targetRoom && noCRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
-          if (isFixed(core) || targetCores.includes(core) || m.includes("17:00") || m.includes("19:00") || m.includes("22:00") || this.isForbidden(core, targetRoom) || prevDayMembers.includes(core) || this.hasNGPair(core, targetCores, false) || !this.canAddKenmu(core, targetRoom)) continue;
+          const prevDayMembers = (this.prevDay && targetRoom && noConsecutiveRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
+          if (isFixedToAny(core) || targetCores.includes(core) || m.includes("17:00") || m.includes("19:00") || m.includes("22:00") || this.isForbidden(core, targetRoom) || prevDayMembers.includes(core) || this.hasNGPair(core, targetCores, false) || !this.canAddKenmu(core, targetRoom)) continue;
 
           let pushStr = m; let curAm = 0; let curPm = 0;
           targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
@@ -1024,9 +1031,9 @@ class AutoAssigner {
         split(this.dayCells[srcRoom]).forEach(m => {
           if (curAm >= targetCap && curPm >= targetCap) return;
           const core = extractStaffName(m);
-          const prevDayMembers = (this.prevDay && targetRoom && noCRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
+          const prevDayMembers = (this.prevDay && targetRoom && noConsecutiveRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
 
-          if (isFixed(core) || this.hasNGPair(core, currentMems.map(extractStaffName), false) || prevDayMembers.includes(core) || (targetRoom === "MMG" && !this.isMmgCapable(core)) || (!currentMems.map(extractStaffName).includes(core) && !this.canAddKenmu(core, targetRoom, true))) return;
+          if (isFixedToAny(core) || this.hasNGPair(core, currentMems.map(extractStaffName), false) || prevDayMembers.includes(core) || (targetRoom === "MMG" && !this.isMmgCapable(core)) || (!currentMems.map(extractStaffName).includes(core) && !this.canAddKenmu(core, targetRoom, true))) return;
 
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom)) {
             if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) {
@@ -1061,7 +1068,7 @@ class AutoAssigner {
          const sourceRooms = matchingRescueRules.flatMap((r: any) => split(r.sourceRooms || ""));
          let candidates: { core: string, fullStr: string, srcIdx: number }[] = [];
          
-         const prevDayMembers = (this.prevDay && targetRoom && noCRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
+         const prevDayMembers = (this.prevDay && targetRoom && noConsecutiveRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
 
          sourceRooms.forEach((srcStr: string, idx: number) => {
             const { r: srcRoom, min } = parseRoomCond(srcStr);
@@ -1070,7 +1077,7 @@ class AutoAssigner {
 
             split(this.dayCells[srcRoom]).forEach(m => {
                const core = extractStaffName(m);
-               if (isFixed(core) || ROLE_PLACEHOLDERS.includes(core) || prevDayMembers.includes(core) || candidates.some(c => c.core === core) || this.isForbidden(core, targetRoom)) return;
+               if (isFixedToAny(core) || ROLE_PLACEHOLDERS.includes(core) || prevDayMembers.includes(core) || candidates.some(c => c.core === core) || this.isForbidden(core, targetRoom)) return;
                if (!m.includes("17:00") && !m.includes("19:00") && !m.includes("22:00")) candidates.push({ core, fullStr: m, srcIdx: idx });
             });
          });
@@ -1120,7 +1127,7 @@ class AutoAssigner {
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes(rule.lateTime)).map(extractStaffName) : [];
         const getCandidate = (candidatesList: string[], allowConsecutive: boolean, checkIsUsed: boolean) => {
           let cand = candidatesList.filter(name => {
-            if (cannotLS.includes(name) || currentCore.includes(name) || this.blockMap.get(name) === 'PM' || this.isForbidden(name, rule.section) || (!allowConsecutive && prevLateStaff.includes(name)) || (checkIsUsed && this.isUsed(name))) return false;
+            if (cannotLateShift.includes(name) || currentCore.includes(name) || this.blockMap.get(name) === 'PM' || this.isForbidden(name, rule.section) || (!allowConsecutive && prevLateStaff.includes(name)) || (checkIsUsed && this.isUsed(name))) return false;
             return true;
           });
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
@@ -1163,7 +1170,7 @@ class AutoAssigner {
         const candidateToReplaceIdx = currentMems.findIndex(m => {
           const core = extractStaffName(m);
           if (ROLE_PLACEHOLDERS.includes(core)) return false;
-          if (isFixed(core)) return false;
+          if (isFixedToAny(core)) return false;
           if (this.getTodayRoomCount(core) <= 1) return false;
           
           const otherCores = currentMems.filter(x => x !== m).map(extractStaffName);
@@ -1252,7 +1259,7 @@ class AutoAssigner {
         const currentCores = current.map(extractStaffName);
         const currentAmount = current.reduce((sum: number, m: string) => sum + getStaffAmount(m), 0);
         
-        const prevDayMembers = (this.prevDay && room && noCRooms.includes(room)) ? split(this.prevDay.cells[room] || "").map(extractStaffName) : [];
+        const prevDayMembers = (this.prevDay && room && noConsecutiveRooms.includes(room)) ? split(this.prevDay.cells[room] || "").map(extractStaffName) : [];
 
         if (currentAmount > 0 && !currentCores.includes(staff) && !this.hasNGPair(staff, currentCores, false) && !prevDayMembers.includes(staff)) {
           let tag = ""; let f = 1;
@@ -1359,7 +1366,7 @@ class AutoAssigner {
         const lunchCores = split(this.dayCells["昼当番"]).map(extractStaffName);
         const getHelp = (exclude: string[]) => {
           let cand = this.initialAvailGeneral.filter((n: string) => {
-            if (exclude.includes(n) || helpMems.map(extractStaffName).includes(n) || this.isForbidden(n, "受付ヘルプ") || cannotLS.includes(n) || isFixed(n)) return false; 
+            if (exclude.includes(n) || helpMems.map(extractStaffName).includes(n) || this.isForbidden(n, "受付ヘルプ") || cannotLateShift.includes(n) || isFixedToAny(n)) return false; 
             return true;
           });
           if (cand.length > 0) { 
@@ -1372,11 +1379,11 @@ class AutoAssigner {
         const lunchHelpCandidate = getHelp(lunchCores);
         if (lunchHelpCandidate) { helpMems.push(`${lunchHelpCandidate}(12:15〜13:00)`); this.log(`🛎️ [受付ヘルプ] 昼枠(12:15〜)に ${lunchHelpCandidate} をアサインしました`); }
         const kenzoCores = split(this.dayCells["検像"]).map(extractStaffName);
-        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLS.includes(n) && !isFixed(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false));
+        const validKenzo = kenzoCores.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false));
         let picked16 = validKenzo.length > 0 ? validKenzo[0] : null;
         if (!picked16) {
           const excl = lunchHelpCandidate ? [lunchHelpCandidate] : [];
-          let cand = this.initialAvailGeneral.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLS.includes(n) && !isFixed(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false));
+          let cand = this.initialAvailGeneral.filter((n: string) => this.blockMap.get(n) !== 'AM' && !helpMems.map(extractStaffName).includes(n) && !excl.includes(n) && !this.isForbidden(n, "受付ヘルプ") && !cannotLateShift.includes(n) && !isFixedToAny(n) && !this.hasNGPair(n, helpMems.map(extractStaffName), false));
           if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); picked16 = cand[0]; }
         }
         if (picked16) { helpMems.push(`${picked16}(16:00〜)`); this.log(`🛎️ [受付ヘルプ] 夕枠(16:00〜)に ${picked16} をアサインしました`); }
@@ -1392,7 +1399,10 @@ export default function App() {
   const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { return JSON.parse(localStorage.getItem(KEY_ALL_DAYS) || "{}"); } catch { return {}; } });
   const [customRules, setCustomRules] = useState<CustomRules>(() => { try { return { ...DEFAULT_RULES, ...JSON.parse(localStorage.getItem(KEY_RULES) || "{}") }; } catch { return DEFAULT_RULES; } });
   const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => { try { return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(localStorage.getItem(KEY_MONTHLY) || "{}") }; } catch { return DEFAULT_MONTHLY_ASSIGN; } });
-  const [targetMonday, setTargetMonday] = useState(() => { const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff)); return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`; });
+  const [targetMonday, setTargetMonday] = useState(() => {
+    const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff));
+    return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
+  });
   const [sel, setSel] = useState("");
   const [assignLogs, setAssignLogs] = useState<Record<string, string[]>>({});
   const [selectedErrorDay, setSelectedErrorDay] = useState<string | null>(null);
@@ -1405,6 +1415,7 @@ export default function App() {
   const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
 
   useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
+
   useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); localStorage.setItem(KEY_RULES, JSON.stringify(customRules)); localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [allDays, customRules, monthlyAssign]);
 
   const activeGeneralStaff = useMemo(() => parseAndSortStaff(customRules.staffList), [customRules.staffList]);
@@ -1426,49 +1437,126 @@ export default function App() {
   const cur = days.find(d => d.id === sel) || days[0];
 
   const getDailyStats = (dayId: string) => {
-    const cells = allDays[dayId] || {}; const absent = new Set<string>(); REST_SECTIONS.forEach(s => split(cells[s]).forEach(m => absent.add(extractStaffName(m))));
-    const working = allStaff.filter(s => !absent.has(s)); const assigned = new Set<string>(); WORK_SECTIONS.forEach(s => split(cells[s]).forEach(m => assigned.add(extractStaffName(m))));
+    const cells = allDays[dayId] || {}; const absent = new Set<string>();
+    REST_SECTIONS.forEach(s => split(cells[s]).forEach(m => absent.add(extractStaffName(m))));
+    const working = allStaff.filter(s => !absent.has(s)); const assigned = new Set<string>();
+    WORK_SECTIONS.forEach(s => split(cells[s]).forEach(m => assigned.add(extractStaffName(m))));
     return { workingCount: working.length, absentCount: absent.size, unassigned: working.filter(s => !assigned.has(s)) };
   };
 
   const getDayWarnings = (dayId: string) => {
     const w: any[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {};
-    ROOM_SECTIONS.forEach(room => { if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return; split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }) });
+    ROOM_SECTIONS.forEach(room => {
+      if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return;
+      split(cells[room]).forEach(m => { 
+        const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); 
+      })
+    });
     Object.entries(staffMap).forEach(([staff, rms]) => { if(rms.length >= (customRules.alertMaxKenmu || 3)) w.push({ type: 'error', msg: `【兼務限界】${staff}さんが ${rms.length}部屋（${rms.join('、')}）を担当中` }); });
+    
     ROOM_SECTIONS.forEach(room => { if (split(cells[room]).length === 0) w.push({type: 'alert', msg: `【空室】${room}`}); });
+
     const curIdx = days.findIndex(d => d.id === dayId);
     if (curIdx > 0 && !days[curIdx-1].isPublicHoliday) {
-      split(customRules.consecutiveAlertRooms).forEach(room => { const prev = split(allDays[days[curIdx-1].id]?.[room]).map(extractStaffName); split(cells[room]).map(extractStaffName).filter(n => prev.includes(n)).forEach(n => w.push({ type: 'error', msg: `【連日注意】${n}さんが「${room}」に連日入っています` })); });
+      split(customRules.consecutiveAlertRooms).forEach(room => {
+        const prev = split(allDays[days[curIdx-1].id]?.[room]).map(extractStaffName);
+        split(cells[room]).map(extractStaffName).filter(n => prev.includes(n)).forEach(n => w.push({ type: 'error', msg: `【連日注意】${n}さんが「${room}」に連日入っています` }));
+      });
     }
-    const pSMap: Record<string, number> = {};
-    for (let i = 0; i <= curIdx; i++) { const dId = days[i].id; const mems = split((allDays[dId] || {})["ポータブル"]).map(extractStaffName); mems.forEach(m => { pSMap[m] = (pSMap[m] || 0) + 1; }); }
-    Object.entries(pSMap).forEach(([staff, count]) => { if (count >= 2) { const tMems = split((allDays[dayId] || {})["ポータブル"]).map(extractStaffName); if (tMems.includes(staff)) { w.push({ type: 'alert', msg: `【ポータブル多】${staff}さんが今週${count}回目のポータブルです` }); } } });
+
+    const portableStaffMap: Record<string, number> = {};
+    for (let i = 0; i <= curIdx; i++) {
+      const dId = days[i].id;
+      const mems = split((allDays[dId] || {})["ポータブル"]).map(extractStaffName);
+      mems.forEach(m => { portableStaffMap[m] = (portableStaffMap[m] || 0) + 1; });
+    }
+    Object.entries(portableStaffMap).forEach(([staff, count]) => {
+      if (count >= 2) {
+        const todayMems = split((allDays[dayId] || {})["ポータブル"]).map(extractStaffName);
+        if (todayMems.includes(staff)) {
+          w.push({ type: 'alert', msg: `【ポータブル多】${staff}さんが今週${count}回目のポータブルです` });
+        }
+      }
+    });
+
     return w;
   };
 
   const monthlyMatrixStats = useMemo(() => {
-    const targetMonth = targetMonday.substring(0, 7); const stats: Record<string, Record<string, { total: number, late: number }>> = {};
+    const targetMonth = targetMonday.substring(0, 7);
+    const stats: Record<string, Record<string, { total: number, late: number }>> = {};
     activeGeneralStaff.forEach(s => { stats[s] = {}; ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); });
     Object.entries(allDays).forEach(([dateStr, cells]) => {
-      if (dateStr.startsWith(targetMonth)) { ROOM_SECTIONS.forEach(room => { split(cells[room] || "").forEach(m => { const core = extractStaffName(m); if (stats[core] !== undefined && stats[core][room] !== undefined) { stats[core][room].total += 1; if (m.includes("17:00") || m.includes("18:00") || m.includes("19:00") || m.includes("22:00")) stats[core][room].late += 1; } }); }); }
+      if (dateStr.startsWith(targetMonth)) {
+        ROOM_SECTIONS.forEach(room => {
+          split(cells[room] || "").forEach(m => {
+            const core = extractStaffName(m);
+            if (stats[core] !== undefined && stats[core][room] !== undefined) {
+              stats[core][room].total += 1;
+              if (m.includes("17:00") || m.includes("18:00") || m.includes("19:00") || m.includes("22:00")) stats[core][room].late += 1;
+            }
+          });
+        });
+      }
     });
     return stats;
   }, [targetMonday, allDays, activeGeneralStaff]);
 
-  const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) { setHistory(h => [...h, prev].slice(-20)); } return next; }); };
-  const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev, [sel]: { ...(prev[sel] || {}), [k]: v } }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
+  const setAllDaysWithHistory = (updater: any) => {
+    setAllDays(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (JSON.stringify(prev) !== JSON.stringify(next)) { setHistory(h => [...h, prev].slice(-20)); } return next;
+    });
+  };
+
+  const updateDay = (k: string, v: string) => {
+    setAllDaysWithHistory((prev: any) => {
+      const nextState = { ...prev, [sel]: { ...(prev[sel] || {}), [k]: v } };
+      if (k === "入り") {
+        const idx = days.findIndex(d => d.id === sel);
+        if (idx >= 0 && idx < days.length - 1) {
+          const nextDayId = days[idx + 1].id;
+          const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m));
+          nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) };
+        }
+      }
+      return nextState;
+    });
+  };
 
   const handleAutoAssign = (isSmart: boolean, isWeekly: boolean) => {
     setAllDaysWithHistory((prev: any) => {
-      const nextAll = { ...prev }; const newLogs = { ...assignLogs }; const ctx = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules }; const targetDays = isWeekly ? days : [cur];
+      const nextAll = { ...prev }; const newLogs = { ...assignLogs };
+      const ctx = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules };
+      const targetDays = isWeekly ? days : [cur];
+      
       targetDays.forEach(day => {
-        const idx = days.findIndex(d => d.id === day.id); let prevDayObj: any = null; const dObj = new Date(day.id);
-        if (dObj.getDay() !== 1) { const prevDate = new Date(dObj); prevDate.setDate(prevDate.getDate() - 1); const prevDateStr = `${prevDate.getFullYear()}-${pad(prevDate.getMonth() + 1)}-${pad(prevDate.getDate())}`; if (nextAll[prevDateStr]) prevDayObj = { id: prevDateStr, cells: nextAll[prevDateStr] }; else if (idx > 0) prevDayObj = { id: days[idx-1].id, cells: nextAll[days[idx-1].id] || days[idx-1].cells }; }
+        const idx = days.findIndex(d => d.id === day.id);
+        
+        let prevDayObj: any = null;
+        const dObj = new Date(day.id);
+        if (dObj.getDay() !== 1) { 
+            const prevDate = new Date(dObj);
+            prevDate.setDate(prevDate.getDate() - 1);
+            const prevDateStr = `${prevDate.getFullYear()}-${pad(prevDate.getMonth() + 1)}-${pad(prevDate.getDate())}`;
+            if (nextAll[prevDateStr]) {
+                prevDayObj = { id: prevDateStr, cells: nextAll[prevDateStr] };
+            } else if (idx > 0) {
+                prevDayObj = { id: days[idx-1].id, cells: nextAll[days[idx-1].id] || days[idx-1].cells };
+            }
+        }
+        
         const targetMonth = day.id.substring(0, 7);
-        const pastDaysInMonthArray = Object.entries(nextAll).filter(([dateStr]) => dateStr.startsWith(targetMonth) && dateStr < day.id).map(([dateStr, cells]) => ({ id: dateStr, cells } as any));
+        const pastDaysInMonthArray = Object.entries(nextAll)
+          .filter(([dateStr]) => dateStr.startsWith(targetMonth) && dateStr < day.id)
+          .map(([dateStr, cells]) => ({ id: dateStr, cells } as any));
+        
         const pastDaysInWeekArray = days.slice(0, idx).map(d => ({ ...d, cells: nextAll[d.id] || d.cells }));
-        const worker = new AutoAssigner({ ...day, cells: nextAll[day.id] || day.cells }, prevDayObj, pastDaysInMonthArray, pastDaysInWeekArray, ctx, isSmart);
-        const res = worker.execute(); nextAll[day.id] = res.cells; newLogs[day.id] = res.logInfo || []; 
+
+        const baseDay = { ...day, cells: nextAll[day.id] || day.cells };
+        const worker = new AutoAssigner(baseDay, prevDayObj, pastDaysInMonthArray, pastDaysInWeekArray, ctx, isSmart);
+        const res = worker.execute();
+        nextAll[day.id] = res.cells; newLogs[day.id] = res.logInfo || []; 
       });
       setAssignLogs(newLogs); return nextAll;
     });
@@ -1479,6 +1567,7 @@ export default function App() {
   const updateRule = (type: keyof CustomRules, idx: number, key: string, val: any) => { setCustomRules(r => { const arr = [...((r[type] as any[]) || [])]; arr[idx] = { ...arr[idx], [key]: val }; return { ...r, [type]: arr }; }); };
   const removeRule = (type: keyof CustomRules, idx: number) => { setCustomRules(r => { const arr = [...((r[type] as any[]) || [])]; arr.splice(idx, 1); return { ...r, [type]: arr }; }); };
   const addRule = (type: keyof CustomRules, def: any) => { setCustomRules(r => ({ ...r, [type]: [...((r[type] as any[]) || []), def] })); };
+  
   const handleClearGroupDay = (title: string, sections: string[]) => { if (window.confirm(`${cur.label} の「${title}」をクリアしますか？`)) { setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; sections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
   const handleClearGroupWeek = (title: string, sections: string[]) => { if (window.confirm(`表示中の「${title}」を1週間分すべてクリアしますか？`)) { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev }; days.forEach(d => { const nextCells = { ...(prev[d.id] || d.cells) }; sections.forEach(sec => { nextCells[sec] = ""; }); nextState[d.id] = nextCells; }); return nextState; }); } };
   const handleClearWorkDay = () => { if (window.confirm(`${cur.label} の「モダリティ」と「一般撮影・透視・その他」をクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections]; setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
@@ -1495,7 +1584,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.47</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.48</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1587,24 +1676,10 @@ export default function App() {
                <div key={group.title} style={{ gridColumn: "1 / -1" }}>
                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #e2e8f0" }}>
                    <h4 style={{ fontSize: 20, fontWeight: 900, borderLeft: `6px solid ${group.color}`, paddingLeft: 12, margin: 0 }}>{group.title}</h4>
-                   {group.title === "休務・夜勤" && (
-                      <div style={{display: "flex", gap: 8}}>
-                        <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
-                        <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
-                      </div>
-                    )}
-                    {group.title === "モダリティ" && (
-                      <div style={{display: "flex", gap: 8}}>
-                        <button onClick={handleClearWorkDay} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務1日クリア</button>
-                        <button onClick={handleClearWorkWeek} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 業務週間クリア</button>
-                      </div>
-                    )}
-                    {group.title === "待機・その他" && (
-                      <div style={{display: "flex", gap: 8}}>
-                        <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
-                        <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
-                      </div>
-                    )}
+                   <div style={{display: "flex", gap: 8}}>
+                      <button onClick={() => handleClearGroupDay(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 1日クリア</button>
+                      <button onClick={() => handleClearGroupWeek(group.title, group.sections)} className="btn-hover" style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 12px", fontSize: 14, cursor: "pointer", color: "#64748b", fontWeight: 700 }}>🧹 週間クリア</button>
+                    </div>
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
                    {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} />)}
@@ -1615,7 +1690,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* ===================== 📊 マトリックス タブ ===================== */}
       <div className="no-print" style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
         <div style={{ ...panelStyle(), marginBottom: 24 }}>
           <h3 style={{ fontWeight: 900, color: "#3b82f6", fontSize: 20, marginTop: 0 }}>配置マトリックス（月間集計）</h3>
@@ -1655,9 +1729,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* ===================== ⚙️ 設定 タブ ===================== */}
       <div className="no-print" style={{ display: activeTab === 'rules' ? 'block' : 'none' }}>
-        
         <div style={{ ...panelStyle(), marginBottom: 32 }}>
           <h3 style={{ fontSize: 24, fontWeight: 900, marginBottom: 20, color: "#0f766e" }}>👥 スタッフ名簿</h3>
           <div style={{ background: "#f0fdf4", padding: "16px 20px", borderRadius: 12, border: "2px solid #bbf7d0", marginBottom: 24 }}>
@@ -1686,7 +1758,7 @@ export default function App() {
              <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleImport} />
              <div style={{ width: "2px", height: "32px", background: "#cbd5e1", margin: "0 8px" }}></div>
              <button className="btn-hover" onClick={handleCopyToClipboard} style={btnStyle("#db2777")}>📋 テキストコピー</button>
-             <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "10px 16px", fontSize: 16, borderRadius: 8, border: "2px solid #f9a8d4" }} />
+             <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "10px 16px", fontSize: 16, borderRadius: 8, border: "1px solid #f9a8d4" }} />
              <button className="btn-hover" onClick={handleTextImport} style={btnStyle("#be185d")}>✨ 復元</button>
           </div>
         </div>
