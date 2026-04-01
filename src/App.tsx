@@ -4,8 +4,8 @@ const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
   
-  /* 🌟 ベースの文字サイズを強制的に超巨大化（28px） */
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 28px; overflow-x: clip; }
+  /* 🌟 全体のベース文字サイズを極大化（32px） */
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.02em; font-size: 32px; overflow-x: clip; }
   
   * { box-sizing: border-box; }
   textarea, select, button, input { font: inherit; }
@@ -14,8 +14,8 @@ const globalStyle = `
   select { 
     appearance: none; 
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); 
-    background-repeat: no-repeat; background-position: right 18px center; background-size: 2em; 
-    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 64px !important; 
+    background-repeat: no-repeat; background-position: right 20px center; background-size: 2.2em; 
+    text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 72px !important; 
   }
   
   details > summary { list-style: none; cursor: pointer; transition: color 0.2s; outline: none; }
@@ -24,37 +24,37 @@ const globalStyle = `
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
   
   .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; box-shadow: 0 6px 8px -1px rgba(0,0,0,0.05); }
-  .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 32px; margin-top: -32px; box-shadow: 0 12px 12px -12px rgba(0,0,0,0.05); }
+  .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 36px; margin-top: -36px; box-shadow: 0 12px 12px -12px rgba(0,0,0,0.05); }
 
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-  .btn-hover:hover { transform: translateY(-3px); filter: brightness(1.05); box-shadow: 0 8px 16px -1px rgba(0,0,0,0.1), 0 4px 6px -1px rgba(0,0,0,0.06) !important; }
+  .btn-hover:hover { transform: translateY(-4px); filter: brightness(1.05); box-shadow: 0 10px 20px -1px rgba(0,0,0,0.1), 0 4px 8px -1px rgba(0,0,0,0.06) !important; }
   .btn-hover:active { transform: translateY(0); box-shadow: none !important; }
   .card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; cursor: pointer; }
-  .card-hover:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
+  .card-hover:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
   
-  .rule-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; align-items: center; width: 100%; }
-  .rule-sel { padding: 16px 48px 16px 20px; border-radius: 12px; border: 3px solid #cbd5e1; font-weight: 700; flex: 1 1 180px; min-width: 180px; font-size: 28px; transition: border-color 0.2s; }
-  .rule-num { width: 110px; padding: 16px; border-radius: 12px; border: 3px solid #cbd5e1; font-weight: 700; font-size: 28px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
-  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 36px; flex-shrink: 0; padding: 0 12px; transition: 0.2s; }
-  .rule-del:hover { background: #fee2e2; border-radius: 8px; }
-  .rule-add { background: #fff; color: #4f46e5; border: 4px dashed #a5b4fc; padding: 18px 28px; font-size: 28px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; transition: all 0.2s; }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 24px; align-items: center; width: 100%; }
+  .rule-sel { padding: 20px 56px 20px 24px; border-radius: 14px; border: 4px solid #cbd5e1; font-weight: 700; flex: 1 1 200px; min-width: 200px; font-size: 32px; transition: border-color 0.2s; }
+  .rule-num { width: 130px; padding: 20px; border-radius: 14px; border: 4px solid #cbd5e1; font-weight: 700; font-size: 32px; text-align: center; flex-shrink: 0; transition: border-color 0.2s; }
+  .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 40px; flex-shrink: 0; padding: 0 16px; transition: 0.2s; }
+  .rule-del:hover { background: #fee2e2; border-radius: 10px; }
+  .rule-add { background: #fff; color: #4f46e5; border: 5px dashed #a5b4fc; padding: 22px 36px; font-size: 32px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 16px; cursor: pointer; margin-top: 24px; transition: all 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
-  .rule-label { font-size: 28px; font-weight: 800; color: #64748b; flex-shrink: 0; }
+  .rule-label { font-size: 32px; font-weight: 800; color: #64748b; flex-shrink: 0; }
   
-  .tabs-header { display: flex; gap: 16px; border-bottom: 5px solid #e2e8f0; margin-bottom: 40px; padding: 0 20px; flex-wrap: wrap; }
-  .tab-btn { background: none; border: none; padding: 20px 40px; font-size: 32px; font-weight: 900; color: #64748b; cursor: pointer; border-bottom: 6px solid transparent; margin-bottom: -5px; transition: 0.2s; }
+  .tabs-header { display: flex; gap: 20px; border-bottom: 6px solid #e2e8f0; margin-bottom: 48px; padding: 0 24px; flex-wrap: wrap; }
+  .tab-btn { background: none; border: none; padding: 24px 48px; font-size: 36px; font-weight: 900; color: #64748b; cursor: pointer; border-bottom: 8px solid transparent; margin-bottom: -6px; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
 
   .name-textarea {
     width: 100%;
-    height: 280px;
-    padding: 24px;
-    font-size: 32px !important;
-    border-radius: 20px;
-    border: 4px solid #cbd5e1;
+    height: 320px;
+    padding: 32px;
+    font-size: 36px !important;
+    border-radius: 24px;
+    border: 5px solid #cbd5e1;
     font-weight: 800;
     line-height: 1.6;
   }
@@ -64,11 +64,11 @@ const globalStyle = `
   .modal-animate { animation: fadeIn 0.2s ease-out forwards; }
 
   @media print {
-    body { background: #fff; overflow: visible; font-size: 18pt; } .no-print { display: none !important; }
+    body { background: #fff; overflow: visible; font-size: 20pt; } .no-print { display: none !important; }
     .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed; }
     tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #000 !important; padding: 14px !important; font-size: 18pt !important; color: #000 !important; position: static !important; max-width: 180px; word-break: break-all; }
+    th, td { border: 1px solid #000 !important; padding: 16px !important; font-size: 20pt !important; color: #000 !important; position: static !important; max-width: 220px; word-break: break-all; }
   }
 `;
 
@@ -119,7 +119,7 @@ const DEFAULT_RULES: CustomRules = {
   smartKenmu: [{ targetRoom: "MMG", sourceRooms: "1号室、2号室、3号室、5号室、CT(4)" }]
 };
 
-const KEY_ALL_DAYS = "shifto_alldays_v2320"; const KEY_MONTHLY = "shifto_monthly_v2320"; const KEY_RULES = "shifto_rules_v2320";
+const KEY_ALL_DAYS = "shifto_alldays_v2330"; const KEY_MONTHLY = "shifto_monthly_v2330"; const KEY_RULES = "shifto_rules_v2330";
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const TIME_OPTIONS: string[] = ["(AM)", "(PM)", "(12:15〜13:00)", "(17:00〜19:00)", "(17:00〜22:00)"];
@@ -147,11 +147,11 @@ function getMonthlyStaffForSection(sec: string, monthlyAssign: Record<string, st
 function isMonthlyMainStaff(section: string, name: string, monthlyAssign: Record<string, string>) { if (!section) return false; return getMonthlyStaffForSection(section, monthlyAssign).includes(name); }
 function getStaffAmount(name: string) { if (ROLE_PLACEHOLDERS.includes(extractStaffName(name))) return 0; return (name.includes("(AM)") || name.includes("(PM)") || name.match(/\(〜/) || name.match(/〜\)/)) ? 0.5 : 1; }
 
-const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 28): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "14px", padding: "16px 28px", cursor: "pointer", fontWeight: 800, fontSize, whiteSpace: "nowrap", boxShadow: "0 6px 8px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 12 });
-const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "2px solid #e2e8f0", borderRadius: "28px", padding: "48px", boxShadow: "0 8px 16px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" });
+const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 32): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "16px", padding: "18px 32px", cursor: "pointer", fontWeight: 800, fontSize, whiteSpace: "nowrap", boxShadow: "0 6px 10px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 14 });
+const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "3px solid #e2e8f0", borderRadius: "32px", padding: "56px", boxShadow: "0 10px 20px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" });
 const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { 
   let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); 
-  return { border: "2px solid #e2e8f0", padding: "24px 28px", background: bg, fontWeight: isHeader ? 900 : 700, textAlign: isHeader ? "center" : "left", fontSize: 28, minWidth: isHeader && !isSticky ? "260px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "4px 0 8px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
+  return { border: "3px solid #e2e8f0", padding: "28px 32px", background: bg, fontWeight: isHeader ? 900 : 700, textAlign: isHeader ? "center" : "left", fontSize: 32, minWidth: isHeader && !isSticky ? "300px" : "auto", color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, boxShadow: isSticky ? "5px 0 10px -2px rgba(0,0,0,0.05)" : "none", transition: "background-color 0.2s" }; 
 };
 
 const RENDER_GROUPS: RenderGroup[] = [
@@ -167,9 +167,9 @@ const MultiPicker = ({ selected, onChange, options, placeholder }: any) => {
   const handleAdd = (val: string) => { if (val && !current.includes(val)) onChange(join([...current, val])); };
   const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); };
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 16, marginBottom: 16 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 20, marginBottom: 20 }}>
       {current.map((item, i) => (
-        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 28, padding: "16px 24px", fontSize: 28, fontWeight: 800, border: "3px solid #bae6fd", display: "flex", alignItems: "center", gap: 12 }}>
+        <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 32, padding: "20px 28px", fontSize: 32, fontWeight: 800, border: "4px solid #bae6fd", display: "flex", alignItems: "center", gap: 16 }}>
           <span>{item}</span><span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span>
         </div>
       ))}
@@ -199,28 +199,28 @@ const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, customHo
   };
   return (
     <div style={{ position: "relative" }}>
-      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "3px solid #bfdbfe", padding: "18px 28px", fontSize: 30 }}>📅 {targetMonday} 週 ▼</button>
+      <button className="btn-hover" onClick={() => setIsOpen(!isOpen)} style={{ ...btnStyle("#fff", "#2563eb"), border: "4px solid #bfdbfe", padding: "20px 32px", fontSize: 32 }}>📅 {targetMonday} 週 ▼</button>
       {isOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setIsOpen(false)}></div>
-          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "3px solid #cbd5e1", borderRadius: 28, padding: 40, zIndex: 50, boxShadow: "0 30px 40px -5px rgba(0, 0, 0, 0.15)", minWidth: 560 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
-              <button onClick={() => setViewDate(new Date(year, month - 2, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 12, padding: "16px 24px", cursor: "pointer", fontSize: 30 }}>◀</button>
-              <div style={{ fontWeight: 900, fontSize: 36 }}>{year}年 {month}月</div>
-              <button onClick={() => setViewDate(new Date(year, month, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 12, padding: "16px 24px", cursor: "pointer", fontSize: 30 }}>▶</button>
+          <div style={{ position: "absolute", top: "110%", left: 0, background: "#fff", border: "4px solid #cbd5e1", borderRadius: 32, padding: 48, zIndex: 50, boxShadow: "0 30px 40px -5px rgba(0, 0, 0, 0.15)", minWidth: 640 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+              <button onClick={() => setViewDate(new Date(year, month - 2, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 16, padding: "20px 28px", cursor: "pointer", fontSize: 32 }}>◀</button>
+              <div style={{ fontWeight: 900, fontSize: 40 }}>{year}年 {month}月</div>
+              <button onClick={() => setViewDate(new Date(year, month, 1))} style={{ border: "none", background: "#f1f5f9", borderRadius: 16, padding: "20px 28px", cursor: "pointer", fontSize: 32 }}>▶</button>
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 32 }}>
-              <thead><tr><th style={{ color: "#ef4444", padding: 20 }}>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th style={{ color: "#3b82f6", padding: 20 }}>土</th></tr></thead>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: 36 }}>
+              <thead><tr><th style={{ color: "#ef4444", padding: 24 }}>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th style={{ color: "#3b82f6", padding: 24 }}>土</th></tr></thead>
               <tbody>
                 {weeks.map((w, wIdx) => {
                   const isSelectedWeek = w.some(d => { if(!d) return false; const dObj = new Date(year, month - 1, d, 12, 0, 0); const day = dObj.getDay(); const diff = dObj.getDate() - day + (day === 0 ? -6 : 1); const checkMon = new Date(dObj.getTime()); checkMon.setDate(diff); return `${checkMon.getFullYear()}-${pad(checkMon.getMonth()+1)}-${pad(checkMon.getDate())}` === targetMonday; });
                   return (
                     <tr key={wIdx} onClick={() => handleWeekClick(w)} className="calendar-row" style={{ background: isSelectedWeek ? "#eff6ff" : "transparent" }}>
                       {w.map((d, dIdx) => {
-                        if (!d) return <td key={dIdx} style={{ padding: 28 }}></td>;
+                        if (!d) return <td key={dIdx} style={{ padding: 32 }}></td>;
                         const isHoliday = !!(nationalHolidays[`${year}-${pad(month)}-${pad(d)}`] || customHolidays.includes(`${year}-${pad(month)}-${pad(d)}`));
                         let color = "#334155"; if (dIdx === 0 || isHoliday) color = "#ef4444"; else if (dIdx === 6) color = "#3b82f6";
-                        return <td key={dIdx} style={{ padding: 28, color, fontWeight: isHoliday ? 900 : 700, position: "relative" }}>{d}{isHoliday && <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", width: 14, height: 14, background: "#ef4444", borderRadius: "50%" }}></div>}</td>;
+                        return <td key={dIdx} style={{ padding: 32, color, fontWeight: isHoliday ? 900 : 700, position: "relative" }}>{d}{isHoliday && <div style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", width: 16, height: 16, background: "#ef4444", borderRadius: "50%" }}></div>}</td>;
                       })}
                     </tr>
                   )
@@ -240,25 +240,25 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
   const handleTimeChange = (idx: number, newTime: string) => { if (noTime && !isFuzai) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
   return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "2px solid #e2e8f0", borderRadius: 24, padding: "32px", boxShadow: "0 4px 8px rgba(0,0,0,0.02)" }}>
-      <label style={{ fontSize: 32, fontWeight: 900, color: "#475569", marginBottom: 24 }}>{section}</label>
+    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "3px solid #e2e8f0", borderRadius: 28, padding: "36px", boxShadow: "0 4px 8px rgba(0,0,0,0.02)" }}>
+      <label style={{ fontSize: 36, fontWeight: 900, color: "#475569", marginBottom: 28 }}>{section}</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         {members.map((m, i) => {
           const coreName = extractStaffName(m); const currentMod = m.substring(coreName.length);
           const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
           return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 28, padding: "18px 28px 18px 30px", fontSize: 28, display: "flex", alignItems: "center", gap: 14, border: `3px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
+            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 28, padding: "20px 32px 20px 32px", fontSize: 32, display: "flex", alignItems: "center", gap: 16, border: `4px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 800 }}>
               <span>{coreName}</span>
               {(!noTime || isFuzai) && (
-                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 28, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 36px 0 12px" }}>
+                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 32, fontWeight: 800, color: "inherit", cursor: "pointer", padding: "0 44px 0 16px" }}>
                   {isFuzai ? <><option value="">全休</option><option value="(AM)">AM休</option><option value="(PM)">PM休</option></> : isTaiki ? <><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></> : <><option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>}
                 </select>
               )}
-              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 14 }}>✖</span>
+              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 16 }}>✖</span>
             </div>
           )
         })}
-        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "4px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 28, color: "#64748b", flex: 1, minWidth: 200, cursor: "pointer", fontWeight: 800, borderRadius: 20, padding: "18px 44px 18px 28px" }}>
+        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "5px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 32, color: "#64748b", flex: 1, minWidth: 220, cursor: "pointer", fontWeight: 800, borderRadius: 24, padding: "20px 48px 20px 32px" }}>
           <option value="">＋追加</option>
           <optgroup label="スタッフ">{activeStaff.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>
           {customOptions.length > 0 && <optgroup label="担当枠（未定）">{customOptions.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>}
@@ -271,10 +271,10 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
 // ===================== 🌟 ログのレンダリング =====================
 const renderLog = (logStr: string, i: number) => {
   if (logStr.startsWith("・■")) {
-    return <li key={i} style={{ marginTop: 40, marginBottom: 20, paddingBottom: 10, borderBottom: "5px solid #cbd5e1", fontSize: 36, fontWeight: 900, color: "#334155" }}>{logStr.substring(2)}</li>;
+    return <li key={i} style={{ marginTop: 48, marginBottom: 24, paddingBottom: 12, borderBottom: "6px solid #cbd5e1", fontSize: 40, fontWeight: 900, color: "#334155" }}>{logStr.substring(2)}</li>;
   }
   const match = logStr.match(/^・(.*?)\s\[(.*?)\]\s(.*)$/);
-  if (!match) return <li key={i} style={{ padding: "16px 24px", marginBottom: "10px", background: "#f8fafc", borderRadius: "14px", fontSize: 28, color: "#475569", fontWeight: 600 }}>{logStr.substring(1)}</li>;
+  if (!match) return <li key={i} style={{ padding: "20px 28px", marginBottom: "12px", background: "#f8fafc", borderRadius: "16px", fontSize: 32, color: "#475569", fontWeight: 600 }}>{logStr.substring(1)}</li>;
   const [_, icon, category, text] = match;
   let bg = "#f8fafc"; let border = "#e2e8f0"; let color = "#475569"; let badgeBg = "#e2e8f0"; let badgeColor = "#475569";
   if (category.includes("配置決定") || category.includes("増枠")) { bg = "#eff6ff"; border = "#bfdbfe"; color = "#1e3a8a"; badgeBg = "#dbeafe"; badgeColor = "#1d4ed8"; }
@@ -286,8 +286,8 @@ const renderLog = (logStr: string, i: number) => {
   else if (category.includes("専従") || category.includes("役割")) { bg = "#f0fdfa"; border = "#bbf7d0"; color = "#14532d"; badgeBg = "#dcfce7"; badgeColor = "#15803d"; }
   else if (category.includes("昼当番") || category.includes("ヘルプ") || category.includes("サポート") || category.includes("余剰")) { bg = "#fdf4ff"; border = "#f5d0fe"; color = "#701a75"; badgeBg = "#fae8ff"; badgeColor = "#86198f"; }
   return (
-    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "20px 28px", marginBottom: "14px", background: bg, borderRadius: "16px", border: `3px solid ${border}`, fontSize: 28, color, lineHeight: "1.6", fontWeight: 600 }}>
-      <span style={{ display: "inline-block", padding: "8px 18px", background: badgeBg, color: badgeColor, borderRadius: "10px", fontWeight: 900, fontSize: 24, whiteSpace: "nowrap", flexShrink: 0, marginTop: 4 }}>{icon} {category}</span>
+    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "24px 32px", marginBottom: "16px", background: bg, borderRadius: "20px", border: `4px solid ${border}`, fontSize: 32, color, lineHeight: "1.6", fontWeight: 700 }}>
+      <span style={{ display: "inline-block", padding: "8px 20px", background: badgeBg, color: badgeColor, borderRadius: "12px", fontWeight: 900, fontSize: 28, whiteSpace: "nowrap", flexShrink: 0, marginTop: 4 }}>{icon} {category}</span>
       <span style={{ fontWeight: 800 }}>{text}</span>
     </li>
   );
@@ -776,6 +776,7 @@ class AutoAssigner {
       const noConsecutiveRooms = split(this.ctx.customRules.noConsecutiveRooms || "");
       const prevDayTarget = (this.prevDay && noConsecutiveRooms.includes(targetRoom)) ? split(this.prevDay.cells[targetRoom] || "").map(extractStaffName) : [];
 
+      // triggerRoomの中に「targetRoomへ兼務できる人」がいるか？
       const triggerCanTarget = triggerMembers.some(m => {
           const c = extractStaffName(m);
           if (ROLE_PLACEHOLDERS.includes(c) || this.isForbidden(c, targetRoom) || prevDayTarget.includes(c) || isFixedToAny(c)) return false;
@@ -1232,28 +1233,6 @@ class AutoAssigner {
       }
       this.dayCells["受付ヘルプ"] = join(helpMems);
     }
-    
-    const unassignedGeneral = this.initialAvailGeneral.filter((s: string) => !this.isUsed(s));
-    unassignedGeneral.forEach((staff: string) => {
-      const b = this.blockMap.get(staff); if (b === 'ALL') return;
-      let tag = ""; let f = 1;
-      if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } 
-      else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } 
-      else { this.blockMap.set(staff, 'ALL'); }
-      
-      if (!this.skipSections.includes("3号室") && !this.isForbidden(staff, "3号室")) {
-        let current = split(this.dayCells["3号室"]);
-        this.dayCells["3号室"] = join([...current, `${staff}${tag}`]);
-        this.addU(staff, f);
-        this.log(`♻️ [余剰配置] 配置先がなかったため、${staff} を 3号室 に配置しました`);
-      } else if (!this.skipSections.includes("待機") && !this.isForbidden(staff, "待機")) {
-        let current = split(this.dayCells["待機"]);
-        this.dayCells["待機"] = join([...current, `${staff}${tag}`]);
-        this.addU(staff, f);
-        this.log(`♻️ [余剰配置] 配置先がなかったため、${staff} を 待機 に配置しました`);
-      }
-    });
-
   }
 }
 
@@ -1800,7 +1779,7 @@ export default function App() {
                   <span className="rule-label" style={{ color: "#166534" }}>の</span>
                   <select value={rule.section} onChange={(e: any) => updateRule("dailyAdditions", idx, "section", e.target.value)} className="rule-sel" style={{ borderColor: "#4ade80" }}><option value="">部屋を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   <span className="rule-label" style={{ color: "#166534" }}>に</span>
-                  <select value={rule.time || "全日"} onChange={(e: any) => updateRule("dailyAdditions", idx, "time", e.target.value)} className="rule-sel" style={{ borderColor: "#4ade80", flex: "0 0 140px" }}><option value="全日">全日</option><option value="(AM)">AM</option><option value="(PM)">PM</option></select>
+                  <select value={rule.time || "全日"} onChange={(e: any) => updateRule("dailyAdditions", idx, "time", e.target.value)} className="rule-sel" style={{ borderColor: "#4ade80", flex: "0 0 160px" }}><option value="全日">全日</option><option value="(AM)">AM</option><option value="(PM)">PM</option></select>
                   <input type="number" min="1" value={rule.count} onChange={(e: any) => updateRule("dailyAdditions", idx, "count", Number(e.target.value))} className="rule-num" style={{ borderColor: "#4ade80" }} />
                   <span className="rule-label" style={{ color: "#166534" }}>人追加する</span>
                   <button onClick={() => removeRule("dailyAdditions", idx)} className="rule-del">✖</button>
@@ -1903,7 +1882,7 @@ export default function App() {
               ))}
               <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("kenmuPairs", { s1: "", s2: "" })}>＋ ペアを追加</button>
 
-              <h6 style={{ fontSize: 28, color: "#047857", marginTop: 48, marginBottom: 20 }}>■ 基本兼務（セット配置）<br/><span style={{fontSize: 24, color: "#065f46", fontWeight: "normal", marginLeft: 20}}>※ 引抜元が定員を満たしている場合のみ発動します。<br/>※ 「CT(4)」などを指定した場合、CTが4名以上いる日のみ発動します。</span></h6>
+              <h6 style={{ fontSize: 28, color: "#047857", marginTop: 48, marginBottom: 20 }}>■ 基本兼務（セット配置）<br/><span style={{fontSize: 24, color: "#065f46", fontWeight: "normal", marginLeft: 20}}>※ 引抜元が定員を満たしている場合のみ発動します。</span></h6>
               {(customRules.linkedRooms || []).map((rule: any, idx: number, arr: any[]) => (
                   <div key={idx} style={{ background: "#fff", padding: "28px 36px", border: "4px solid #a7f3d0", borderRadius: 20, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 24 }}>
                     <div style={{ flex: 1 }}>
@@ -1929,7 +1908,7 @@ export default function App() {
               ))}
               <button className="rule-add" style={{ color: "#065f46", borderColor: "#6ee7b7" }} onClick={() => addRule("linkedRooms", { target: "", sources: "" })}>＋ セット配置ルールを追加</button>
 
-              <h6 style={{ fontSize: 28, color: "#047857", marginTop: 48, marginBottom: 20 }}>■ 🆘 空室（人数不足）救済ルール<br/><span style={{fontSize: 24, color: "#065f46", fontWeight: "normal", marginLeft: 20}}>※ 引抜元に「CT」を指定した場合、CTが4名以上いる日のみ発動します。</span></h6>
+              <h6 style={{ fontSize: 28, color: "#047857", marginTop: 48, marginBottom: 20 }}>■ 🆘 空室（人数不足）救済ルール</h6>
               {(customRules.rescueRules || []).map((rule: any, idx: number, arr: any[]) => (
                   <div key={idx} style={{ background: "#fff", padding: "28px 36px", border: "4px solid #fde047", borderRadius: 20, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 24 }}>
                     <div style={{ flex: 1 }}>
@@ -1981,7 +1960,7 @@ export default function App() {
           </div>
 
           {/* ===================== フェーズ5 ===================== */}
-          <div style={{ borderLeft: "10px solid #8b5cf6", paddingLeft: 40, marginBottom: 80 }}>
+          <div style={{ borderLeft: "12px solid #8b5cf6", paddingLeft: 40, marginBottom: 80 }}>
             <h4 style={{ fontSize: 36, fontWeight: 900, color: "#6d28d9", marginBottom: 32, borderBottom: "4px solid #c4b5fd", paddingBottom: 16 }}>フェーズ5：仕上げ（最後に配置）</h4>
             
             <div style={{ background: "#eef2ff", padding: 40, borderRadius: 20, border: "4px solid #c7d2fe", marginBottom: 32 }}>
