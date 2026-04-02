@@ -61,7 +61,10 @@ type RejectReason = { hard: boolean, msg: string };
 type WarningInfo = { level: 'red' | 'orange' | 'yellow'; title: string; msg: string; staff?: string; room?: string; };
 
 interface CustomRules {
-  staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; customHolidays: string;
+  staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; 
+  supportTargetRoomsLowImpact: string; // 追加: 影響の少ない部屋
+  supportTargetRoomsHighImpact: string; // 追加: 影響の大きい部屋
+  customHolidays: string;
   capacity: Record<string, number>; dailyCapacities: any[]; dailyAdditions: any[]; priorityRooms: string[]; fullDayOnlyRooms: string; noConsecutiveRooms: string; consecutiveAlertRooms: string;
   noLateShiftStaff: string; noLateShiftRooms: string; ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; swapRules: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[];
   lunchBaseCount: number; lunchSpecialDays: any[]; lunchConditional: any[]; lunchRoleRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[];
@@ -88,7 +91,10 @@ const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療
 const DEFAULT_PRIORITY_ROOMS = ["治療", "受付", "MMG", "RI", "MRI", "CT", "透視（6号）", "透視（11号）", "1号室", "5号室", "2号室", "骨塩", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部"];
 
 const DEFAULT_RULES: CustomRules = {
-  staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", customHolidays: "",
+  staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", 
+  supportTargetRoomsLowImpact: "3号室,パノラマCT", // デフォルト追加
+  supportTargetRoomsHighImpact: "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像", // デフォルト追加
+  customHolidays: "",
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 },
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
   noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [],
@@ -294,6 +300,7 @@ const renderLog = (logStr: string, i: number) => {
   else if (category.includes("玉突き")) { bg = "#e0f2fe"; border = "#bae6fd"; color = "#0c4a6e"; badgeBg = "#bae6fd"; badgeColor = "#0369a1"; }
   else if (category.includes("専従") || category.includes("役割")) { bg = "#f0fdfa"; border = "#bbf7d0"; color = "#14532d"; badgeBg = "#dcfce7"; badgeColor = "#15803d"; }
   else if (category.includes("昼当番") || category.includes("ヘルプ") || category.includes("サポート") || category.includes("余剰")) { bg = "#fdf4ff"; border = "#f5d0fe"; color = "#701a75"; badgeBg = "#fae8ff"; badgeColor = "#86198f"; }
+  else if (category.includes("低影響補充")) { bg = "#f0fdfa"; border = "#ccfbf1"; color = "#0f766e"; badgeBg = "#ccfbf1"; badgeColor = "#0f766e"; }
   return (
     <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", marginBottom: "6px", background: bg, borderRadius: "8px", border: `1px solid ${border}`, fontSize: 14, color, lineHeight: 1.6, fontWeight: 600, wordBreak: "break-word" }}>
       <span style={{ display: "inline-block", padding: "4px 8px", background: badgeBg, color: badgeColor, borderRadius: "6px", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>{icon} {category}</span>
@@ -354,6 +361,52 @@ class AutoAssigner {
     if (!this.prevDay || !noCRooms.includes(room)) return false;
     const prev = split(this.prevDay.cells[room] || "").map(extractStaffName);
     return prev.includes(staff);
+  }
+
+  private getRoomDependencyCount(room: string): number {
+    let score = 0;
+    (this.ctx.customRules.linkedRooms || []).forEach((r: any) => {
+      if (split(r.sources || "").some((s: string) => parseRoomCond(s).r === room)) score += 3;
+      if (r.target === room) score += 1;
+    });
+    (this.ctx.customRules.rescueRules || []).forEach((r: any) => {
+      if (split(r.sourceRooms || "").some((s: string) => parseRoomCond(s).r === room)) score += 2;
+      if (r.targetRoom === room) score += 1;
+    });
+    (this.ctx.customRules.swapRules || []).forEach((r: any) => {
+      if (split(r.sourceRooms || "").some((s: string) => parseRoomCond(s).r === room)) score += 2;
+      if (r.triggerRoom === room) score += 1;
+      if (r.targetRoom === room) score += 1;
+    });
+    (this.ctx.customRules.kenmuPairs || []).forEach((p: any) => {
+      if (p.s1 === room || p.s2 === room) score += 2;
+    });
+    return score;
+  }
+
+  private getRescueSourceScore(srcRoom: string, targetRoom: string, staff?: string): number {
+    let score = 0;
+    const lowImpact = split(this.ctx.customRules.supportTargetRoomsLowImpact || "3号室,パノラマCT");
+    const highImpact = split(this.ctx.customRules.supportTargetRoomsHighImpact || "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像");
+
+    if (srcRoom === targetRoom) score += 9999;
+    if (lowImpact.includes(srcRoom)) score -= 1000;
+    if (highImpact.includes(srcRoom)) score += 1000;
+
+    score += this.getRoomDependencyCount(srcRoom) * 100;
+
+    const currentAmount = split(this.dayCells[srcRoom] || "").reduce((sum, m) => sum + getStaffAmount(m), 0);
+    if (currentAmount <= 1) score += 500;
+    else if (currentAmount <= 2) score += 200;
+
+    if (staff) {
+      const b = this.blockMap.get(staff);
+      if ((b === 'AM' || b === 'PM') && highImpact.includes(srcRoom)) score += 300;
+    }
+
+    if (this.clearSections.includes(srcRoom) || this.skipSections.includes(srcRoom)) score += 5000;
+
+    return score;
   }
 
   canAddKenmu(staff: string, targetRoom: string, bypassExclusiveForSource: boolean = false): boolean {
@@ -638,7 +691,6 @@ class AutoAssigner {
          else if (section === "RI") { mainStaff = split(this.ctx.monthlyAssign.RI || "").map(extractStaffName); subStaff = split(this.ctx.monthlyAssign.RIサブ || "").map(extractStaffName); } 
          else { mainStaff = split(this.ctx.monthlyAssign[section] || "").map(extractStaffName); }
          const hasAmFree = validNames.some(s => this.blockMap.get(s) === 'PM'); const hasPmFree = validNames.some(s => this.blockMap.get(s) === 'AM');
-         const prevDayMembers = (this.prevDay && section) ? split(this.prevDay.cells[section] || "").map(extractStaffName) : [];
          
          return [...candidates].sort((a, b) => {
              const bA = this.blockMap.get(a); const bB = this.blockMap.get(b); let scoreA = 0; let scoreB = 0;
@@ -652,7 +704,7 @@ class AutoAssigner {
 
              const roomCountWeight = (section === "MRI" || section === "CT") ? 200 : 100;
              scoreA -= (this.roomCounts[a]?.[section] || 0) * roomCountWeight; scoreB -= (this.roomCounts[b]?.[section] || 0) * roomCountWeight;
-             if (prevDayMembers.includes(a)) scoreA -= 500; if (prevDayMembers.includes(b)) scoreB -= 500;
+             if (this.isHardNoConsecutive(a, section)) scoreA -= 500; if (this.isHardNoConsecutive(b, section)) scoreB -= 500;
              
              if (section === "ポータブル") {
                  const pastA = this.getPastRoomCount(a, section); const pastB = this.getPastRoomCount(b, section);
@@ -862,7 +914,14 @@ class AutoAssigner {
       });
 
       if (!triggerCanTarget) {
-          const swapSources = split(sourceRooms);
+          // ★ 低影響スコアで並び替え
+          const swapSources = split(sourceRooms).sort((a, b) => {
+            const ra = parseRoomCond(a).r;
+            const rb = parseRoomCond(b).r;
+            return this.getRescueSourceScore(ra, targetRoom) - this.getRescueSourceScore(rb, targetRoom);
+          });
+          this.log(`🧭 [低影響補充] ${targetRoom} の交換元を ${swapSources.join(" → ")} の順で評価しました`);
+
           let swapped = false;
           for (const srcStrRoom of swapSources) {
               const { r: srcRoom, min } = parseRoomCond(srcStrRoom);
@@ -1079,7 +1138,16 @@ class AutoAssigner {
        
       const matchingRescueRules = (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === targetRoom);
       if (matchingRescueRules.length > 0) {
-         const sourceRooms = matchingRescueRules.flatMap((r: any) => split(r.sourceRooms || ""));
+         // ★ 低影響スコアで並び替え
+         const sourceRooms = matchingRescueRules
+            .flatMap((r: any) => split(r.sourceRooms || ""))
+            .sort((a: string, b: string) => {
+               const ra = parseRoomCond(a).r;
+               const rb = parseRoomCond(b).r;
+               return this.getRescueSourceScore(ra, targetRoom) - this.getRescueSourceScore(rb, targetRoom);
+            });
+         this.log(`🧭 [低影響補充] ${targetRoom} の救済元を ${sourceRooms.join(" → ")} の順で評価しました`);
+
          let candidates: { core: string, fullStr: string, srcIdx: number }[] = [];
          
          sourceRooms.forEach((srcStr: string, idx: number) => {
@@ -1245,7 +1313,10 @@ class AutoAssigner {
     });
 
     const availSupport = this.initialAvailSupport; 
-    const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT");
+    // ★ サポート先も低影響スコアで並び替え
+    const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT")
+      .sort((a, b) => this.getRescueSourceScore(a, a) - this.getRescueSourceScore(b, b));
+
     const unassignedSupport = availSupport.filter((s: string) => !this.isUsed(s));
     unassignedSupport.forEach((staff: string) => {
       const b = this.blockMap.get(staff); if (b === 'ALL') return;
@@ -1258,7 +1329,7 @@ class AutoAssigner {
           let tag = ""; let f = 1;
           if (b === 'AM') { tag = "(PM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else if (b === 'PM') { tag = "(AM)"; f = 0.5; this.blockMap.set(staff, 'ALL'); } else { this.blockMap.set(staff, 'ALL'); }
           this.dayCells[room] = join([...current, `${staff}${tag}`]); this.addU(staff, f); 
-          this.log(`🤝 [サポート] 全ての配置完了後、${staff} を ${room} に追加しました`); break;
+          this.log(`🤝 [サポート] 全ての配置完了後、低影響度の ${room} に ${staff} を追加しました`); break;
         }
       }
     });
@@ -1308,7 +1379,7 @@ class AutoAssigner {
         if (currentLunch.length >= lunchTarget) break;
         split(this.dayCells[sec]).forEach((name: string) => { 
           const core = extractStaffName(name); 
-          if (!currentLunch.includes(core) && currentLunch.length < lunchTarget && !this.isForbidden(core, "昼当番") && !this.hasNGPair(core, currentLunch, false)) { currentLunch.push(core); }
+          if (!currentLunch.includes(core) && currentLunch.length < lunchTarget && !this.isForbidden(core, "昼当番") && !this.hasNGPair(name, currentLunch, false)) { currentLunch.push(core); }
         });
       }
 
@@ -1435,10 +1506,11 @@ export default function App() {
     
     Object.entries(staffMap).forEach(([staff, rms]) => { 
       const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:00") && !m.includes("18:00") && !m.includes("19:00") && !m.includes("22:00"); }).length;
-      if(dayCount >= (customRules.alertMaxKenmu || 3)) w.push({ level: 'orange', title: '兼務限界', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); 
+      if(dayCount > (customRules.alertMaxKenmu || 3)) w.push({ level: 'orange', title: '兼務限界', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); 
     });
     
-    ROOM_SECTIONS.forEach(room => { 
+    const targetEmptyRooms = split(customRules.alertEmptyRooms || "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像");
+    targetEmptyRooms.forEach(room => { 
       if (room === "受付ヘルプ") return;
       if (split(cells[room]).length === 0) w.push({ level: 'yellow', title: '空室', room, msg: `「${room}」の担当者がいません` }); 
     });
@@ -1452,7 +1524,10 @@ export default function App() {
 
     const curIdx = days.findIndex(d => d.id === dayId);
     if (curIdx > 0 && !days[curIdx-1].isPublicHoliday) {
-      split(customRules.consecutiveAlertRooms).forEach(room => { const prev = split(allDays[days[curIdx-1].id]?.[room]).map(extractStaffName); split(cells[room]).map(extractStaffName).filter(n => prev.includes(n)).forEach(n => w.push({ level: 'red', title: '連日注意', staff: n, room, msg: `${n}さんが「${room}」に連日入っています` })); });
+      split(customRules.noConsecutiveRooms).forEach(room => { 
+        const prev = split(allDays[days[curIdx-1].id]?.[room]).map(extractStaffName); 
+        split(cells[room]).map(extractStaffName).filter(n => prev.includes(n)).forEach(n => w.push({ level: 'red', title: '連日注意', staff: n, room, msg: `${n}さんが「${room}」に連日入っています` })); 
+      });
     }
     
     const absent = new Set<string>(); REST_SECTIONS.forEach(s => split(cells[s]).forEach(m => absent.add(extractStaffName(m))));
@@ -1520,7 +1595,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.47</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.48</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1571,7 +1646,8 @@ export default function App() {
                     {days.map((day, dIdx) => {
                       const currentMems = split(allDays[day.id]?.[section]);
                       const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : [];
-                      const isAlertRoom = split(customRules.consecutiveAlertRooms).includes(section);
+                      
+                      const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section);
                       const warnings = getDayWarnings(day.id);
                       
                       const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section);
@@ -2142,6 +2218,16 @@ export default function App() {
                   <div style={{ flex: 2, minWidth: "260px" }}>
                     <label style={{ fontSize: 16, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>優先する対象部屋</label>
                     <MultiPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
+                  </div>
+              </div>
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start", marginTop: 16 }}>
+                  <div style={{ flex: 1, minWidth: "260px" }}>
+                    <label style={{ fontSize: 14, fontWeight: 800, color: "#166534", display: "block", marginBottom: 4 }}>低影響グループ（優先的に補充元にする部屋）</label>
+                    <MultiPicker selected={customRules.supportTargetRoomsLowImpact ?? "3号室,パノラマCT"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRoomsLowImpact: v})} options={ROOM_SECTIONS} />
+                  </div>
+                  <div style={{ flex: 2, minWidth: "260px" }}>
+                    <label style={{ fontSize: 14, fontWeight: 800, color: "#166534", display: "block", marginBottom: 4 }}>高影響グループ（極力補充元にしない部屋）</label>
+                    <MultiPicker selected={customRules.supportTargetRoomsHighImpact ?? "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRoomsHighImpact: v})} options={ROOM_SECTIONS} />
                   </div>
               </div>
             </RuleCard>
