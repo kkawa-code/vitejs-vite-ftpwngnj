@@ -945,10 +945,7 @@ class AutoAssigner {
     }
   }
 }
-// ===================== 🌟 メインコンポーネント =====================
-export default function App() 
-// ===================== 🌟 メインコンポーネント =====================
-export default function App() {
+export default function App(): any {
   const [activeTab, setActiveTab] = useState<'calendar' | 'stats' | 'rules'>('calendar');
   const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { return JSON.parse(localStorage.getItem(KEY_ALL_DAYS) || "{}"); } catch { return {}; } });
   const [customRules, setCustomRules] = useState<CustomRules>(() => { try { return { ...DEFAULT_RULES, ...JSON.parse(localStorage.getItem(KEY_RULES) || "{}") }; } catch { return DEFAULT_RULES; } });
@@ -957,7 +954,7 @@ export default function App() {
   const [sel, setSel] = useState("");
   const [assignLogs, setAssignLogs] = useState<Record<string, string[]>>({});
   const [selectedErrorDay, setSelectedErrorDay] = useState<string | null>(null);
-  const [selectedLogDay, setSelectedLogDay] = useState<string | null>(null);
+  const [showLogDay, setShowLogDay] = useState<string | null>(null); // ★修正：変数名を統一
   const [showUnassignedList, setShowUnassignedList] = useState<string | null>(null);
   const [selectedStaffForStats, setSelectedStaffForStats] = useState<string | null>(null);
   const [showRuleModal, setShowRuleModal] = useState(false);
@@ -1092,7 +1089,8 @@ export default function App() {
                           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 16 }}>{day.label}</span>
                             {warnings.length > 0 && <span onClick={(e) => { e.stopPropagation(); setSelectedErrorDay(day.id); }} className="btn-hover" style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: 6, fontSize: 13, border: "1px solid #fdba74" }}>⚠️ 注意 {warnings.length}</span>}
-                            {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && <span onClick={(e) => { e.stopPropagation(); setSelectedLogDay(day.id); }} className="btn-hover" style={{ background: "#f0f9ff", color: "#0369a1", padding: "4px 8px", borderRadius: 6, fontSize: 13, border: "1px solid #bae6fd" }}>🤔 根拠</span>}
+                            {/* ★修正：ログボタンの表示判定と引数をsetShowLogDayに変更 */}
+                            {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && <span onClick={(e) => { e.stopPropagation(); setShowLogDay(day.id); }} className="btn-hover" style={{ background: "#f0f9ff", color: "#0369a1", padding: "4px 8px", borderRadius: 6, fontSize: 13, border: "1px solid #bae6fd" }}>🤔 根拠</span>}
                           </div>
                           {!day.isPublicHoliday && (
                             <div onClick={(e) => { e.stopPropagation(); setShowUnassignedList(day.id); }} className="btn-hover" style={{ fontSize: 13, background: stats.unassigned.length > 0 ? "#fee2e2" : "#d1fae5", color: stats.unassigned.length > 0 ? "#ef4444" : "#065f46", padding: "4px 8px", borderRadius: 6, fontWeight: 800 }}>
