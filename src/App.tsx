@@ -62,11 +62,13 @@ type WarningInfo = { level: 'red' | 'orange' | 'yellow'; title: string; msg: str
 
 interface CustomRules {
   staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; 
-  supportTargetRoomsLowImpact: string; // 追加: 影響の少ない部屋
-  supportTargetRoomsHighImpact: string; // 追加: 影響の大きい部屋
+  supportTargetRoomsLowImpact: string; 
+  supportTargetRoomsHighImpact: string; 
   customHolidays: string;
   capacity: Record<string, number>; dailyCapacities: any[]; dailyAdditions: any[]; priorityRooms: string[]; fullDayOnlyRooms: string; noConsecutiveRooms: string; consecutiveAlertRooms: string;
-  noLateShiftStaff: string; noLateShiftRooms: string; ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; swapRules: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[];
+  noLateShiftStaff: string; noLateShiftRooms: string; 
+  lateShiftLowPriorityStaff: string; // 追加: 遅番の優先度を下げるスタッフ
+  ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; swapRules: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[];
   lunchBaseCount: number; lunchSpecialDays: any[]; lunchConditional: any[]; lunchRoleRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[];
   alertMaxKenmu: number; alertEmptyRooms: string; smartKenmu: any[];
 }
@@ -92,12 +94,14 @@ const DEFAULT_PRIORITY_ROOMS = ["治療", "受付", "MMG", "RI", "MRI", "CT", "�
 
 const DEFAULT_RULES: CustomRules = {
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", 
-  supportTargetRoomsLowImpact: "3号室,パノラマCT", // デフォルト追加
-  supportTargetRoomsHighImpact: "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像", // デフォルト追加
+  supportTargetRoomsLowImpact: "3号室,パノラマCT", 
+  supportTargetRoomsHighImpact: "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像",
   customHolidays: "",
   capacity: { CT: 4, MRI: 3, 治療: 3, RI: 1, MMG: 1, "透視（6号）": 1, "透視（11号）": 1, 骨塩: 1, "1号室": 1, "5号室": 1, パノラマCT: 2 },
   dailyCapacities: [], dailyAdditions: [], priorityRooms: DEFAULT_PRIORITY_ROOMS, fullDayOnlyRooms: "", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）",
-  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [],
+  noLateShiftStaff: "浅野、木内康、髙橋", noLateShiftRooms: "透視（11号）", 
+  lateShiftLowPriorityStaff: "", // デフォルト追加
+  ngPairs: [], fixed: [], forbidden: [], substitutes: [], pushOuts: [], emergencies: [],
   swapRules: [{ targetRoom: "ポータブル", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" }, { targetRoom: "パノラマCT", triggerRoom: "2号室", sourceRooms: "1号室、5号室、CT(4)" }],
   kenmuPairs: [], rescueRules: [{ targetRoom: "ポータブル", sourceRooms: "3号室、2号室、1号室、5号室、CT(4)" }, { targetRoom: "DSA", sourceRooms: "5号室、2号室、検像、CT(4)" }, { targetRoom: "骨塩", sourceRooms: "1号室、5号室、2号室、CT(4)" }], lateShifts: [],
   lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }],
@@ -326,6 +330,21 @@ class AutoAssigner {
     const isMonthlyTarget = ["CT", "MRI"].includes(room);
     const targetPastDays = isMonthlyTarget ? this.pastDaysInMonth : this.pastDaysInWeek;
     return targetPastDays.filter(pd => split(pd.cells[room] || "").map(extractStaffName).includes(staff)).length;
+  }
+
+  // ★ 遅番（17:00以降）の月間実績回数をカウントするメソッド（均等化用）
+  getPastLateShiftCount(staff: string) {
+    let count = 0;
+    this.pastDaysInMonth.forEach(pd => {
+      Object.values(pd.cells).forEach(val => {
+        split(val as string).forEach(m => {
+          if (extractStaffName(m) === staff && (m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:"))) {
+            count++;
+          }
+        });
+      });
+    });
+    return count;
   }
 
   getTodayRoomCount(staff: string) {
@@ -914,7 +933,6 @@ class AutoAssigner {
       });
 
       if (!triggerCanTarget) {
-          // ★ 低影響スコアで並び替え
           const swapSources = split(sourceRooms).sort((a, b) => {
             const ra = parseRoomCond(a).r;
             const rb = parseRoomCond(b).r;
@@ -1138,7 +1156,6 @@ class AutoAssigner {
        
       const matchingRescueRules = (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === targetRoom);
       if (matchingRescueRules.length > 0) {
-         // ★ 低影響スコアで並び替え
          const sourceRooms = matchingRescueRules
             .flatMap((r: any) => split(r.sourceRooms || ""))
             .sort((a: string, b: string) => {
@@ -1201,31 +1218,47 @@ class AutoAssigner {
 
       if (!current.some(m => m.includes(rule.lateTime))) {
         const currentCore = current.map(extractStaffName);
-        const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes(rule.lateTime)).map(extractStaffName) : [];
-        const getCandidate = (candidatesList: string[], allowConsecutive: boolean, checkIsUsed: boolean) => {
+        const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
+        
+        // ★ 遅番の優先度を下げるスタッフリスト
+        const lowPriorityStaff = split(this.ctx.customRules.lateShiftLowPriorityStaff || "");
+
+        const getCandidate = (candidatesList: string[], allowConsecutive: boolean) => {
           let cand = candidatesList.filter(name => {
-            if (cannotLS.includes(name) || currentCore.includes(name) || this.blockMap.get(name) === 'PM' || this.isForbidden(name, rule.section) || (!allowConsecutive && prevLateStaff.includes(name)) || (checkIsUsed && this.isUsed(name))) return false;
+            if (cannotLS.includes(name) || currentCore.includes(name) || this.blockMap.get(name) === 'PM' || this.isForbidden(name, rule.section) || (!allowConsecutive && prevLateStaff.includes(name))) return false;
             return true;
           });
-          if (cand.length > 0) { cand.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return cand[0]; }
+          if (cand.length > 0) { 
+            cand.sort((a, b) => {
+               // ★ 日中の負担（assignCounts）は無視し、月間の遅番回数だけで勝負する
+               let scoreA = this.getPastLateShiftCount(a) * 100;
+               let scoreB = this.getPastLateShiftCount(b) * 100;
+               
+               // ★ 年配者等（低優先スタッフ）はペナルティ大
+               if (lowPriorityStaff.includes(a)) scoreA += 10000;
+               if (lowPriorityStaff.includes(b)) scoreB += 10000;
+               
+               if (scoreA !== scoreB) return scoreA - scoreB;
+               return a.localeCompare(b, 'ja');
+            }); 
+            return cand[0]; 
+          }
           return null;
         };
 
-        let picked = getCandidate(this.initialAvailGeneral, false, true);
-        if (!picked) picked = getCandidate(this.initialAvailGeneral, false, false); 
-        if (!picked) picked = getCandidate(this.initialAvailGeneral, true, true);
-        if (!picked) picked = getCandidate(this.initialAvailGeneral, true, false);
+        let picked = getCandidate(this.initialAvailGeneral, false);
+        if (!picked) picked = getCandidate(this.initialAvailGeneral, true);
 
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
-          this.addU(picked, 0.5); this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM'); 
+          // ★ 遅番の追加は、日中の疲労カウント(addU)には含めない（完全な別枠とする）
+          this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM'); 
           this.log(`🌆 [遅番] ${rule.section} の遅番に ${picked} をアサインしました`);
         }
       }
       this.dayCells[rule.section] = join(current);
     });
 
-    // ★ 兼務解消（De-Kenmu）ロジック
     const deKenmuTargets = ["ポータブル", "DSA", "パノラマCT", "検像", "骨塩", "MMG", "透視（11号）", "透視（6号）"];
     let uGen2 = this.initialAvailGeneral.filter((s: string) => !this.isUsed(s));
     uGen2.forEach((staff: string) => {
@@ -1313,7 +1346,6 @@ class AutoAssigner {
     });
 
     const availSupport = this.initialAvailSupport; 
-    // ★ サポート先も低影響スコアで並び替え
     const supportTargetRooms = split(this.ctx.customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT")
       .sort((a, b) => this.getRescueSourceScore(a, a) - this.getRescueSourceScore(b, b));
 
@@ -1595,7 +1627,7 @@ export default function App() {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.48</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.49</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -2120,6 +2152,11 @@ export default function App() {
             </RuleCard>
 
             <RuleCard bg="#f5f3ff" border="#ddd6fe" color="#6d28d9" icon="🌆" title="遅番ルール">
+              <div style={{ marginBottom: 16, background: "#fff", padding: 16, borderRadius: 8, border: "1px solid #ddd6fe" }}>
+                <label style={{ fontSize: 14, fontWeight: 800, color: "#6d28d9", display: "block", marginBottom: 4 }}>優先度を下げるスタッフ（年配の方・時間外を減らしたい方）</label>
+                <MultiPicker selected={customRules.lateShiftLowPriorityStaff || ""} onChange={(v: string) => setCustomRules({...customRules, lateShiftLowPriorityStaff: v})} options={allStaff} placeholder="＋スタッフを選択" />
+                <div style={{ fontSize: 13, color: "#475569", marginTop: 8 }}>※遅番は「日中の業務量」ではなく「今月の遅番回数が少ない人」から均等に選ばれます。ここに登録された人は最終手段としてのみ選ばれます。</div>
+              </div>
               {(customRules.lateShifts || []).map((rule: any, idx: number) => (
                   <div key={idx} className="rule-row" style={{background:"#fff", padding:"12px 16px", border:"1px solid #ddd6fe", borderRadius:8}}>
                     <select value={rule.section} onChange={(e: any) => updateRule("lateShifts", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", minWidth: "140px", flex: "1 1 auto"}}><option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
