@@ -318,14 +318,14 @@ const renderLog = (logStr: string, i: number) => {
   let bg = "#f8fafc"; let border = "#e2e8f0"; let color = "#475569"; let badgeBg = "#e2e8f0"; let badgeColor = "#475569";
   if (category.includes("配置決定") || category.includes("増枠")) { bg = "#eff6ff"; border = "#bfdbfe"; color = "#1e3a8a"; badgeBg = "#dbeafe"; badgeColor = "#1d4ed8"; }
   else if (category.includes("緊急") || category.includes("除外")) { bg = "#fef2f2"; border = "#fecaca"; color = "#7f1d1d"; badgeBg = "#fee2e2"; badgeColor = "#b91c1c"; }
-  else if (category.includes("救済発動") || category.includes("特例サポート") || category.includes("救済")) { bg = "#fff7ed"; border = "#fed7aa"; color = "#9a3412"; badgeBg = "#ffedd5"; badgeColor = "#c2410c"; }
+  else if (category.includes("救済発動") || category.includes("特例サポート") || category.includes("救済") || category.includes("汎用救済")) { bg = "#fff7ed"; border = "#fed7aa"; color = "#9a3412"; badgeBg = "#ffedd5"; badgeColor = "#c2410c"; }
   else if (category.includes("代打") || category.includes("交換")) { bg = "#fff7ed"; border = "#fed7aa"; color = "#7c2d12"; badgeBg = "#ffedd5"; badgeColor = "#c2410c"; }
   else if (category.includes("兼務") || category.includes("専任スキップ") || category.includes("負担軽減")) { bg = "#ecfdf5"; border = "#a7f3d0"; color = "#064e3b"; badgeBg = "#d1fae5"; badgeColor = "#047857"; }
   else if (category.includes("遅番")) { bg = "#f5f3ff"; border = "#ddd6fe"; color = "#4c1d95"; badgeBg = "#ede9fe"; badgeColor = "#6d28d9"; }
   else if (category.includes("玉突き")) { bg = "#e0f2fe"; border = "#bae6fd"; color = "#0c4a6e"; badgeBg = "#bae6fd"; badgeColor = "#0369a1"; }
   else if (category.includes("専従") || category.includes("役割")) { bg = "#f0fdfa"; border = "#bbf7d0"; color = "#14532d"; badgeBg = "#dcfce7"; badgeColor = "#15803d"; }
   else if (category.includes("昼当番") || category.includes("ヘルプ") || category.includes("サポート") || category.includes("余剰")) { bg = "#fdf4ff"; border = "#f5d0fe"; color = "#701a75"; badgeBg = "#fae8ff"; badgeColor = "#86198f"; }
-  else if (category.includes("低影響補充") || category.includes("汎用救済")) { bg = "#f0fdfa"; border = "#ccfbf1"; color = "#0f766e"; badgeBg = "#ccfbf1"; badgeColor = "#0f766e"; }
+  else if (category.includes("低影響補充")) { bg = "#f0fdfa"; border = "#ccfbf1"; color = "#0f766e"; badgeBg = "#ccfbf1"; badgeColor = "#0f766e"; }
   return (
     <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", marginBottom: "6px", background: bg, borderRadius: "8px", border: `1px solid ${border}`, fontSize: 14, color, lineHeight: 1.6, fontWeight: 600, wordBreak: "break-word" }}>
       <span style={{ display: "inline-block", padding: "4px 8px", background: badgeBg, color: badgeColor, borderRadius: "6px", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>{icon} {category}</span>
@@ -842,7 +842,6 @@ class AutoAssigner {
          sourceRooms = matchingRescueRules.flatMap((r: any) => split(r.sourceRooms || "")).sort((a: string, b: string) => this.getRescueSourceScore(parseRoomCond(a).r, targetRoom) - this.getRescueSourceScore(parseRoomCond(b).r, targetRoom));
          this.log(`🧭 [低影響補充] ${targetRoom} の救済元を ${sourceRooms.map(s=>parseRoomCond(s).r).join(" → ")} の順で評価しました`);
       } else {
-         // ★バグ修正・機能改善：救済ルールが未設定でも、定員割れなら自動で他から呼ぶ（汎用救済）
          const lowImpact = split(this.ctx.customRules.supportTargetRoomsLowImpact || "3号室,パノラマCT");
          sourceRooms = [...lowImpact, "2号室", "1号室", "5号室", "CT(4)"].filter(r => r !== targetRoom);
       }
@@ -875,7 +874,7 @@ class AutoAssigner {
         const currentCore = current.map(extractStaffName);
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
         
-        // ★遅番不可スタッフ・部屋のバグ修正
+        // ★遅番不可スタッフ・部屋の除外ロジックを反映
         const noLateStaff = split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName);
         const noLateRooms = split(this.ctx.customRules.noLateShiftRooms || "");
         const noLateRoomStaff = noLateRooms.flatMap(r => split(this.dayCells[r] || "").map(extractStaffName));
@@ -891,7 +890,7 @@ class AutoAssigner {
         });
         let picked = candidates.find(n => !prevLateStaff.includes(n));
         if (!picked && candidates.length > 0) picked = candidates[0];
-        if (picked) { current.push(`${picked}${rule.lateTime}`); this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM'); this.dayCells[rule.section] = join(current); this.log(`🌆 [遅番] ${rule.section} の遅番に ${picked} を指名しました（左側優先除外設定を考慮）`); }
+        if (picked) { current.push(`${picked}${rule.lateTime}`); this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM'); this.dayCells[rule.section] = join(current); this.log(`🌆 [遅番] ${rule.section} の遅番に ${picked} を指名しました`); }
       }
     });
 
@@ -1012,7 +1011,14 @@ export default function App(): any {
   const getDayWarnings = (dayId: string): WarningInfo[] => {
     const w: WarningInfo[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {};
     ROOM_SECTIONS.forEach(room => { if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return; split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }) });
-    Object.entries(staffMap).forEach(([staff, rms]) => { const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:"); }).length; if(dayCount > (customRules.alertMaxKenmu || 3)) w.push({ level: 'orange', title: '兼務限界', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); });
+    
+    // ★Ver 2.49 修正点：limitに達した時点 ( >= ) で警告を出すように変更
+    Object.entries(staffMap).forEach(([staff, rms]) => { 
+      const limit = customRules.alertMaxKenmu || 3;
+      const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:"); }).length; 
+      if(dayCount >= limit) w.push({ level: 'orange', title: '兼務限界', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); 
+    });
+
     const targetEmptyRooms = split(customRules.alertEmptyRooms || "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像");
     targetEmptyRooms.forEach(room => { if (room === "受付ヘルプ") return; if (split(cells[room]).length === 0) w.push({ level: 'yellow', title: '空室', room, msg: `「${room}」の担当者がいません` }); });
     const uTarget = customRules.capacity?.受付 ?? 2;
@@ -1077,7 +1083,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.48</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.49</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1786,36 +1792,29 @@ export default function App(): any {
             <h4 style={{ color: "#e11d48", borderBottom: "2px solid #ffe4e6", paddingBottom: 8, marginTop: 24 }}>🛑 1. システムが「絶対に守る」鉄の掟</h4>
             <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
               <li style={{ marginBottom: 8 }}><strong>担当不可・NGペアの厳守:</strong> 「この部屋はまだ不可」「この2人は同室にしない」設定は必ず守ります。</li>
-              <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 日中最大3部屋まで。自動割付では4部屋目をブロックします（手動時はオレンジ色の警告表示）。</li>
+              <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点で⚠️注意が出ます。4部屋目の自動配置はブロックされます。</li>
               <li style={{ marginBottom: 8 }}><strong>連日担当の禁止:</strong> ポータブルなど連日禁止の部屋は、昨日の担当者をすべてのルートで問答無用に除外します。</li>
-              <li style={{ marginBottom: 8 }}><strong>半休の終日専任室ブロック:</strong> 午前後休の人をCT/MRI等に配置することは原則ありません。月担当のみ例外ですが強い減点がかかり、最終手段に近い扱いになります。</li>
+              <li style={{ marginBottom: 8 }}><strong>半休の終日専任室ブロック:</strong> 午前後休の人をCT/MRI等に配置することは原則ありません。</li>
             </ul>
 
             <h4 style={{ color: "#2563eb", borderBottom: "2px solid #dbeafe", paddingBottom: 8 }}>🟦 2. 誰が選ばれる？「ポイント制」</h4>
             <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
               <li style={{ marginBottom: 8 }}><strong>優先加点:</strong> その月の「メイン担当」「サブ担当」は優先的に選ばれます。</li>
-              <li style={{ marginBottom: 8 }}><strong>平等化減点:</strong> CT・MRIは「今月」の回数、その他一般撮影は「今週」の回数が多い人ほど減点され、均等化されます。</li>
-              <li style={{ marginBottom: 8 }}><strong>ポータブル疲れ考慮:</strong> 今週すでにポータブルをやっている人は激しく減点されます。</li>
+              <li style={{ marginBottom: 8 }}><strong>平等化減点:</strong> CT・MRIは「今月」の回数、その他一般撮影は「今週」の回数が多い人ほど減点されます。</li>
             </ul>
 
             <h4 style={{ color: "#10b981", borderBottom: "2px solid #d1fae5", paddingBottom: 8 }}>🟩 3. シフトが完成するまでの「5ステップ」</h4>
             <ol style={{ paddingLeft: 24, marginBottom: 24 }}>
-              <li style={{ marginBottom: 8 }}><strong>欠員ブロック＆緊急対応:</strong> 休みを外し、人数不足時は緊急ルール（定員減・空室化）を真っ先に発動。</li>
+              <li style={{ marginBottom: 8 }}><strong>欠員ブロック＆緊急対応:</strong> 休みを外し、人数不足時は緊急ルールを真っ先に発動。</li>
               <li style={{ marginBottom: 8 }}><strong>例外・代打・玉突き:</strong> 専従固定や代打ルールを先に処理します。</li>
               <li style={{ marginBottom: 8 }}><strong>メイン配置:</strong> 優先順位の高い部屋から順番にメイン担当者を決めます。</li>
-              <li style={{ marginBottom: 8 }}><strong>兼務・救済・応援:</strong> 定員割れがある場合、他への影響が少ない部屋（3号室等）から安全に兼務の応援を呼びます。</li>
+              <li style={{ marginBottom: 8 }}><strong>兼務・救済・応援:</strong> 定員割れがある場合、他への影響が少ない部屋から安全に兼務の応援を呼びます。</li>
               <li style={{ marginBottom: 8 }}><strong>総仕上げ:</strong> 昼当番、受付ヘルプを決め、余った人は3号室などの指定枠に入ります。</li>
             </ol>
 
-            <h4 style={{ color: "#8b5cf6", borderBottom: "2px solid #ede9fe", paddingBottom: 8 }}>🌙 4. 特殊なルールの仕組み</h4>
-            <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
-              <li style={{ marginBottom: 8 }}><strong>遅番の選ばれ方:</strong> 今月の回数が少ない人から選ばれます。設定で「優先度を下げるスタッフ（年配の方等）」を左に書くほど強力に除外され、最終手段に近い扱いになります。</li>
-              <li style={{ marginBottom: 8 }}><strong>サポート要員（部長など）:</strong> 基本は2人目として入りますが、空室に単独配置せざるを得ない場合は、システムが「実質0人だから応援に来て！」とSOSを出し、他から兼務を引き抜いて合流させます。</li>
-            </ul>
-
             <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", padding: 16, borderRadius: 8, marginTop: 32 }}>
               <strong style={{ color: "#334155" }}>💡 最後に</strong><br/>
-              システムは性別やベテランの勘を自動察知できません。もし「この部屋の負担が偏っている」「上手く組まれない」場合は、人間が【設定画面】の「月担当」や「優先順位」を少し調整してあげることで、システムはその設定を次回の自動割付に反映し、意図に近いシフトを作れるようになります。
+              もし「この部屋の負担が偏っている」場合は、人間が【設定画面】の「月担当」や「優先順位」を少し調整することで、意図に近いシフトを作れるようになります。
             </div>
           </div>
         </Modal>
