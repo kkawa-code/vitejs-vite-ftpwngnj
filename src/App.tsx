@@ -874,7 +874,6 @@ class AutoAssigner {
         const currentCore = current.map(extractStaffName);
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
         
-        // ★遅番不可スタッフ・部屋の除外ロジックを反映
         const noLateStaff = split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName);
         const noLateRooms = split(this.ctx.customRules.noLateShiftRooms || "");
         const noLateRoomStaff = noLateRooms.flatMap(r => split(this.dayCells[r] || "").map(extractStaffName));
@@ -1012,7 +1011,6 @@ export default function App(): any {
     const w: WarningInfo[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {};
     ROOM_SECTIONS.forEach(room => { if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return; split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }) });
     
-    // ★Ver 2.49 修正点：limitに達した時点 ( >= ) で警告を出すように変更
     Object.entries(staffMap).forEach(([staff, rms]) => { 
       const limit = customRules.alertMaxKenmu || 3;
       const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:"); }).length; 
@@ -1083,7 +1081,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.49</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.50</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1792,7 +1790,7 @@ export default function App(): any {
             <h4 style={{ color: "#e11d48", borderBottom: "2px solid #ffe4e6", paddingBottom: 8, marginTop: 24 }}>🛑 1. システムが「絶対に守る」鉄の掟</h4>
             <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
               <li style={{ marginBottom: 8 }}><strong>担当不可・NGペアの厳守:</strong> 「この部屋はまだ不可」「この2人は同室にしない」設定は必ず守ります。</li>
-              <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点で⚠️注意が出ます。4部屋目の自動配置はブロックされます。</li>
+              <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点で⚠️注意が出ます。上限を超える自動配置はブロックされます。</li>
               <li style={{ marginBottom: 8 }}><strong>連日担当の禁止:</strong> ポータブルなど連日禁止の部屋は、昨日の担当者をすべてのルートで問答無用に除外します。</li>
               <li style={{ marginBottom: 8 }}><strong>半休の終日専任室ブロック:</strong> 午前後休の人をCT/MRI等に配置することは原則ありません。</li>
             </ul>
