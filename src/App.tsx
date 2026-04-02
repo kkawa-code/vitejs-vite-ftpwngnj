@@ -325,7 +325,7 @@ const renderLog = (logStr: string, i: number) => {
   else if (category.includes("玉突き")) { bg = "#e0f2fe"; border = "#bae6fd"; color = "#0c4a6e"; badgeBg = "#bae6fd"; badgeColor = "#0369a1"; }
   else if (category.includes("専従") || category.includes("役割")) { bg = "#f0fdfa"; border = "#bbf7d0"; color = "#14532d"; badgeBg = "#dcfce7"; badgeColor = "#15803d"; }
   else if (category.includes("昼当番") || category.includes("ヘルプ") || category.includes("サポート") || category.includes("余剰")) { bg = "#fdf4ff"; border = "#f5d0fe"; color = "#701a75"; badgeBg = "#fae8ff"; badgeColor = "#86198f"; }
-  else if (category.includes("低影響補充")) { bg = "#f0fdfa"; border = "#ccfbf1"; color = "#0f766e"; badgeBg = "#ccfbf1"; badgeColor = "#0f766e"; }
+  else if (category.includes("低影響補充") || category.includes("汎用救済")) { bg = "#f0fdfa"; border = "#ccfbf1"; color = "#0f766e"; badgeBg = "#ccfbf1"; badgeColor = "#0f766e"; }
   return (
     <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", marginBottom: "6px", background: bg, borderRadius: "8px", border: `1px solid ${border}`, fontSize: 14, color, lineHeight: 1.6, fontWeight: 600, wordBreak: "break-word" }}>
       <span style={{ display: "inline-block", padding: "4px 8px", background: badgeBg, color: badgeColor, borderRadius: "6px", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>{icon} {category}</span>
@@ -837,9 +837,17 @@ class AutoAssigner {
       if (curAm >= targetCap && curPm >= targetCap) return;
        
       const matchingRescueRules = (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === targetRoom);
+      let sourceRooms: string[] = [];
       if (matchingRescueRules.length > 0) {
-         const sourceRooms = matchingRescueRules.flatMap((r: any) => split(r.sourceRooms || "")).sort((a: string, b: string) => this.getRescueSourceScore(parseRoomCond(a).r, targetRoom) - this.getRescueSourceScore(parseRoomCond(b).r, targetRoom));
+         sourceRooms = matchingRescueRules.flatMap((r: any) => split(r.sourceRooms || "")).sort((a: string, b: string) => this.getRescueSourceScore(parseRoomCond(a).r, targetRoom) - this.getRescueSourceScore(parseRoomCond(b).r, targetRoom));
          this.log(`🧭 [低影響補充] ${targetRoom} の救済元を ${sourceRooms.map(s=>parseRoomCond(s).r).join(" → ")} の順で評価しました`);
+      } else {
+         // ★バグ修正・機能改善：救済ルールが未設定でも、定員割れなら自動で他から呼ぶ（汎用救済）
+         const lowImpact = split(this.ctx.customRules.supportTargetRoomsLowImpact || "3号室,パノラマCT");
+         sourceRooms = [...lowImpact, "2号室", "1号室", "5号室", "CT(4)"].filter(r => r !== targetRoom);
+      }
+
+      if (sourceRooms.length > 0) {
          let candidates: { core: string, fullStr: string, srcIdx: number }[] = [];
          sourceRooms.forEach((srcStr: string, idx: number) => {
             const { r: srcRoom, min } = parseRoomCond(srcStr); if (srcRoom === targetRoom) return;
@@ -853,7 +861,9 @@ class AutoAssigner {
             if (curAm >= targetCap && curPm >= targetCap) break;
             if (this.hasNGPair(cand.core, currentCores, false)) continue;
             let pushStr = cand.fullStr; if (curAm < targetCap && curPm >= targetCap) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
-            currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(cand.core, getStaffAmount(pushStr)); this.log(`🆘 [救済] 定員割れの ${targetRoom} に、${pushStr} を兼務で追加しました`);
+            currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(cand.core, getStaffAmount(pushStr)); 
+            if (matchingRescueRules.length > 0) this.log(`🆘 [救済] 定員割れの ${targetRoom} に、${pushStr} を兼務で追加しました`);
+            else this.log(`🛡️ [汎用救済] ${targetRoom} の定員割れを防ぐため、自動探索で ${pushStr} を兼務で追加しました`);
          }
          this.dayCells[targetRoom] = join(currentMems);
       }
@@ -864,7 +874,14 @@ class AutoAssigner {
       if (current.length > 0 && !current.some(m => m.includes("17:") || m.includes("18:"))) {
         const currentCore = current.map(extractStaffName);
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
-        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && this.blockMap.get(n) !== 'PM' && !this.isForbidden(n, rule.section));
+        
+        // ★遅番不可スタッフ・部屋のバグ修正
+        const noLateStaff = split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName);
+        const noLateRooms = split(this.ctx.customRules.noLateShiftRooms || "");
+        const noLateRoomStaff = noLateRooms.flatMap(r => split(this.dayCells[r] || "").map(extractStaffName));
+        const excludeStaff = Array.from(new Set([...noLateStaff, ...noLateRoomStaff]));
+
+        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && this.blockMap.get(n) !== 'PM' && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n));
         candidates.sort((a, b) => {
           let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100;
           const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b);
@@ -954,7 +971,7 @@ export default function App(): any {
   const [sel, setSel] = useState("");
   const [assignLogs, setAssignLogs] = useState<Record<string, string[]>>({});
   const [selectedErrorDay, setSelectedErrorDay] = useState<string | null>(null);
-  const [showLogDay, setShowLogDay] = useState<string | null>(null); // ★修正：変数名を統一
+  const [showLogDay, setShowLogDay] = useState<string | null>(null);
   const [showUnassignedList, setShowUnassignedList] = useState<string | null>(null);
   const [selectedStaffForStats, setSelectedStaffForStats] = useState<string | null>(null);
   const [showRuleModal, setShowRuleModal] = useState(false);
@@ -1060,7 +1077,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.51</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.48</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1089,7 +1106,6 @@ export default function App(): any {
                           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 16 }}>{day.label}</span>
                             {warnings.length > 0 && <span onClick={(e) => { e.stopPropagation(); setSelectedErrorDay(day.id); }} className="btn-hover" style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: 6, fontSize: 13, border: "1px solid #fdba74" }}>⚠️ 注意 {warnings.length}</span>}
-                            {/* ★修正：ログボタンの表示判定と引数をsetShowLogDayに変更 */}
                             {!day.isPublicHoliday && assignLogs[day.id]?.length > 0 && <span onClick={(e) => { e.stopPropagation(); setShowLogDay(day.id); }} className="btn-hover" style={{ background: "#f0f9ff", color: "#0369a1", padding: "4px 8px", borderRadius: 6, fontSize: 13, border: "1px solid #bae6fd" }}>🤔 根拠</span>}
                           </div>
                           {!day.isPublicHoliday && (
