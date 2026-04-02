@@ -2346,3 +2346,35 @@ export default function App() {
                 const assigns: string[] = [];
                 Object.entries(cells).forEach(([sec, val]) => {
                   if(["明け","入り","土日
+{Object.entries(allDays).filter(([dateStr]) => dateStr.startsWith(targetMonday.substring(0, 7))).sort((a, b) => a[0].localeCompare(b[0])).map(([dateStr, cells]) => {
+                const assigns: string[] = [];
+                Object.entries(cells).forEach(([sec, val]) => {
+                  if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
+                  const members = split(val as string); const myAssign = members.find(m => extractStaffName(m) === selectedStaffForStats);
+                  if (myAssign) { const timeStr = myAssign.substring(selectedStaffForStats.length); assigns.push(`${sec}${timeStr}`); }
+                });
+                const dObj = new Date(dateStr); const YOUBI = ["日", "月", "火", "水", "木", "金", "土"];
+                const label = `${dObj.getMonth() + 1}/${dObj.getDate()}(${YOUBI[dObj.getDay()]})`;
+                if (assigns.length === 0) return null;
+                return (
+                  <tr key={dateStr} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "12px 10px", fontWeight: 600 }}>{label}</td>
+                    <td style={{ padding: "12px 10px", color: "#0ea5e9", fontWeight: 700 }}>{assigns.join(" / ")}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </Modal>
+      )}
+
+      {selectedLogDay && (
+        <Modal title={`🤔 ${selectedLogDay} の割当根拠`} onClose={() => setSelectedLogDay(null)} wide>
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {assignLogs[selectedLogDay]?.map((log, i) => renderLog(log, i))}
+          </ul>
+        </Modal>
+      )}
+    </div>
+  );
+}
