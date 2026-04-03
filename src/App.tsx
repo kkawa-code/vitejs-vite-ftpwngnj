@@ -882,8 +882,13 @@ class AutoAssigner {
         const noLateRooms = split(this.ctx.customRules.noLateShiftRooms || "");
         const noLateRoomStaff = noLateRooms.flatMap(r => split(this.dayCells[r] || "").map(extractStaffName));
         const excludeStaff = Array.from(new Set([...noLateStaff, ...noLateRoomStaff]));
+        const fuzaiMems = split(this.dayCells["不在"]);
 
-        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && (this.blockMap.get(n) === 'NONE' || this.blockMap.get(n) === 'AM') && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n));
+        const candidates = this.initialAvailGeneral.filter(n => {
+          if (currentCore.includes(n) || this.isForbidden(n, rule.section) || excludeStaff.includes(n)) return false;
+          if (fuzaiMems.some(m => extractStaffName(m) === n && !m.includes("(AM)"))) return false;
+          return true;
+        });
         candidates.sort((a, b) => {
           let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100;
           const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b);
@@ -1106,7 +1111,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.56</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.57</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
