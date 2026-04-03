@@ -97,7 +97,7 @@ const MONTHLY_CATEGORIES = [
 const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療: "", 治療サブ優先: "", 治療サブ: "", RI: "", RIサブ: "", MMG: "", 受付: "", 受付ヘルプ: "" };
 const DEFAULT_PRIORITY_ROOMS = ["治療", "受付", "MMG", "RI", "MRI", "CT", "透視（6号）", "透視（11号）", "骨塩", "1号室", "5号室", "2号室", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部"];
 
-// 個人情報を排除しつつ、病院の構造ルールは完全に維持した初期設定
+// 個人情報を排除しつつ、病院の構造ルールは維持した初期設定
 const DEFAULT_RULES: CustomRules = { 
   staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", 
   supportTargetRoomsLowImpact: "3号室,パノラマCT", 
@@ -333,7 +333,7 @@ const renderLog = (logStr: string, i: number) => {
   else if (category.includes("遅番")) { bg = "#f5f3ff"; border = "#ddd6fe"; color = "#4c1d95"; badgeBg = "#ede9fe"; badgeColor = "#6d28d9"; }
   else if (category.includes("玉突き")) { bg = "#e0f2fe"; border = "#bae6fd"; color = "#0c4a6e"; badgeBg = "#bae6fd"; badgeColor = "#0369a1"; }
   else if (category.includes("専従") || category.includes("役割")) { bg = "#f0fdfa"; border = "#bbf7d0"; color = "#14532d"; badgeBg = "#dcfce7"; badgeColor = "#15803d"; }
-  else if (category.includes("昼当番") || category.includes("ヘルプ") || category.includes("サポート") || category.includes("余剰") || category.includes("ポータブル特例")) { bg = "#fdf4ff"; border = "#f5d0fe"; color = "#701a75"; badgeBg = "#fae8ff"; badgeColor = "#86198f"; }
+  else if (category.includes("昼当番") || category.includes("ヘルプ") || category.includes("サポート") || category.includes("余剰") || category.includes("ポータブル特例") || category.includes("ポータブル連動")) { bg = "#fdf4ff"; border = "#f5d0fe"; color = "#701a75"; badgeBg = "#fae8ff"; badgeColor = "#86198f"; }
   else if (category.includes("低影響補充")) { bg = "#f0fdfa"; border = "#ccfbf1"; color = "#0f766e"; badgeBg = "#ccfbf1"; badgeColor = "#0f766e"; }
   return (
     <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", marginBottom: "6px", background: bg, borderRadius: "8px", border: `1px solid ${border}`, fontSize: 14, color, lineHeight: 1.6, fontWeight: 600, wordBreak: "break-word" }}>
@@ -995,22 +995,31 @@ class AutoAssigner {
         this.dayCells["2号室"] = join([...room2Members, `${picked}${tag}`]);
         this.addU(picked, tag ? 0.5 : 1);
         this.blockMap.set(picked, 'ALL');
-        this.log(`🤝 [ポータブル特例] 2号室担当がポータブルを兼務しているため、2号室に ${picked} を追加しました`);
+        this.log(`🤝 [ポータブル特例] 2号室担当がポータブルを兼務しているため、特例で ${picked} を2号室の助っ人に追加しました`);
       } else {
         this.log(`⚠️ [ポータブル特例] 2号室に追加できるスタッフがいませんでした`);
       }
     }
 
-    const deKenmuTargets = ROOM_SECTIONS.filter(r => !["CT", "MRI", "治療", "RI", "待機", "昼当番", "受付", "受付ヘルプ"].includes(r));
-    let uGen2 = this.initialAvailGeneral.filter(s => !this.isUsed(s) && this.blockMap.get(s) !== 'ALL');
-    
     const priorityList = this.ctx.customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS;
+
+    // ★ Ver 2.69 修正：兼務解消は「優先度が高い順（priorityRooms順）」で試みる
+    const deKenmuTargets = ROOM_SECTIONS.filter(r => !["CT", "MRI", "治療", "RI", "待機", "昼当番", "受付", "受付ヘルプ"].includes(r));
+    deKenmuTargets.sort((a, b) => {
+        let idxA = priorityList.indexOf(a); if (idxA === -1) idxA = 999;
+        let idxB = priorityList.indexOf(b); if (idxB === -1) idxB = 999;
+        return idxA - idxB;
+    });
+
+    // ★ Ver 2.69 修正：余剰フォールバックは「優先度が低い順（逆順）」で試みる
     const reversePriority = [...ROOM_SECTIONS].sort((a, b) => {
         let idxA = priorityList.indexOf(a); if (idxA === -1) idxA = 999;
         let idxB = priorityList.indexOf(b); if (idxB === -1) idxB = 999;
         return idxB - idxA;
     });
 
+    let uGen2 = this.initialAvailGeneral.filter(s => !this.isUsed(s) && this.blockMap.get(s) !== 'ALL');
+    
     uGen2.forEach(staff => {
       const b = this.blockMap.get(staff); if (b === 'ALL') return; let tag = b==='AM'?"(PM)":b==='PM'?"(AM)":""; let assigned = false;
       for (const room of deKenmuTargets) {
@@ -1048,7 +1057,7 @@ class AutoAssigner {
           else if (pm) this.blockMap.set(oldCore, 'PM');
           else this.blockMap.set(oldCore, 'NONE');
 
-          this.log(`🪄 [兼務解消] 余剰の ${staff} を ${room} に専任配置し、${oldCore} の兼務を解消しました`); assigned = true; break;
+          this.log(`🪄 [兼務解消] 余剰の ${staff} を優先度の高い ${room} に専任配置し、${oldCore} の兼務を解消しました`); assigned = true; break;
         }
       }
       
@@ -1066,7 +1075,7 @@ class AutoAssigner {
               this.dayCells[room] = join([...currentMems, `${staff}${tag}`]);
               this.addU(staff, tag?0.5:1); 
               this.blockMap.set(staff, 'ALL'); 
-              this.log(`♻️ [余剰配置] 役割のなかった ${staff} を 優先度の低い ${room} に配置しました`);
+              this.log(`♻️ [余剰配置] 役割のなかった ${staff} を優先度の低い ${room} に配置しました`);
               assigned = true;
               break;
           }
