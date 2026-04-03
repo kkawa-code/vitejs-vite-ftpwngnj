@@ -642,7 +642,13 @@ class AutoAssigner {
          if (section === "MMG" && !this.isMmgCapable(name)) return { hard: true, msg: "MMG月間担当外" };
          if (!this.canAddKenmu(name, section)) return { hard: true, msg: "兼務上限" };
          const b = this.blockMap.get(name);
-         if (needTag && b === 'NONE') return { hard: true, msg: "半端枠ブロック" };
+         
+         // ★Ver 2.58 修正：月間メイン担当者なら半端枠ブロックを無視する
+         if (needTag && b === 'NONE') {
+           const isMain = isMonthlyMainStaff(section, name, this.ctx.monthlyAssign);
+           if (!isMain) return { hard: true, msg: "半端枠ブロック" };
+         }
+         
          if (b === 'ALL') return { hard: true, msg: "全日ブロック" };
          if (needTag === "(AM)" && b === 'AM') return { hard: true, msg: "AMブロック" };
          if (needTag === "(PM)" && b === 'PM') return { hard: true, msg: "PMブロック" };
@@ -1112,7 +1118,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.57 (クリーン版)</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.58 (クリーン版)</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
