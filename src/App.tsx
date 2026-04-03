@@ -558,9 +558,11 @@ class AutoAssigner {
     return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
   }
 
+  // ★Ver 2.55 修正箇所: initCounts() の月間・週間カウント積み上げ分離
   initCounts() {
-    this.ctx.allStaff.forEach(s => { this.assignCounts[s] = 0; this.maxAssigns[s] = 1; this.roomCounts[s] = {}; SECTIONS.forEach(sec => this.roomCounts[s][sec] = 0); });
-    this.pastDaysInMonth.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) this.roomCounts[c][sec]++; }); }); });
+    this.ctx.allStaff.forEach(s => { this.assignCounts[s] = 0; this.maxAssigns[s] = 1; this.roomCounts[s] = {}; SECTIONS.forEach(sec => this.roomCounts[s][sec] = 0); this.counts[s] = 0; });
+    this.pastDaysInMonth.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["CT", "MRI"].includes(sec)) { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) { this.roomCounts[c][sec]++; this.counts[c]++; } }); } }); });
+    this.pastDaysInWeek.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (!["CT", "MRI"].includes(sec)) { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) { this.roomCounts[c][sec]++; this.counts[c]++; } }); } }); });
   }
 
   buildBlockMap() {
@@ -598,9 +600,13 @@ class AutoAssigner {
     });
   }
 
+  // ★Ver 2.55 修正箇所: prepareAvailability() の this.counts 業務負荷ソート復元
   prepareAvailability() {
     const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
-    this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => a.localeCompare(b, 'ja'));
+    this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => {
+      if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0);
+      return a.localeCompare(b, 'ja');
+    });
     this.initialAvailSupport = this.initialAvailAll.filter(s => supportStaffList.includes(s));
     this.initialAvailGeneral = this.initialAvailAll.filter(s => this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s));
     this.initialAvailReception = this.initialAvailAll.filter(s => this.ctx.activeReceptionStaff.includes(s) || (this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s)));
@@ -907,8 +913,30 @@ class AutoAssigner {
         });
         if (repIdx !== -1) {
           const oldStr = currentMems[repIdx]; const oldCore = extractStaffName(oldStr);
-          currentMems[repIdx] = `${staff}${oldStr.includes("(AM)") ? "(AM)" : oldStr.includes("(PM)") ? "(PM)" : tag}`; this.dayCells[room] = join(currentMems); this.addU(staff, tag?0.5:1); this.blockMap.set(staff, 'ALL');
+          currentMems[repIdx] = `${staff}${oldStr.includes("(AM)") ? "(AM)" : oldStr.includes("(PM)") ? "(PM)" : tag}`; 
+          this.dayCells[room] = join(currentMems); 
+          this.addU(staff, tag?0.5:1); 
+          this.blockMap.set(staff, 'ALL');
+          
           this.assignCounts[oldCore] = Math.max(0, (this.assignCounts[oldCore] || 1) - getStaffAmount(oldStr));
+          
+          // ★Ver 2.55 修正箇所: 兼務解消後の blockMap 再計算処理
+          let am = false; let pm = false;
+          ROOM_SECTIONS.forEach(r => {
+             if (r === "待機" || r === "昼当番" || r === "受付" || r === "受付ヘルプ") return;
+             split(this.dayCells[r]).forEach(m => {
+                 if (extractStaffName(m) === oldCore) {
+                     if (m.includes("(AM)")) am = true;
+                     else if (m.includes("(PM)")) pm = true;
+                     else { am = true; pm = true; }
+                 }
+             });
+          });
+          if (am && pm) this.blockMap.set(oldCore, 'ALL');
+          else if (am) this.blockMap.set(oldCore, 'AM');
+          else if (pm) this.blockMap.set(oldCore, 'PM');
+          else this.blockMap.set(oldCore, 'NONE');
+
           this.log(`🪄 [兼務解消] 余剰の ${staff} を ${room} に専任配置し、${oldCore} の兼務を解消しました`); assigned = true; break;
         }
       }
@@ -1081,7 +1109,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.54</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.55</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
