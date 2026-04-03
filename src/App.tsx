@@ -558,7 +558,6 @@ class AutoAssigner {
     return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
   }
 
-  // ★Ver 2.55 修正箇所: initCounts() の月間・週間カウント積み上げ分離
   initCounts() {
     this.ctx.allStaff.forEach(s => { this.assignCounts[s] = 0; this.maxAssigns[s] = 1; this.roomCounts[s] = {}; SECTIONS.forEach(sec => this.roomCounts[s][sec] = 0); this.counts[s] = 0; });
     this.pastDaysInMonth.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["CT", "MRI"].includes(sec)) { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) { this.roomCounts[c][sec]++; this.counts[c]++; } }); } }); });
@@ -600,7 +599,6 @@ class AutoAssigner {
     });
   }
 
-  // ★Ver 2.55 修正箇所: prepareAvailability() の this.counts 業務負荷ソート復元
   prepareAvailability() {
     const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
     this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => {
@@ -885,7 +883,7 @@ class AutoAssigner {
         const noLateRoomStaff = noLateRooms.flatMap(r => split(this.dayCells[r] || "").map(extractStaffName));
         const excludeStaff = Array.from(new Set([...noLateStaff, ...noLateRoomStaff]));
 
-        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && this.blockMap.get(n) !== 'PM' && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n));
+        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && (this.blockMap.get(n) === 'NONE' || this.blockMap.get(n) === 'AM') && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n));
         candidates.sort((a, b) => {
           let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100;
           const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b);
@@ -920,7 +918,6 @@ class AutoAssigner {
           
           this.assignCounts[oldCore] = Math.max(0, (this.assignCounts[oldCore] || 1) - getStaffAmount(oldStr));
           
-          // ★Ver 2.55 修正箇所: 兼務解消後の blockMap 再計算処理
           let am = false; let pm = false;
           ROOM_SECTIONS.forEach(r => {
              if (r === "待機" || r === "昼当番" || r === "受付" || r === "受付ヘルプ") return;
@@ -1109,7 +1106,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.55</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.56</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
