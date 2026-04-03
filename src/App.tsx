@@ -637,7 +637,6 @@ class AutoAssigner {
       let curAm = 0; let curPm = 0;
       current.forEach(x => { if (x.includes("(AM)")) curAm++; else if (x.includes("(PM)")) curPm++; else { curAm++; curPm++; } });
       
-      // ★Ver 2.59 修正箇所：端数計算バグの修正（remaining=0.5 の最後の瞬間のみ needTag を強制する）
       if (curAm >= targetCount && curPm < targetCount) needTag = "(PM)";
       else if (curPm >= targetCount && curAm < targetCount) needTag = "(AM)";
       else if (remaining === 0.5) {
@@ -1129,7 +1128,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.59 (クリーン版)</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.60 (クリーン版)</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1838,7 +1837,7 @@ export default function App(): any {
             <h4 style={{ color: "#e11d48", borderBottom: "2px solid #ffe4e6", paddingBottom: 8, marginTop: 24 }}>🛑 1. システムが「絶対に守る」鉄の掟</h4>
             <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
               <li style={{ marginBottom: 8 }}><strong>担当不可・NGペアの厳守:</strong> 「この部屋はまだ不可」「この2人は同室にしない」設定は必ず守ります。</li>
-              <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点で⚠️注意が出ます。上限を超える自動配置はブロックされます。</li>
+              <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点（3部屋担当など）でカレンダーに⚠️注意が出ます。さらにその上限を超える（4部屋目などの）自動配置はブロックされます。</li>
               <li style={{ marginBottom: 8 }}><strong>連日担当の禁止:</strong> ポータブルなど連日禁止の部屋は、昨日の担当者をすべてのルートで問答無用に除外します。</li>
               <li style={{ marginBottom: 8 }}><strong>半休の終日専任室ブロック:</strong> 午前後休の人をCT/MRI等に配置することは原則ありません。</li>
             </ul>
@@ -1858,9 +1857,10 @@ export default function App(): any {
                 <strong>兼務・救済・応援:</strong>
                 <div style={{ background: "#f0fdf4", padding: "8px 12px", borderRadius: 6, border: "1px solid #bbf7d0", margin: "4px 0" }}>
                    💡 フェーズ4で複数候補がある場合は、原則として<br/>
-                   <strong>① 指定順（左から優先）</strong><br/>
-                   <strong>② 過去担当回数が少ない人</strong><br/>
-                   の順で選びます。
+                   <strong>① 過去担当回数が少ない人</strong><br/>
+                   <strong>② 今日の兼務部屋数が少ない人</strong><br/>
+                   <strong>③ 補充元として指定された順（左から優先）</strong><br/>
+                   の順で総合的に選びます。
                 </div>
                 定員割れがある場合、他への影響が少ない部屋から安全に兼務の応援を呼びます。
               </li>
