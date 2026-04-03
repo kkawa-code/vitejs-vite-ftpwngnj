@@ -631,8 +631,20 @@ class AutoAssigner {
     let prevAmount = -1;
     while (getCurrentAmount(current) < targetCount) {
       const currentAmount = getCurrentAmount(current); if (currentAmount === prevAmount) break; prevAmount = currentAmount;
-      const remaining = targetCount - currentAmount; let needTag = "";
-      if (remaining === 0.5 || remaining === 1.5 || remaining === 2.5) { const amCount = current.filter(m => m.includes("(AM)")).length; const pmCount = current.filter(m => m.includes("(PM)")).length; if (amCount > pmCount) needTag = "(PM)"; if (pmCount > amCount) needTag = "(AM)"; }
+      const remaining = targetCount - currentAmount;
+      
+      let needTag = "";
+      let curAm = 0; let curPm = 0;
+      current.forEach(x => { if (x.includes("(AM)")) curAm++; else if (x.includes("(PM)")) curPm++; else { curAm++; curPm++; } });
+      
+      // ★Ver 2.59 修正箇所：端数計算バグの修正（remaining=0.5 の最後の瞬間のみ needTag を強制する）
+      if (curAm >= targetCount && curPm < targetCount) needTag = "(PM)";
+      else if (curPm >= targetCount && curAm < targetCount) needTag = "(AM)";
+      else if (remaining === 0.5) {
+        if (curAm > curPm) needTag = "(PM)";
+        else if (curPm > curAm) needTag = "(AM)";
+      }
+
       this.log(`📋 [候補選考] ${section} の枠を補充します（残り ${remaining}人分${needTag ? ` / 要求: ${needTag}` : ''}）`);
 
       const getFilterReason = (name: string): RejectReason | null => {
@@ -643,7 +655,6 @@ class AutoAssigner {
          if (!this.canAddKenmu(name, section)) return { hard: true, msg: "兼務上限" };
          const b = this.blockMap.get(name);
          
-         // ★Ver 2.58 修正：月間メイン担当者なら半端枠ブロックを無視する
          if (needTag && b === 'NONE') {
            const isMain = isMonthlyMainStaff(section, name, this.ctx.monthlyAssign);
            if (!isMain) return { hard: true, msg: "半端枠ブロック" };
@@ -1118,7 +1129,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.58 (クリーン版)</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.59 (クリーン版)</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
