@@ -118,7 +118,7 @@ const DEFAULT_RULES: CustomRules = {
   ], 
   lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
   lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" }], lunchPrioritySections: "RI, 1号室, 2号室, 3号室, 5号室", lunchLastResortSections: "治療", 
-  linkedRooms: [{ target: "ポータブル", sources: "3号室、2号室、1号室、5号室、CT(4)" }, { target: "検像", sources: "骨塩" }, { target: "DSA", sources: "5号室、2号室、CT(4)、パノラマCT" }, { target: "パノラマCT", sources: "透視（6号）、2号室" }], 
+  linkedRooms: [{ target: "ポータブル", sources: "3号室(1)、2号室、1号室、5号室、CT(4)" }, { target: "検像", sources: "骨塩" }, { target: "DSA", sources: "5号室、2号室、CT(4)、パノラマCT" }, { target: "パノラマCT", sources: "透視（6号）、2号室" }], 
   alertMaxKenmu: 3, alertEmptyRooms: "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像,受付", smartKenmu: [{ targetRoom: "MMG", sourceRooms: "1号室、2号室、3号室、5号室、CT(4)" }] 
 };
 
@@ -718,8 +718,23 @@ class AutoAssigner {
              if (this.isHardNoConsecutive(a, section)) scoreA -= 500; if (this.isHardNoConsecutive(b, section)) scoreB -= 500;
              if (section === "ポータブル") { const pastA = this.getPastRoomCount(a, section); const pastB = this.getPastRoomCount(b, section); if (pastA > 0) scoreA -= 1000 * pastA; if (pastB > 0) scoreB -= 1000 * pastB; }
              
-             if (needTag === "") { if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 200; else if (bA === 'AM' || bA === 'PM') scoreA += 150; else if (bA === 'NONE') scoreA += 100; } else { if (needTag === "(AM)" && bA === 'PM') scoreA += 200; if (needTag === "(PM)" && bA === 'AM') scoreA += 200; if (bA === 'NONE') scoreA += 100; }
-             if (needTag === "") { if (hasAmFree && hasPmFree && (bB === 'AM' || bB === 'PM')) scoreB += 200; else if (bB === 'AM' || bB === 'PM') scoreB += 150; else if (bB === 'NONE') scoreB += 100; } else { if (needTag === "(AM)" && bB === 'PM') scoreB += 200; if (needTag === "(PM)" && bB === 'AM') scoreB += 200; if (bB === 'NONE') scoreB += 100; }
+             // ★ Ver 2.70 修正：1日専任スロット（needTag === ""）の時は、半休者を優先しない（無駄な分割を防ぐ）
+             if (needTag === "") { 
+               if (bA === 'NONE') scoreA += 200; 
+               else if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 100; 
+             } else { 
+               if (needTag === "(AM)" && bA === 'PM') scoreA += 200; 
+               if (needTag === "(PM)" && bA === 'AM') scoreA += 200; 
+               if (bA === 'NONE') scoreA += 100; 
+             }
+             if (needTag === "") { 
+               if (bB === 'NONE') scoreB += 200; 
+               else if (hasAmFree && hasPmFree && (bB === 'AM' || bB === 'PM')) scoreB += 100; 
+             } else { 
+               if (needTag === "(AM)" && bB === 'PM') scoreB += 200; 
+               if (needTag === "(PM)" && bB === 'AM') scoreB += 200; 
+               if (bB === 'NONE') scoreB += 100; 
+             }
              
              if (scoreA !== scoreB) return scoreB - scoreA;
              if ((this.assignCounts[a] || 0) !== (this.assignCounts[b] || 0)) return (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0);
@@ -963,7 +978,6 @@ class AutoAssigner {
       }
     });
 
-    // ★ Ver 2.68 追加：2号室担当がポータブル兼務時の特例サポート
     const portableMembers = split(this.dayCells["ポータブル"]);
     const room2Members = split(this.dayCells["2号室"]);
     const room2Cores = room2Members.map(extractStaffName);
@@ -974,7 +988,7 @@ class AutoAssigner {
       const highImpactRooms = ["1号室", "5号室"];
       const findCandidate = (excludeRooms: string[]) => 
         [...supportStaffList, ...this.initialAvailGeneral]
-          .filter((s, i, arr) => arr.indexOf(s) === i) // 重複除去で優先維持
+          .filter((s, i, arr) => arr.indexOf(s) === i) 
           .filter(s => {
             if (room2Cores.includes(s)) return false;
             if (this.isForbidden(s, "2号室")) return false;
@@ -1003,7 +1017,6 @@ class AutoAssigner {
 
     const priorityList = this.ctx.customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS;
 
-    // ★ Ver 2.69 修正：兼務解消は「優先度が高い順（priorityRooms順）」で試みる
     const deKenmuTargets = ROOM_SECTIONS.filter(r => !["CT", "MRI", "治療", "RI", "待機", "昼当番", "受付", "受付ヘルプ"].includes(r));
     deKenmuTargets.sort((a, b) => {
         let idxA = priorityList.indexOf(a); if (idxA === -1) idxA = 999;
@@ -1011,7 +1024,6 @@ class AutoAssigner {
         return idxA - idxB;
     });
 
-    // ★ Ver 2.69 修正：余剰フォールバックは「優先度が低い順（逆順）」で試みる
     const reversePriority = [...ROOM_SECTIONS].sort((a, b) => {
         let idxA = priorityList.indexOf(a); if (idxA === -1) idxA = 999;
         let idxB = priorityList.indexOf(b); if (idxB === -1) idxB = 999;
@@ -1075,7 +1087,7 @@ class AutoAssigner {
               this.dayCells[room] = join([...currentMems, `${staff}${tag}`]);
               this.addU(staff, tag?0.5:1); 
               this.blockMap.set(staff, 'ALL'); 
-              this.log(`♻️ [余剰配置] 役割のなかった ${staff} を優先度の低い ${room} に配置しました`);
+              this.log(`♻️ [余剰配置] 役割のなかった ${staff} を 優先度の低い ${room} に配置しました`);
               assigned = true;
               break;
           }
@@ -1258,7 +1270,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.68</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.70</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1869,146 +1881,4 @@ export default function App(): any {
             <RuleCard bg="#f0fdf4" border="#bbf7d0" color="#15803d" icon="🤝" title="サポート専任（2人目要員）ルール">
               <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
                   <div style={{ flex: 1, minWidth: "260px" }}>
-                    <label style={{ fontSize: 16, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>対象スタッフ名（複数可）</label>
-                    <div style={{ background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #86efac", minHeight: "56px", display: "flex", alignItems: "center" }}>
-                      <MultiPicker selected={customRules.supportStaffList || ""} onChange={(v: string) => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" />
-                    </div>
-                  </div>
-                  <div style={{ flex: 2, minWidth: "260px" }}>
-                    <label style={{ fontSize: 16, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>優先する対象部屋</label>
-                    <MultiPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
-                  </div>
-              </div>
-              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start", marginTop: 16 }}>
-                  <div style={{ flex: 1, minWidth: "260px" }}>
-                    <label style={{ fontSize: 14, fontWeight: 800, color: "#166534", display: "block", marginBottom: 4 }}>低影響グループ（優先的に補充元にする部屋）</label>
-                    <MultiPicker selected={customRules.supportTargetRoomsLowImpact ?? "3号室,パノラマCT"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRoomsLowImpact: v})} options={ROOM_SECTIONS} />
-                  </div>
-                  <div style={{ flex: 2, minWidth: "260px" }}>
-                    <label style={{ fontSize: 14, fontWeight: 800, color: "#166534", display: "block", marginBottom: 4 }}>高影響グループ（極力補充元にしない部屋）</label>
-                    <MultiPicker selected={customRules.supportTargetRoomsHighImpact ?? "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRoomsHighImpact: v})} options={ROOM_SECTIONS} />
-                  </div>
-              </div>
-            </RuleCard>
-          </div>
-          
-        </div>
-      </div>
-
-      {/* ===================== モーダル類 ===================== */}
-      {showUnassignedList && (
-        <Modal title="未配置のスタッフ" onClose={() => setShowUnassignedList(null)}>
-          <div style={{ fontSize: 20, lineHeight: 1.6, color: "#ef4444", fontWeight: 800, textAlign: "center" }}>
-            {getDailyStats(showUnassignedList).unassigned.join("、") || "全員配置済みです"}
-          </div>
-        </Modal>
-      )}
-
-      {selectedErrorDay && (
-        <Modal title={`👀 ${selectedErrorDay} の確認事項`} onClose={() => setSelectedErrorDay(null)}>
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {getDayWarnings(selectedErrorDay).map((w, i) => {
-              let badgeColor = "#475569"; let badgeBg = "#f8fafc"; let icon = "⚠️"; let borderColor = "#cbd5e1";
-              if (w.level === 'red') { badgeColor = "#b91c1c"; badgeBg = "#fee2e2"; icon = "🔴"; borderColor = "#fecaca"; }
-              else if (w.level === 'orange') { badgeColor = "#c2410c"; badgeBg = "#ffedd5"; icon = "🟠"; borderColor = "#fed7aa"; }
-              else if (w.level === 'yellow') { badgeColor = "#a16207"; badgeBg = "#fef08a"; icon = "🟡"; borderColor = "#fde047"; }
-              
-              return (
-                <li key={i} style={{ display: "flex", gap: "12px", padding: "16px 20px", marginBottom: "12px", background: "#f8fafc", border: `2px solid ${borderColor}`, borderRadius: "10px", fontSize: 16, fontWeight: 700, color: "#334155", lineHeight: 1.6, alignItems: "center" }}>
-                  <span style={{ display: "inline-block", background: badgeBg, color: badgeColor, padding: "4px 10px", borderRadius: "6px", fontSize: "14px", fontWeight: 800, whiteSpace: "nowrap", border: `1px solid ${borderColor}` }}>{icon} {w.title}</span>
-                  <span>{w.msg}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </Modal>
-      )}
-
-      {selectedStaffForStats && (
-        <Modal title={`👤 ${selectedStaffForStats} さんの詳細`} onClose={() => setSelectedStaffForStats(null)}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 18 }}>
-            <thead><tr style={{ borderBottom: "2px solid #e2e8f0" }}><th style={{ padding: "12px 10px", textAlign: "left" }}>日付</th><th style={{ padding: "12px 10px", textAlign: "left" }}>担当業務</th></tr></thead>
-            <tbody>
-              {Object.entries(allDays).filter(([dateStr]) => dateStr.startsWith(targetMonday.substring(0, 7))).sort((a, b) => a[0].localeCompare(b[0])).map(([dateStr, cells]) => {
-                const assigns: string[] = [];
-                Object.entries(cells).forEach(([sec, val]) => {
-                  if(["明け","入り","土日休日代休","不在","待機","昼当番","受付","受付ヘルプ"].includes(sec)) return;
-                  const members = split(val as string); const myAssign = members.find(m => extractStaffName(m) === selectedStaffForStats);
-                  if (myAssign) { const timeStr = myAssign.substring(selectedStaffForStats.length); assigns.push(`${sec}${timeStr}`); }
-                });
-                const dObj = new Date(dateStr); const YOUBI = ["日", "月", "火", "水", "木", "金", "土"];
-                const label = `${dObj.getMonth() + 1}/${dObj.getDate()}(${YOUBI[dObj.getDay()]})`;
-                if (assigns.length === 0) return null;
-                return (
-                  <tr key={dateStr} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td style={{ padding: "12px 10px", fontWeight: 600 }}>{label}</td>
-                    <td style={{ padding: "12px 10px", color: "#0ea5e9", fontWeight: 700 }}>{assigns.join(" / ")}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </Modal>
-      )}
-
-      {showLogDay && (
-        <Modal title={`🤔 ${showLogDay} の割当根拠`} onClose={() => setShowLogDay(null)} wide>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {assignLogs[showLogDay]?.map((log, i) => renderLog(log, i))}
-            {!assignLogs[showLogDay] || assignLogs[showLogDay].length === 0 ? <li style={{ textAlign: "center", color: "#94a3b8", padding: 32 }}>自動割当の履歴がありません</li> : null}
-          </ul>
-        </Modal>
-      )}
-
-      {showRuleModal && (
-        <Modal title="🏥 勤務割付システムのルールブック" onClose={() => setShowRuleModal(false)} wide>
-          <div style={{ lineHeight: 1.8, fontSize: "16px", color: "#334155" }}>
-            <p>このシステムはランダムではなく、複数のルールを順番に適用し、スタッフの負担・安全・公平性のバランスを見ながら、最適に近いシフトを自動で組み立てています。</p>
-            
-            <h4 style={{ color: "#e11d48", borderBottom: "2px solid #ffe4e6", paddingBottom: 8, marginTop: 24 }}>🛑 1. システムが「絶対に守る」鉄の掟</h4>
-            <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
-              <li style={{ marginBottom: 8 }}><strong>担当不可・NGペアの厳守:</strong> 「この部屋はまだ不可」「この2人は同室にしない」設定は必ず守ります。</li>
-              <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点（3部屋担当など）でカレンダーに⚠️注意が出ます。さらにその上限を超える（4部屋目などの）自動配置はブロックされます。</li>
-              <li style={{ marginBottom: 8 }}><strong>連日担当の禁止:</strong> ポータブルなど連日禁止の部屋は、昨日の担当者をすべてのルートで問答無用に除外します。</li>
-              <li style={{ marginBottom: 8 }}><strong>半休の終日専任室ブロック:</strong> 午前後休の人をCT/MRI等に配置することは原則ありません。</li>
-            </ul>
-
-            <h4 style={{ color: "#2563eb", borderBottom: "2px solid #dbeafe", paddingBottom: 8 }}>🟦 2. 誰が選ばれる？「ポイント制」</h4>
-            <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
-              <li style={{ marginBottom: 8 }}><strong>優先加点:</strong> その月の「メイン担当」「サブ担当」は優先的に選ばれます。</li>
-              <li style={{ marginBottom: 8 }}><strong>平等化減点:</strong> CT・MRIは「今月」、その他の部屋は「今週」すでにその部屋に入っている回数が多い人ほど減点され、均等化されます。</li>
-            </ul>
-
-            <h4 style={{ color: "#10b981", borderBottom: "2px solid #d1fae5", paddingBottom: 8 }}>🟩 3. シフトが完成するまでの「5ステップ」</h4>
-            <ol style={{ paddingLeft: 24, marginBottom: 24 }}>
-              <li style={{ marginBottom: 8 }}><strong>欠員ブロック＆緊急対応:</strong> 休みを外し、人数不足時は緊急ルールを真っ先に発動。</li>
-              <li style={{ marginBottom: 8 }}><strong>例外・代打・玉突き:</strong> 専従固定や代打ルールを先に処理します。</li>
-              <li style={{ marginBottom: 8 }}><strong>メイン配置:</strong> 優先順位の高い部屋から順番にメイン担当者を決めます。</li>
-              <li style={{ marginBottom: 8 }}>
-                <strong>兼務・救済・応援:</strong>
-                <div style={{ background: "#f0fdf4", padding: "8px 12px", borderRadius: 6, border: "1px solid #bbf7d0", margin: "4px 0" }}>
-                   💡 フェーズ4で複数候補がある場合は、原則として<br/>
-                   <strong>① 過去担当回数が少ない人</strong><br/>
-                   <strong>② 今日の兼務部屋数が少ない人</strong><br/>
-                   <strong>③ 補充元として指定された順（左から優先）</strong><br/>
-                   の順で総合的に選びます。
-                </div>
-                定員割れがある場合、他への影響が少ない部屋から安全に兼務の応援を呼びます。
-              </li>
-              <li style={{ marginBottom: 8 }}>
-                <strong>総仕上げ（昼当番・余剰配置）:</strong>
-                昼当番はまず設定された条件（治療以外など）から探し、それでも不足なら最終手段（治療など）からも拾います。受付ヘルプもここで決定します。<br/>
-                <strong>♻️ 余剰配置:</strong> 1日を通して何の部屋にも割り当てられなかった一般スタッフがいる場合、まず<strong>兼務中の部屋の兼務解消（専任化）</strong>を試みます。兼務解消できる部屋がなければ、<strong>優先順位が低い部屋から順に</strong>配置します。（※待機への自動配置は行いません）
-              </li>
-            </ol>
-
-            <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", padding: 16, borderRadius: 8, marginTop: 32 }}>
-              <strong style={{ color: "#334155" }}>💡 最後に</strong><br/>
-              もし「この部屋の負担が偏っている」場合は、人間が【設定画面】の「月担当」や「優先順位」を少し調整することで、意図に近いシフトを作れるようになります。
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
+                    <label style={{ fontSize: 16, fontWeight: 800, color: "#166534", display: "block", marginBottom:
