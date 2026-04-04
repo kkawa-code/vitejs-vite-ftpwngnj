@@ -417,6 +417,23 @@ class AutoAssigner {
     return score;
   }
 
+  // ★ Ver 2.72 追加：兼務配置後のblockMapを正しく更新するヘルパー
+  // 現在のblockMapと新しい配置タグを合算して判定する
+  updateBlockMapAfterKenmu(core: string, pushStr: string) {
+    const current = this.blockMap.get(core);
+    let next: string;
+    if (pushStr.includes("(AM)")) {
+      // AM枠に追加 → AMは埋まった
+      next = (current === 'PM' || current === 'ALL') ? 'ALL' : 'AM';
+    } else if (pushStr.includes("(PM)")) {
+      // PM枠に追加 → PMは埋まった
+      next = (current === 'AM' || current === 'ALL') ? 'ALL' : 'PM';
+    } else {
+      next = 'ALL';
+    }
+    this.blockMap.set(core, next);
+  }
+
   canAddKenmu(staff: string, targetRoom: string, bypassExclusiveForSource: boolean = false): boolean {
     const limit = this.ctx.customRules.alertMaxKenmu || 3;
     const currentRoomCount = this.getTodayRoomCount(staff);
@@ -773,7 +790,6 @@ class AutoAssigner {
              if (this.isHardNoConsecutive(a, section)) scoreA -= 500; if (this.isHardNoConsecutive(b, section)) scoreB -= 500;
              if (section === "ポータブル") { const pastA = this.getPastRoomCount(a, section); const pastB = this.getPastRoomCount(b, section); if (pastA > 0) scoreA -= 1000 * pastA; if (pastB > 0) scoreB -= 1000 * pastB; }
              
-             // ★ Ver 2.70/2.71 修正：1日専任スロット（needTag === ""）の時は、半休者を優先しない
              if (needTag === "") { 
                if (bA === 'NONE') scoreA += 200; 
                else if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 100; 
@@ -817,62 +833,6 @@ class AutoAssigner {
   processPostTasks() {
     const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
     const lowPriorityStaff = split(this.ctx.customRules.lateShiftLowPriorityStaff || "").map(extractStaffName);
-
-    // ★ Ver 2.71 追加：月担当外の半休者を低影響部屋の空き枠に補充
-    this.logPhase("半休者補充フェーズ");
-    const halfDayUnassigned = this.initialAvailGeneral.filter(s => {
-      const b = this.blockMap.get(s);
-      return (b === 'AM' || b === 'PM') && !this.isUsed(s);
-    });
-
-    if (halfDayUnassigned.length > 0) {
-      // 低影響部屋リスト：設定の supportTargetRoomsLowImpact を基本に、
-      // 一般撮影室を加えた順序で試みる
-      const lowImpactBase = split(this.ctx.customRules.supportTargetRoomsLowImpact || "3号室,パノラマCT");
-      const lowImpactExtra = ["検像", "2号室", "1号室", "5号室", "透視（11号）", "骨塩", "DSA", "ポータブル"];
-      const lowImpactRooms = [
-        ...lowImpactBase,
-        ...lowImpactExtra.filter(r => !lowImpactBase.includes(r))
-      ];
-      // CT・MRI・治療・RI・透視（6号）等の高影響部屋は除外
-      const highImpactExclude = ["CT", "MRI", "治療", "RI", "透視（6号）", "MMG", "受付", "受付ヘルプ", "待機", "昼当番"];
-
-      halfDayUnassigned.forEach(staff => {
-        const b = this.blockMap.get(staff);
-        const tag = b === 'AM' ? "(PM)" : "(AM)";
-
-        for (const room of lowImpactRooms) {
-          if (highImpactExclude.includes(room)) continue;
-          if (this.skipSections.includes(room)) continue;
-          if (this.isForbidden(staff, room)) continue;
-          if (this.isHardNoConsecutive(staff, room)) continue;
-          if (!this.canAddKenmu(staff, room)) continue;
-          if (room === "MMG" && !this.isMmgCapable(staff)) continue;
-
-          const current = split(this.dayCells[room]);
-          const currentCores = current.map(extractStaffName);
-          if (currentCores.includes(staff)) continue;
-          if (this.hasNGPair(staff, currentCores, false)) continue;
-
-          // AM/PM枠が空いているか確認
-          let curAm = 0; let curPm = 0;
-          current.forEach(x => {
-            if (x.includes("(AM)")) curAm++;
-            else if (x.includes("(PM)")) curPm++;
-            else { curAm++; curPm++; }
-          });
-          const cap = this.dynamicCapacity[room] ?? 1;
-          if (tag === "(PM)" && curPm >= cap) continue;
-          if (tag === "(AM)" && curAm >= cap) continue;
-
-          this.dayCells[room] = join([...current, `${staff}${tag}`]);
-          this.addU(staff, 0.5);
-          this.blockMap.set(staff, 'ALL');
-          this.log(`🌓 [半休補充] ${staff}${tag} を ${room} の空き枠に補充しました`);
-          break;
-        }
-      });
-    }
 
     this.initialAvailSupport.forEach(staff => {
       if (this.isUsed(staff)) return;
@@ -1013,6 +973,7 @@ class AutoAssigner {
           let pushStr = m; let curAm = 0; let curPm = 0; targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
           if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) continue; pushStr = `${core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) continue; pushStr = `${core}(PM)`; }
           targetMems.push(pushStr); targetCores.push(core); const amount = getStaffAmount(pushStr); currentAmount += amount; this.addU(core, amount);
+          this.updateBlockMapAfterKenmu(core, pushStr); // ★ Ver 2.72 修正：blockMap更新
        }
        return targetMems;
     };
@@ -1033,7 +994,8 @@ class AutoAssigner {
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom) && !this.isHalfDayBlockedForFullDayRoom(core, targetRoom).hard && !this.hasNGPair(core, currentMems.map(extractStaffName), false) && !this.isHardNoConsecutive(core, targetRoom) && (targetRoom === "MMG" ? this.isMmgCapable(core) : true) && this.canAddKenmu(core, targetRoom, true) && !m.includes("17:") && !m.includes("19:")) {
                let pushStr = m;
                if (targetRoom === "パノラマCT" && srcRoom === "透視（6号）") { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } else { if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; } }
-               currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(core, getStaffAmount(pushStr)); this.log(`🔗 [基本兼務] ${srcRoom} の ${pushStr} を ${targetRoom} にセット配置しました`);
+               currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(core, getStaffAmount(pushStr)); this.updateBlockMapAfterKenmu(core, pushStr); // ★ Ver 2.72 修正：blockMap更新
+               this.log(`🔗 [基本兼務] ${srcRoom} の ${pushStr} を ${targetRoom} にセット配置しました`);
           }
         });
       }
@@ -1075,7 +1037,7 @@ class AutoAssigner {
             if (curAm >= targetCap && curPm >= targetCap) break;
             if (this.hasNGPair(cand.core, currentCores, false)) continue;
             let pushStr = cand.fullStr; if (curAm < targetCap && curPm >= targetCap) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
-            currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(cand.core, getStaffAmount(pushStr)); 
+            currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(cand.core, getStaffAmount(pushStr)); this.updateBlockMapAfterKenmu(cand.core, pushStr); // ★ Ver 2.72 修正：blockMap更新
             if (matchingRescueRules.length > 0) this.log(`🆘 [救済] 定員割れの ${targetRoom} に、${pushStr} を兼務で追加しました`);
             else this.log(`🛡️ [汎用救済] ${targetRoom} の定員割れを防ぐため、自動探索で ${pushStr} を兼務で追加しました`);
          }
@@ -1405,7 +1367,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.71</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.72</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
