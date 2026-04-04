@@ -1506,7 +1506,7 @@ export default function App(): any {
       )}
 
       {showRuleModal && (
-        <Modal title="システムの自動割当ルール（優先順位）" onClose={() => setShowRuleModal(null)} wide>
+        <Modal title="システムの自動割当ルール（優先順位）" onClose={() => setShowRuleModal(false)} wide>
            <div style={{ lineHeight: 1.6, color: "#334155" }}>
             <p>※システムの仕様についての説明をここに記載します（今回はUIのデモのため省略しています）。</p>
            </div>
