@@ -1070,60 +1070,62 @@ class AutoAssigner {
     // ★ 緊急：指定部屋が空の時だけ発動するswap（empty_room_swap）
     (this.ctx.customRules.emergencies || []).forEach((em: any) => {
       if (em.type !== "empty_room_swap") return;
-      const watchRoom = em.section;       // 監視部屋（例：DSA）
-      const swapFrom = em.sourceRoom;     // 入れ替え元（例：透視（6号））
-      if (!watchRoom || !swapFrom) return;
+      const watchRoom = em.section;
+      // sourceRooms（複数・読点区切り）またはlegacy sourceRoom（単数）に対応
+      const sourceRoomList = split(em.sourceRooms || em.sourceRoom || "");
+      if (!watchRoom || sourceRoomList.length === 0) return;
       if (this.skipSections.includes(watchRoom)) return;
 
-      // 監視部屋にDSA可能な人が既にいるなら何もしない
+      // 監視部屋が既に埋まっているなら何もしない
       const watchMems = split(this.dayCells[watchRoom]);
       const watchCap = this.dynamicCapacity[watchRoom] ?? 1;
       const watchAmt = watchMems.reduce((s, m) => s + getStaffAmount(m), 0);
       if (watchAmt >= watchCap) return;
 
-      // 入れ替え元部屋を確認
-      const srcMems = split(this.dayCells[swapFrom]);
-      if (srcMems.length === 0) return;
-
-      // 入れ替え元でwatchRoomに行けない人（例：石田）を、行ける人と入れ替える
-      const ngInSrc = srcMems.filter(m => {
-        const c = extractStaffName(m);
-        return !ROLE_PLACEHOLDERS.includes(c) && (this.isForbidden(c, watchRoom) || !this.canAddKenmu(c, watchRoom, true));
-      });
-      if (ngInSrc.length === 0) return; // 全員watchRoomに行ける → swapRulesで対応済み
-
-      // 他の部屋からwatchRoom可能かつswapFrom可能な人を探す
-      const allRooms = ROOM_SECTIONS.filter(r => r !== watchRoom && r !== swapFrom && !this.skipSections.includes(r) && !["待機","昼当番","受付","受付ヘルプ"].includes(r));
+      // sourceRoomsを順番に試みる
       let swapped = false;
-      for (const srcRoom of allRooms) {
+      for (const swapFrom of sourceRoomList) {
         if (swapped) break;
-        const roomMems = split(this.dayCells[srcRoom]);
-        const okCands = roomMems.filter(m => {
+        const srcMems = split(this.dayCells[swapFrom]);
+        if (srcMems.length === 0) continue;
+
+        // 入れ替え元でwatchRoomに行けない人を特定
+        const ngInSrc = srcMems.filter(m => {
           const c = extractStaffName(m);
-          if (ROLE_PLACEHOLDERS.includes(c)) return false;
-          if (this.isForbidden(c, watchRoom)) return false;
-          if (this.isForbidden(c, swapFrom)) return false;
-          if (this.isHalfDayBlockedForFullDayRoom(c, watchRoom).hard) return false;
-          if (this.isHardNoConsecutive(c, watchRoom)) return false;
-          if (!this.canAddKenmu(c, watchRoom, true)) return false;
-          if (m.includes("17:") || m.includes("19:")) return false;
-          return true;
+          return !ROLE_PLACEHOLDERS.includes(c) && (this.isForbidden(c, watchRoom) || !this.canAddKenmu(c, watchRoom, true));
         });
-        for (const okM of okCands) {
-          const okCore = extractStaffName(okM);
-          // ngInSrcの誰かとswapFromで入れ替えられるか
-          const kickM = ngInSrc.find(m => {
+        if (ngInSrc.length === 0) continue; // 全員watchRoomに行ける→swapRules側で対応済み
+
+        // 他の部屋からwatchRoom可能かつswapFrom可能な人を探す
+        const allRooms = ROOM_SECTIONS.filter(r => r !== watchRoom && r !== swapFrom && !this.skipSections.includes(r) && !["待機","昼当番","受付","受付ヘルプ"].includes(r));
+        for (const srcRoom of allRooms) {
+          if (swapped) break;
+          const roomMems = split(this.dayCells[srcRoom]);
+          const okCands = roomMems.filter(m => {
             const c = extractStaffName(m);
-            return !this.isForbidden(c, srcRoom) && !this.isHalfDayBlockedForFullDayRoom(c, srcRoom).hard && !this.hasNGPair(c, roomMems.map(extractStaffName), false) && this.canAddKenmu(c, srcRoom, true);
+            if (ROLE_PLACEHOLDERS.includes(c)) return false;
+            if (this.isForbidden(c, watchRoom)) return false;
+            if (this.isForbidden(c, swapFrom)) return false;
+            if (this.isHalfDayBlockedForFullDayRoom(c, watchRoom).hard) return false;
+            if (this.isHardNoConsecutive(c, watchRoom)) return false;
+            if (!this.canAddKenmu(c, watchRoom, true)) return false;
+            if (m.includes("17:") || m.includes("19:")) return false;
+            return true;
           });
-          if (!kickM) continue;
-          const kickCore = extractStaffName(kickM);
-          // 入れ替え実行
-          this.dayCells[swapFrom] = join(srcMems.map(m => m === kickM ? m.replace(kickCore, okCore) : m));
-          this.dayCells[srcRoom] = join(roomMems.map(m => m === okM ? m.replace(okCore, kickCore) : m));
-          this.log(`🚨 [空室緊急swap] ${watchRoom} が空のため、${swapFrom} の ${kickCore} と ${srcRoom} の ${okCore} を入れ替えました`);
-          swapped = true;
-          break;
+          for (const okM of okCands) {
+            const okCore = extractStaffName(okM);
+            const kickM = ngInSrc.find(m => {
+              const c = extractStaffName(m);
+              return !this.isForbidden(c, srcRoom) && !this.isHalfDayBlockedForFullDayRoom(c, srcRoom).hard && !this.hasNGPair(c, roomMems.map(extractStaffName), false) && this.canAddKenmu(c, srcRoom, true);
+            });
+            if (!kickM) continue;
+            const kickCore = extractStaffName(kickM);
+            this.dayCells[swapFrom] = join(srcMems.map(m => m === kickM ? m.replace(kickCore, okCore) : m));
+            this.dayCells[srcRoom] = join(roomMems.map(m => m === okM ? m.replace(okCore, kickCore) : m));
+            this.log(`🚨 [空室緊急swap] ${watchRoom} が空のため、${swapFrom} の ${kickCore} と ${srcRoom} の ${okCore} を入れ替えました`);
+            swapped = true;
+            break;
+          }
         }
       }
     });
@@ -1760,10 +1762,13 @@ export default function App(): any {
                           {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                         <span className="rule-label" style={{color:"#854d0e"}}>が空の時、</span>
-                        <select value={rule.sourceRoom} onChange={(e: any) => updateRule("emergencies", idx, "sourceRoom", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}>
-                          <option value="">入替元の部屋</option>
-                          {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        <input
+                          value={rule.sourceRooms || rule.sourceRoom || ""}
+                          onChange={(e: any) => updateRule("emergencies", idx, "sourceRooms", e.target.value)}
+                          placeholder="入替元の部屋（複数可、読点区切り）"
+                          className="rule-sel"
+                          style={{borderColor:"#fde047", minWidth:240}}
+                        />
                         <span className="rule-label" style={{color:"#854d0e"}}>の不可スタッフを他部屋の可能スタッフと入替</span>
                       </>
                     ) : (
