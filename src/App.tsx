@@ -823,44 +823,20 @@ class AutoAssigner {
       let assigned = false;
       for (const room of targets) {
         if (this.skipSections.includes(room) || this.isForbidden(staff, room)) continue;
-        const eff = this.getEffectiveTarget(room, 1);
-        if (eff.allClosed) continue;
-        const b = this.blockMap.get(staff);
-        let tag = b==='AM'?"(PM)":b==='PM'?"(AM)":"";
-        if (eff.pmClosed && tag === "(PM)") continue;
-        if (eff.amClosed && tag === "(AM)") continue;
-        let finalTag = tag;
-        if (tag === "") {
-            if (eff.pmClosed) finalTag = "(AM)";
-            else if (eff.amClosed) finalTag = "(PM)";
-        }
-
         let current = split(this.dayCells[room]);
         if (current.length > 0 && !current.map(extractStaffName).includes(staff) && !this.hasNGPair(staff, current.map(extractStaffName), false) && !this.isHardNoConsecutive(staff, room)) {
-          this.dayCells[room] = join([...current, `${staff}${finalTag}`]); this.addU(staff, finalTag?0.5:1); 
-          this.blockMap.set(staff, finalTag === "" ? 'ALL' : (finalTag === "(AM)" ? 'PM' : 'AM'));
+          const b = this.blockMap.get(staff); let tag = b==='AM'?"(PM)":b==='PM'?"(AM)":"";
+          this.dayCells[room] = join([...current, `${staff}${tag}`]); this.addU(staff, tag?0.5:1); this.blockMap.set(staff, 'ALL');
           this.log(`🤝 [サポート] 稼働中の ${room} に、サポート要員として ${staff} を追加しました`); assigned = true; break;
         }
       }
       if (!assigned) {
         for (const room of targets) {
           if (this.skipSections.includes(room) || this.isForbidden(staff, room)) continue;
-          const eff = this.getEffectiveTarget(room, 1);
-          if (eff.allClosed) continue;
-          const b = this.blockMap.get(staff);
-          let tag = b==='AM'?"(PM)":b==='PM'?"(AM)":"";
-          if (eff.pmClosed && tag === "(PM)") continue;
-          if (eff.amClosed && tag === "(AM)") continue;
-          let finalTag = tag;
-          if (tag === "") {
-              if (eff.pmClosed) finalTag = "(AM)";
-              else if (eff.amClosed) finalTag = "(PM)";
-          }
-
           let current = split(this.dayCells[room]);
           if (current.length === 0 && !this.isHardNoConsecutive(staff, room) && this.canAddKenmu(staff, room)) {
-             this.dayCells[room] = `${staff}${finalTag}`; this.addU(staff, finalTag?0.5:1); 
-             this.blockMap.set(staff, finalTag === "" ? 'ALL' : (finalTag === "(AM)" ? 'PM' : 'AM'));
+             const b = this.blockMap.get(staff); let tag = b==='AM'?"(PM)":b==='PM'?"(AM)":"";
+             this.dayCells[room] = `${staff}${tag}`; this.addU(staff, tag?0.5:1); this.blockMap.set(staff, 'ALL');
              this.log(`🚨 [特例サポート] 人数不足のため、サポート要員の ${staff} を ${room} に単独配置しました（後ほど兼務を呼びます）`); break;
           }
         }
@@ -902,33 +878,35 @@ class AutoAssigner {
     let uGen1 = this.initialAvailGeneral.filter(s => !this.isUsed(s) && this.blockMap.get(s) !== 'ALL');
     (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
       const targetRoom = rule.target; if (!targetRoom || this.skipSections.includes(targetRoom)) return;
-      const baseCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
-      const eff = this.getEffectiveTarget(targetRoom, baseCap);
-      if (eff.allClosed) return;
-
+      const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
       let currentMems = split(this.dayCells[targetRoom]);
-      let curAm = eff.amClosed ? 999 : 0; let curPm = eff.pmClosed ? 999 : 0; 
-      currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+      let curAm = 0; let curPm = 0; currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
       const isOnlySupport = currentMems.length > 0 && currentMems.every(m => supportStaffList.includes(extractStaffName(m)));
-      if (isOnlySupport) { curAm = eff.amClosed ? 999 : 0; curPm = eff.pmClosed ? 999 : 0; }
+      if (isOnlySupport) { curAm = 0; curPm = 0; }
       uGen1.sort((a, b) => this.getPastRoomCount(a, targetRoom) - this.getPastRoomCount(b, targetRoom));
-      while ((curAm < baseCap || curPm < baseCap) && uGen1.length > 0) {
+      while ((curAm < targetCap || curPm < targetCap) && uGen1.length > 0) {
         const candIdx = uGen1.findIndex(s => {
-           if (this.isForbidden(s, targetRoom) || this.isHalfDayBlockedForFullDayRoom(s, targetRoom).hard || this.hasNGPair(s, currentMems.map(extractStaffName), false) || this.isHardNoConsecutive(s, targetRoom) || (targetRoom === "MMG" && !this.isMmgCapable(s)) || !this.canAddKenmu(s, targetRoom)) return false;
+           if (this.isForbidden(s, targetRoom) || this.isHalfDayBlockedForFullDayRoom(s, targetRoom).hard || this.hasNGPair(s, currentMems.map(extractStaffName), false) || this.isHardNoConsecutive(s, targetRoom) || (targetRoom === "MMG" ? !this.isMmgCapable(s) : false) || !this.canAddKenmu(s, targetRoom)) return false;
+           
            const b = this.blockMap.get(s);
-           if (eff.pmClosed && b === 'AM') return false;
-           if (eff.amClosed && b === 'PM') return false;
+           if (curPm >= targetCap && b === 'AM') return false; 
+           if (curAm >= targetCap && b === 'PM') return false; 
            return true;
         });
         if (candIdx === -1) break;
         const staff = uGen1[candIdx]; uGen1.splice(candIdx, 1);
         const b = this.blockMap.get(staff); 
         let tag = b==='AM'?"(PM)":b==='PM'?"(AM)":""; 
-        if (eff.pmClosed) tag = "(AM)";
-        else if (eff.amClosed) tag = "(PM)";
+        
+        if (tag === "") {
+           if (curAm >= targetCap) tag = "(PM)";
+           else if (curPm >= targetCap) tag = "(AM)";
+        }
         
         this.blockMap.set(staff, tag === "" ? 'ALL' : (tag === "(AM)" ? 'PM' : 'AM'));
-        currentMems.push(`${staff}${tag}`); if (tag==="(AM)") curAm++; else if (tag==="(PM)") curPm++; else { curAm++; curPm++; } this.addU(staff, tag?0.5:1);
+        currentMems.push(`${staff}${tag}`); 
+        if (tag==="(AM)") curAm++; else if (tag==="(PM)") curPm++; else { curAm++; curPm++; } 
+        this.addU(staff, tag?0.5:1);
         this.log(`🙌 [負担軽減] 人数に余裕があるため ${staff} を ${targetRoom} に専任配置しました`);
       }
       this.dayCells[targetRoom] = join(currentMems);
@@ -944,10 +922,7 @@ class AutoAssigner {
           if (isDedicated) {
               let swapCandidateFullStr: string | null = null; let foundSrcRoom: string | null = null;
               for (const srcStrRoom of split(rule.sourceRooms)) {
-                  const { r: srcRoom, min } = parseRoomCond(srcStrRoom); 
-                  const srcEff = this.getEffectiveTarget(srcRoom, 1);
-                  if (srcEff.allClosed) continue;
-                  const srcMembers = split(this.dayCells[srcRoom]);
+                  const { r: srcRoom, min } = parseRoomCond(srcStrRoom); const srcMembers = split(this.dayCells[srcRoom]);
                   if (min > 0 && srcMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
                   if (!this.isForbidden(targetCore, srcRoom) && !this.isHalfDayBlockedForFullDayRoom(targetCore, srcRoom).hard && this.canAddKenmu(targetCore, srcRoom, true)) {
                       let srcCands = srcMembers.filter(m => { const core = extractStaffName(m); return core !== targetCore && !ROLE_PLACEHOLDERS.includes(core) && !this.isForbidden(core, targetRoom) && !this.hasNGPair(core, targetMembers.map(extractStaffName), false) && !this.isHardNoConsecutive(core, targetRoom) && (targetRoom === "MMG" ? this.isMmgCapable(core) : true) && this.canAddKenmu(core, targetRoom); });
@@ -972,32 +947,14 @@ class AutoAssigner {
     });
 
     const processKenmu = (sourceMems: string[], targetMems: string[], targetRoom: string) => {
-       const baseCap = this.dynamicCapacity[targetRoom] || 1; 
-       const eff = this.getEffectiveTarget(targetRoom, baseCap);
-       if (eff.allClosed) return targetMems;
-
-       const targetCores = targetMems.map(extractStaffName);
+       const targetCap = this.dynamicCapacity[targetRoom] || 1; const targetCores = targetMems.map(extractStaffName);
        let currentAmount = targetMems.reduce((sum, m) => sum + getStaffAmount(m), 0);
        for (const m of sourceMems) {
-          if (currentAmount >= eff.cap) break;
+          if (currentAmount >= targetCap) break;
           const core = extractStaffName(m);
           if (targetCores.includes(core) || m.includes("17:") || m.includes("19:") || this.isForbidden(core, targetRoom) || this.isHardNoConsecutive(core, targetRoom) || this.isHalfDayBlockedForFullDayRoom(core, targetRoom).hard || this.hasNGPair(core, targetCores, false) || !this.canAddKenmu(core, targetRoom)) continue;
-          
-          let pushStr = m; 
-          let curAm = eff.amClosed ? 999 : 0; let curPm = eff.pmClosed ? 999 : 0; 
-          targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
-          
-          if (eff.pmClosed) {
-             if (m.includes("(PM)")) continue;
-             pushStr = `${core}(AM)`;
-          } else if (eff.amClosed) {
-             if (m.includes("(AM)")) continue;
-             pushStr = `${core}(PM)`;
-          } else {
-             if (curAm < baseCap && curPm >= baseCap) { if (m.includes("(PM)")) continue; pushStr = `${core}(AM)`; } 
-             else if (curAm >= baseCap && curPm < baseCap) { if (m.includes("(AM)")) continue; pushStr = `${core}(PM)`; }
-          }
-
+          let pushStr = m; let curAm = 0; let curPm = 0; targetMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+          if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) continue; pushStr = `${core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) continue; pushStr = `${core}(PM)`; }
           targetMems.push(pushStr); targetCores.push(core); const amount = getStaffAmount(pushStr); currentAmount += amount; this.addU(core, amount);
        }
        return targetMems;
@@ -1006,34 +963,19 @@ class AutoAssigner {
 
     (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
       const targetRoom = rule.target; if (!targetRoom || this.skipSections.includes(targetRoom)) return;
-      const baseCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
-      const eff = this.getEffectiveTarget(targetRoom, baseCap);
-      if (eff.allClosed) return;
-
-      let currentMems = split(this.dayCells[targetRoom]); 
-      let curAm = eff.amClosed ? 999 : 0; let curPm = eff.pmClosed ? 999 : 0; 
-      currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+      const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
+      let currentMems = split(this.dayCells[targetRoom]); let curAm = 0; let curPm = 0; currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
       const isOnlySupport = currentMems.length > 0 && currentMems.every(m => supportStaffList.includes(extractStaffName(m)));
-      if (isOnlySupport) { curAm = eff.amClosed ? 999 : 0; curPm = eff.pmClosed ? 999 : 0; }
-      
+      if (isOnlySupport) { curAm = 0; curPm = 0; }
       const sourceRooms = split(rule.sources);
       for (const srcStr of sourceRooms) {
-        if (curAm >= baseCap && curPm >= baseCap) break; 
+        if (curAm >= targetCap && curPm >= targetCap) break; 
         const { r: srcRoom, min } = parseRoomCond(srcStr); if (min > 0 && split(this.dayCells[srcRoom]).reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
         split(this.dayCells[srcRoom]).forEach(m => {
-          if (curAm >= baseCap && curPm >= baseCap) return; const core = extractStaffName(m);
+          if (curAm >= targetCap && curPm >= targetCap) return; const core = extractStaffName(m);
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom) && !this.isHalfDayBlockedForFullDayRoom(core, targetRoom).hard && !this.hasNGPair(core, currentMems.map(extractStaffName), false) && !this.isHardNoConsecutive(core, targetRoom) && (targetRoom === "MMG" ? this.isMmgCapable(core) : true) && this.canAddKenmu(core, targetRoom, true) && !m.includes("17:") && !m.includes("19:")) {
                let pushStr = m;
-               if (eff.pmClosed) {
-                  if (m.includes("(PM)")) return; pushStr = `${core}(AM)`;
-               } else if (eff.amClosed) {
-                  if (m.includes("(AM)")) return; pushStr = `${core}(PM)`;
-               } else if (targetRoom === "パノラマCT" && srcRoom === "透視（6号）") { 
-                  if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; 
-               } else { 
-                  if (curAm < baseCap && curPm >= baseCap) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } 
-                  else if (curAm >= baseCap && curPm < baseCap) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; } 
-               }
+               if (targetRoom === "パノラマCT" && srcRoom === "透視（6号）") { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } else { if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; } }
                currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(core, getStaffAmount(pushStr)); this.log(`🔗 [基本兼務] ${srcRoom} の ${pushStr} を ${targetRoom} にセット配置しました`);
           }
         });
@@ -1043,16 +985,11 @@ class AutoAssigner {
 
     ROOM_SECTIONS.forEach(targetRoom => {
       if (this.clearSections.includes(targetRoom) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
-      const baseCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
-      const eff = this.getEffectiveTarget(targetRoom, baseCap);
-      if (eff.allClosed) return;
-
-      let currentMems = split(this.dayCells[targetRoom]); 
-      let curAm = eff.amClosed ? 999 : 0; let curPm = eff.pmClosed ? 999 : 0; 
-      currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+      const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
+      let currentMems = split(this.dayCells[targetRoom]); let curAm = 0; let curPm = 0; currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
       const isOnlySupport = currentMems.length > 0 && currentMems.every(m => supportStaffList.includes(extractStaffName(m)));
-      if (isOnlySupport) { curAm = eff.amClosed ? 999 : 0; curPm = eff.pmClosed ? 999 : 0; this.log(`💡 [救済発動] ${targetRoom} はサポート要員しかいないため、応援を兼務で呼びます`); }
-      if (curAm >= baseCap && curPm >= baseCap) return;
+      if (isOnlySupport) { curAm = 0; curPm = 0; this.log(`💡 [救済発動] ${targetRoom} はサポート要員しかいないため、応援を兼務で呼びます`); }
+      if (curAm >= targetCap && curPm >= targetCap) return;
        
       const matchingRescueRules = (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === targetRoom);
       let sourceRooms: string[] = [];
@@ -1078,17 +1015,9 @@ class AutoAssigner {
          candidates = candidates.filter(c => !currentCores.includes(c.core) && (targetRoom === "MMG" ? this.isMmgCapable(c.core) : true) && this.canAddKenmu(c.core, targetRoom, true));
          candidates.sort((a, b) => { const pastA = this.getPastRoomCount(a.core, targetRoom); const pastB = this.getPastRoomCount(b.core, targetRoom); if (pastA !== pastB) return pastA - pastB; const aRooms = this.getTodayRoomCount(a.core); const bRooms = this.getTodayRoomCount(b.core); if (aRooms !== bRooms) return aRooms - bRooms; if (a.srcIdx !== b.srcIdx) return a.srcIdx - b.srcIdx; return (this.assignCounts[a.core] || 0) - (this.assignCounts[b.core] || 0); });
          for (const cand of candidates) {
-            if (curAm >= baseCap && curPm >= baseCap) break;
+            if (curAm >= targetCap && curPm >= targetCap) break;
             if (this.hasNGPair(cand.core, currentCores, false)) continue;
-            let pushStr = cand.fullStr; 
-            if (eff.pmClosed) {
-                if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`;
-            } else if (eff.amClosed) {
-                if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`;
-            } else {
-                if (curAm < baseCap && curPm >= baseCap) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; } 
-                else if (curAm >= baseCap && curPm < baseCap) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
-            }
+            let pushStr = cand.fullStr; if (curAm < targetCap && curPm >= targetCap) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
             currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(cand.core, getStaffAmount(pushStr)); 
             if (matchingRescueRules.length > 0) this.log(`🆘 [救済] 定員割れの ${targetRoom} に、${pushStr} を兼務で追加しました`);
             else this.log(`🛡️ [汎用救済] ${targetRoom} の定員割れを防ぐため、自動探索で ${pushStr} を兼務で追加しました`);
@@ -1098,9 +1027,6 @@ class AutoAssigner {
     });
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
-      const eff = this.getEffectiveTarget(rule.section, 1);
-      if (eff.allClosed || eff.pmClosed) return;
-
       let current = split(this.dayCells[rule.section]);
       if (current.length > 0 && !current.some(m => m.includes("17:") || m.includes("18:"))) {
         const currentCore = current.map(extractStaffName);
@@ -1188,10 +1114,6 @@ class AutoAssigner {
       const b = this.blockMap.get(staff); if (b === 'ALL') return; let tag = b==='AM'?"(PM)":b==='PM'?"(AM)":""; let assigned = false;
       for (const room of deKenmuTargets) {
         if (this.skipSections.includes(room) || this.isForbidden(staff, room) || (room === "MMG" && !this.isMmgCapable(staff))) continue;
-        const eff = this.getEffectiveTarget(room, 1);
-        if (eff.allClosed) continue;
-        if (eff.pmClosed && tag === "(PM)") continue;
-        if (eff.amClosed && tag === "(AM)") continue;
         if (tag !== "" && this.isHalfDayBlockedForFullDayRoom(staff, room).hard) continue;
 
         let currentMems = split(this.dayCells[room]);
@@ -1202,17 +1124,7 @@ class AutoAssigner {
         });
         if (repIdx !== -1) {
           const oldStr = currentMems[repIdx]; const oldCore = extractStaffName(oldStr);
-          
-          let providedAm = tag === "" || tag === "(AM)";
-          let providedPm = tag === "" || tag === "(PM)";
-          if (eff.pmClosed) providedPm = false;
-          if (eff.amClosed) providedAm = false;
-          let replacementTag = "";
-          if (providedAm && providedPm) replacementTag = oldStr.includes("(AM)") ? "(AM)" : oldStr.includes("(PM)") ? "(PM)" : tag;
-          else if (providedAm) replacementTag = "(AM)";
-          else if (providedPm) replacementTag = "(PM)";
-
-          currentMems[repIdx] = `${staff}${replacementTag}`; 
+          currentMems[repIdx] = `${staff}${oldStr.includes("(AM)") ? "(AM)" : oldStr.includes("(PM)") ? "(PM)" : tag}`; 
           this.dayCells[room] = join(currentMems); 
           this.addU(staff, tag?0.5:1); 
           this.blockMap.set(staff, 'ALL');
@@ -1243,10 +1155,6 @@ class AutoAssigner {
           for (const room of reversePriority) {
               if (this.skipSections.includes(room) || this.isForbidden(staff, room) || (room === "MMG" && !this.isMmgCapable(staff))) continue;
               if (["待機", "昼当番", "受付", "受付ヘルプ", "CT", "MRI", "治療", "RI"].includes(room)) continue;
-              const eff = this.getEffectiveTarget(room, 1);
-              if (eff.allClosed) continue;
-              if (eff.pmClosed && tag === "(PM)") continue;
-              if (eff.amClosed && tag === "(AM)") continue;
               if (tag !== "" && this.isHalfDayBlockedForFullDayRoom(staff, room).hard) continue;
               if (!this.canAddKenmu(staff, room)) continue;
               if (this.isHardNoConsecutive(staff, room)) continue;
@@ -1254,13 +1162,7 @@ class AutoAssigner {
               let currentMems = split(this.dayCells[room]);
               if (this.hasNGPair(staff, currentMems.map(extractStaffName), false)) continue;
               
-              let finalTag = tag;
-              if (tag === "") {
-                  if (eff.pmClosed) finalTag = "(AM)";
-                  else if (eff.amClosed) finalTag = "(PM)";
-              }
-
-              this.dayCells[room] = join([...currentMems, `${staff}${finalTag}`]);
+              this.dayCells[room] = join([...currentMems, `${staff}${tag}`]);
               this.addU(staff, tag?0.5:1); 
               this.blockMap.set(staff, 'ALL'); 
               this.log(`♻️ [余剰配置] 役割のなかった ${staff} を 優先度の低い ${room} に配置しました`);
@@ -1446,7 +1348,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.48</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.70</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
@@ -1668,20 +1570,6 @@ export default function App(): any {
           <div style={{ borderLeft: "8px solid #94a3b8", paddingLeft: 24, marginBottom: 40 }}>
             <h4 style={{ fontSize: 22, fontWeight: 900, color: "#475569", marginBottom: 20, borderBottom: "2px solid #cbd5e1", paddingBottom: 10 }}>フェーズ1：前提・固定ルール（最優先）</h4>
             
-            <RuleCard bg="#fef2f2" border="#fecaca" color="#b91c1c" icon="🛑" title="稼働停止・半日閉室ルール">
-              {(customRules.closedRooms || []).map((rule: any, idx: number) => (
-                  <div key={idx} className="rule-row" style={{background:"#fff", padding:"12px 16px", border:"1px solid #fca5a5", borderRadius:8}}>
-                    <select value={rule.day} onChange={(e: any) => updateRule("closedRooms", idx, "day", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5", minWidth: "100px", flex: "0 0 auto"}}><option value="">曜日</option>{["月","火","水","木","金","土","日"].map(d => <option key={d} value={d}>{d}曜</option>)}</select>
-                    <span className="rule-label" style={{color:"#b91c1c"}}>の</span>
-                    <select value={rule.room} onChange={(e: any) => updateRule("closedRooms", idx, "room", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5"}}><option value="">場所を選択</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                    <span className="rule-label" style={{color:"#b91c1c"}}>は</span>
-                    <select value={rule.time} onChange={(e: any) => updateRule("closedRooms", idx, "time", e.target.value)} className="rule-sel" style={{borderColor:"#fca5a5", minWidth: "160px", flex: "0 0 auto"}}><option value="">選択</option><option value="(AM)">午前(AM) 停止</option><option value="(PM)">午後(PM) 停止</option><option value="全日">全日 停止</option></select>
-                    <button onClick={() => removeRule("closedRooms", idx)} className="rule-del">✖</button>
-                  </div>
-              ))}
-              <button className="rule-add" style={{color:"#b91c1c", borderColor:"#fca5a5"}} onClick={() => addRule("closedRooms", { day: "木", room: "3号室", time: "(PM)" })}>＋ 稼働停止ルールを追加</button>
-            </RuleCard>
-
             <RuleCard bg="#f8fafc" border="#cbd5e1" color="#334155" icon="🙅" title="担当不可ルール">
               {(customRules.forbidden || []).map((rule: any, idx: number) => (
                   <div key={idx} style={{ marginBottom: 16, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
@@ -1881,7 +1769,7 @@ export default function App(): any {
             </RuleCard>
           </div>
 
-     {/* ===================== フェーズ4 ===================== */}
+          {/* ===================== フェーズ4 ===================== */}
           <div style={{ borderLeft: "8px solid #10b981", paddingLeft: 24, marginBottom: 40 }}>
             <h4 style={{ fontSize: 22, fontWeight: 900, color: "#047857", marginBottom: 20, borderBottom: "2px solid #a7f3d0", paddingBottom: 10 }}>フェーズ4：兼務・救済・遅番</h4>
             
