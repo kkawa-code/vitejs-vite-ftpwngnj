@@ -982,9 +982,14 @@ class AutoAssigner {
     (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
       const targetRoom = rule.target; if (!targetRoom || this.skipSections.includes(targetRoom)) return;
       const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
-      let currentMems = split(this.dayCells[targetRoom]); let curAm = 0; let curPm = 0; currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+      // ★ Ver 2.73 修正：linkedRoomsでclosedRoomsを考慮
+      const effLR = this.getEffectiveTarget(targetRoom, targetCap);
+      if (effLR.allClosed) return;
+      let currentMems = split(this.dayCells[targetRoom]);
+      let curAm = effLR.amClosed ? 999 : 0; let curPm = effLR.pmClosed ? 999 : 0;
+      currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
       const isOnlySupport = currentMems.length > 0 && currentMems.every(m => supportStaffList.includes(extractStaffName(m)));
-      if (isOnlySupport) { curAm = 0; curPm = 0; }
+      if (isOnlySupport) { curAm = effLR.amClosed ? 999 : 0; curPm = effLR.pmClosed ? 999 : 0; }
       const sourceRooms = split(rule.sources);
       for (const srcStr of sourceRooms) {
         if (curAm >= targetCap && curPm >= targetCap) break; 
@@ -993,8 +998,15 @@ class AutoAssigner {
           if (curAm >= targetCap && curPm >= targetCap) return; const core = extractStaffName(m);
           if (!ROLE_PLACEHOLDERS.includes(core) && !currentMems.map(extractStaffName).includes(core) && !this.isForbidden(core, targetRoom) && !this.isHalfDayBlockedForFullDayRoom(core, targetRoom).hard && !this.hasNGPair(core, currentMems.map(extractStaffName), false) && !this.isHardNoConsecutive(core, targetRoom) && (targetRoom === "MMG" ? this.isMmgCapable(core) : true) && this.canAddKenmu(core, targetRoom, true) && !m.includes("17:") && !m.includes("19:")) {
                let pushStr = m;
-               if (targetRoom === "パノラマCT" && srcRoom === "透視（6号）") { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } else { if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; } }
-               currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(core, getStaffAmount(pushStr)); this.updateBlockMapAfterKenmu(core, pushStr); // ★ Ver 2.72 修正：blockMap更新
+               if (targetRoom === "パノラマCT" && srcRoom === "透視（6号）") { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; }
+               else {
+                 if (curAm < targetCap && curPm >= targetCap) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; }
+                 else if (curAm >= targetCap && curPm < targetCap) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; }
+                 // ★ Ver 2.73 修正：closedRoomsによるタグ強制
+                 else if (effLR.pmClosed) { if (m.includes("(PM)")) return; pushStr = `${core}(AM)`; }
+                 else if (effLR.amClosed) { if (m.includes("(AM)")) return; pushStr = `${core}(PM)`; }
+               }
+               currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(core, getStaffAmount(pushStr)); this.updateBlockMapAfterKenmu(core, pushStr);
                this.log(`🔗 [基本兼務] ${srcRoom} の ${pushStr} を ${targetRoom} にセット配置しました`);
           }
         });
@@ -1005,9 +1017,14 @@ class AutoAssigner {
     ROOM_SECTIONS.forEach(targetRoom => {
       if (this.clearSections.includes(targetRoom) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(targetRoom)) return;
       const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
-      let currentMems = split(this.dayCells[targetRoom]); let curAm = 0; let curPm = 0; currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+      // ★ Ver 2.73 修正：救済ロジックでclosedRoomsを考慮
+      const effResc = this.getEffectiveTarget(targetRoom, targetCap);
+      if (effResc.allClosed) return;
+      let currentMems = split(this.dayCells[targetRoom]);
+      let curAm = effResc.amClosed ? 999 : 0; let curPm = effResc.pmClosed ? 999 : 0;
+      currentMems.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
       const isOnlySupport = currentMems.length > 0 && currentMems.every(m => supportStaffList.includes(extractStaffName(m)));
-      if (isOnlySupport) { curAm = 0; curPm = 0; this.log(`💡 [救済発動] ${targetRoom} はサポート要員しかいないため、応援を兼務で呼びます`); }
+      if (isOnlySupport) { curAm = effResc.amClosed ? 999 : 0; curPm = effResc.pmClosed ? 999 : 0; this.log(`💡 [救済発動] ${targetRoom} はサポート要員しかいないため、応援を兼務で呼びます`); }
       if (curAm >= targetCap && curPm >= targetCap) return;
        
       const matchingRescueRules = (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === targetRoom);
@@ -1036,7 +1053,12 @@ class AutoAssigner {
          for (const cand of candidates) {
             if (curAm >= targetCap && curPm >= targetCap) break;
             if (this.hasNGPair(cand.core, currentCores, false)) continue;
-            let pushStr = cand.fullStr; if (curAm < targetCap && curPm >= targetCap) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; } else if (curAm >= targetCap && curPm < targetCap) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
+            let pushStr = cand.fullStr;
+            if (curAm < targetCap && curPm >= targetCap) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; }
+            else if (curAm >= targetCap && curPm < targetCap) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
+            // ★ Ver 2.73 修正：closedRoomsによるタグ強制
+            else if (effResc.pmClosed) { if (cand.fullStr.includes("(PM)")) continue; pushStr = `${cand.core}(AM)`; }
+            else if (effResc.amClosed) { if (cand.fullStr.includes("(AM)")) continue; pushStr = `${cand.core}(PM)`; }
             currentMems.push(pushStr); if (pushStr.includes("(AM)")) curAm += 1; else if (pushStr.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } this.addU(cand.core, getStaffAmount(pushStr)); this.updateBlockMapAfterKenmu(cand.core, pushStr); // ★ Ver 2.72 修正：blockMap更新
             if (matchingRescueRules.length > 0) this.log(`🆘 [救済] 定員割れの ${targetRoom} に、${pushStr} を兼務で追加しました`);
             else this.log(`🛡️ [汎用救済] ${targetRoom} の定員割れを防ぐため、自動探索で ${pushStr} を兼務で追加しました`);
