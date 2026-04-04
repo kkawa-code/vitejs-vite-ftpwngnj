@@ -1752,57 +1752,70 @@ export default function App(): any {
             
             <RuleCard bg="#fef08a" border="#fde047" color="#a16207" icon="🚨" title="緊急ルール（人数不足時）">
               {(customRules.emergencies || []).map((rule: any, idx: number) => (
-                  <div key={idx} className="rule-row" style={{background:"#fff", padding:"12px 16px", border:"2px dashed #fde047", borderRadius:8}}>
+                <div key={idx} style={{background:"#fff", padding:"12px 16px", border:"2px dashed #fde047", borderRadius:8, marginBottom:8}}>
+                  <div className="rule-row">
+                    {/* 左：タイプ選択 */}
+                    <select value={["clear","role_assign","change_capacity","staff_assign","empty_room_swap"].includes(rule.type) ? rule.type : "change_capacity"} onChange={(e: any) => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"160px", borderColor:"#fde047", fontWeight:800}}>
+                      <option value="change_capacity">定員変更</option>
+                      <option value="staff_assign">特定スタッフ配置</option>
+                      <option value="role_assign">担当配置(月間)</option>
+                      <option value="clear">配置なし</option>
+                      <option value="empty_room_swap">空室緊急入替</option>
+                    </select>
+                    {/* 右：タイプ別詳細 */}
                     {rule.type === "empty_room_swap" ? (
-                      // empty_room_swap は出勤人数閾値不要・別レイアウト
                       <>
-                        <span className="rule-label" style={{color:"#854d0e"}}>【空室緊急】</span>
-                        <select value={rule.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}>
-                          <option value="">監視する部屋</option>
+                        <select value={rule.section || ""} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}>
+                          <option value="">監視する部屋（空の時に発動）</option>
                           {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                        <span className="rule-label" style={{color:"#854d0e"}}>が空の時、</span>
-                        <input
-                          value={rule.sourceRooms || rule.sourceRoom || ""}
-                          onChange={(e: any) => updateRule("emergencies", idx, "sourceRooms", e.target.value)}
-                          placeholder="入替元の部屋（複数可、読点区切り）"
-                          className="rule-sel"
-                          style={{borderColor:"#fde047", minWidth:240}}
-                        />
-                        <span className="rule-label" style={{color:"#854d0e"}}>の不可スタッフを他部屋の可能スタッフと入替</span>
+                        <span className="rule-label" style={{color:"#854d0e"}}>が空の時</span>
                       </>
                     ) : (
                       <>
                         <span className="rule-label" style={{color:"#854d0e"}}>出勤</span>
-                        <input type="number" value={rule.threshold} onChange={(e: any) => updateRule("emergencies", idx, "threshold", Number(e.target.value))} className="rule-num" style={{borderColor:"#fde047"}} />
-                        <span className="rule-label" style={{color:"#854d0e"}}>人以下➔</span>
-                        {rule.type === "staff_assign" ? (
-                          <>
-                            <select value={rule.staff} onChange={(e: any) => updateRule("emergencies", idx, "staff", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}>
-                              <option value="">スタッフ</option>
-                              {activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                            <span className="rule-label" style={{color:"#854d0e"}}>を</span>
-                            <select value={rule.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}>
-                              <option value="">場所</option>
-                              {ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                            <span className="rule-label" style={{color:"#854d0e"}}>に固定配置</span>
-                          </>
-                        ) : rule.type === "role_assign" ? (<><select value={rule.role} onChange={(e: any) => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>を</span><select value={rule.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></>) : rule.type === "change_capacity" ? (<><select value={rule.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>の定員を</span><input type="number" value={rule.newCapacity ?? 3} onChange={(e: any) => updateRule("emergencies", idx, "newCapacity", Number(e.target.value))} className="rule-num" style={{borderColor:"#fde047"}} /><span className="rule-label" style={{color:"#854d0e"}}>人にする</span></>) : (<><select value={rule.section} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select><span className="rule-label" style={{color:"#854d0e"}}>を空にする</span></>)}
+                        <input type="number" value={rule.threshold ?? 16} onChange={(e: any) => updateRule("emergencies", idx, "threshold", Number(e.target.value))} className="rule-num" style={{borderColor:"#fde047"}} />
+                        <span className="rule-label" style={{color:"#854d0e"}}>人以下で発動</span>
+                        {rule.type === "staff_assign" && (<>
+                          <select value={rule.staff || ""} onChange={(e: any) => updateRule("emergencies", idx, "staff", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">スタッフ</option>{activeGeneralStaff.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                          <span className="rule-label" style={{color:"#854d0e"}}>を</span>
+                          <select value={rule.section || ""} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                          <span className="rule-label" style={{color:"#854d0e"}}>に配置</span>
+                        </>)}
+                        {rule.type === "role_assign" && (<>
+                          <select value={rule.role || ""} onChange={(e: any) => updateRule("emergencies", idx, "role", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+                          <span className="rule-label" style={{color:"#854d0e"}}>を</span>
+                          <select value={rule.section || ""} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        </>)}
+                        {rule.type === "change_capacity" && (<>
+                          <select value={rule.section || ""} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                          <span className="rule-label" style={{color:"#854d0e"}}>の定員を</span>
+                          <input type="number" value={rule.newCapacity ?? 3} onChange={(e: any) => updateRule("emergencies", idx, "newCapacity", Number(e.target.value))} className="rule-num" style={{borderColor:"#fde047"}} />
+                          <span className="rule-label" style={{color:"#854d0e"}}>人に</span>
+                        </>)}
+                        {rule.type === "clear" && (<>
+                          <select value={rule.section || ""} onChange={(e: any) => updateRule("emergencies", idx, "section", e.target.value)} className="rule-sel" style={{borderColor:"#fde047"}}><option value="">場所</option>{ROOM_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                          <span className="rule-label" style={{color:"#854d0e"}}>を空にする</span>
+                        </>)}
                       </>
                     )}
-                    <select value={["clear","role_assign","change_capacity","staff_assign","empty_room_swap"].includes(rule.type) ? rule.type : "change_capacity"} onChange={(e: any) => updateRule("emergencies", idx, "type", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", width:"180px", borderColor:"#fde047"}}>
-                      <option value="role_assign">担当配置(月間)</option>
-                      <option value="staff_assign">特定スタッフ配置</option>
-                      <option value="change_capacity">定員変更</option>
-                      <option value="clear">配置なし</option>
-                      <option value="empty_room_swap">空室緊急入替</option>
-                    </select>
                     <button onClick={() => removeRule("emergencies", idx)} className="rule-del">✖</button>
                   </div>
+                  {/* empty_room_swap の入替元部屋（MultiPicker） */}
+                  {rule.type === "empty_room_swap" && (
+                    <div style={{paddingLeft:8}}>
+                      <span className="rule-label" style={{color:"#854d0e", display:"block", marginBottom:4}}>入替元の部屋（優先順）</span>
+                      <MultiPicker
+                        selected={rule.sourceRooms || rule.sourceRoom || ""}
+                        onChange={(v: string) => updateRule("emergencies", idx, "sourceRooms", v)}
+                        options={ROOM_SECTIONS}
+                        placeholder="＋ 部屋を追加"
+                      />
+                    </div>
+                  )}
+                </div>
               ))}
-              <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "CT", newCapacity: 3 })}>＋ 追加</button>
+              <button className="rule-add" style={{color:"#a16207", borderColor:"#ca8a04"}} onClick={() => addRule("emergencies", { threshold: 16, type: "change_capacity", role: "", section: "", newCapacity: 3 })}>＋ 追加</button>
             </RuleCard>
 
             <RuleCard bg="#f0fdf4" border="#bbf7d0" color="#15803d" icon="🔄" title="メイン配置の交換ルール" desc="※ 兼務に行けないスタッフを、別部屋の兼務に行けるスタッフと丸ごと入れ替えます。">
