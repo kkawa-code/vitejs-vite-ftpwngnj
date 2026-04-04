@@ -773,6 +773,7 @@ class AutoAssigner {
              if (this.isHardNoConsecutive(a, section)) scoreA -= 500; if (this.isHardNoConsecutive(b, section)) scoreB -= 500;
              if (section === "ポータブル") { const pastA = this.getPastRoomCount(a, section); const pastB = this.getPastRoomCount(b, section); if (pastA > 0) scoreA -= 1000 * pastA; if (pastB > 0) scoreB -= 1000 * pastB; }
              
+             // ★ Ver 2.70/2.71 修正：1日専任スロット（needTag === ""）の時は、半休者を優先しない
              if (needTag === "") { 
                if (bA === 'NONE') scoreA += 200; 
                else if (hasAmFree && hasPmFree && (bA === 'AM' || bA === 'PM')) scoreA += 100; 
