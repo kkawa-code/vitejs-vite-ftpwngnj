@@ -817,6 +817,62 @@ class AutoAssigner {
     const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
     const lowPriorityStaff = split(this.ctx.customRules.lateShiftLowPriorityStaff || "").map(extractStaffName);
 
+    // ★ Ver 2.71 追加：月担当外の半休者を低影響部屋の空き枠に補充
+    this.logPhase("半休者補充フェーズ");
+    const halfDayUnassigned = this.initialAvailGeneral.filter(s => {
+      const b = this.blockMap.get(s);
+      return (b === 'AM' || b === 'PM') && !this.isUsed(s);
+    });
+
+    if (halfDayUnassigned.length > 0) {
+      // 低影響部屋リスト：設定の supportTargetRoomsLowImpact を基本に、
+      // 一般撮影室を加えた順序で試みる
+      const lowImpactBase = split(this.ctx.customRules.supportTargetRoomsLowImpact || "3号室,パノラマCT");
+      const lowImpactExtra = ["検像", "2号室", "1号室", "5号室", "透視（11号）", "骨塩", "DSA", "ポータブル"];
+      const lowImpactRooms = [
+        ...lowImpactBase,
+        ...lowImpactExtra.filter(r => !lowImpactBase.includes(r))
+      ];
+      // CT・MRI・治療・RI・透視（6号）等の高影響部屋は除外
+      const highImpactExclude = ["CT", "MRI", "治療", "RI", "透視（6号）", "MMG", "受付", "受付ヘルプ", "待機", "昼当番"];
+
+      halfDayUnassigned.forEach(staff => {
+        const b = this.blockMap.get(staff);
+        const tag = b === 'AM' ? "(PM)" : "(AM)";
+
+        for (const room of lowImpactRooms) {
+          if (highImpactExclude.includes(room)) continue;
+          if (this.skipSections.includes(room)) continue;
+          if (this.isForbidden(staff, room)) continue;
+          if (this.isHardNoConsecutive(staff, room)) continue;
+          if (!this.canAddKenmu(staff, room)) continue;
+          if (room === "MMG" && !this.isMmgCapable(staff)) continue;
+
+          const current = split(this.dayCells[room]);
+          const currentCores = current.map(extractStaffName);
+          if (currentCores.includes(staff)) continue;
+          if (this.hasNGPair(staff, currentCores, false)) continue;
+
+          // AM/PM枠が空いているか確認
+          let curAm = 0; let curPm = 0;
+          current.forEach(x => {
+            if (x.includes("(AM)")) curAm++;
+            else if (x.includes("(PM)")) curPm++;
+            else { curAm++; curPm++; }
+          });
+          const cap = this.dynamicCapacity[room] ?? 1;
+          if (tag === "(PM)" && curPm >= cap) continue;
+          if (tag === "(AM)" && curAm >= cap) continue;
+
+          this.dayCells[room] = join([...current, `${staff}${tag}`]);
+          this.addU(staff, 0.5);
+          this.blockMap.set(staff, 'ALL');
+          this.log(`🌓 [半休補充] ${staff}${tag} を ${room} の空き枠に補充しました`);
+          break;
+        }
+      });
+    }
+
     this.initialAvailSupport.forEach(staff => {
       if (this.isUsed(staff)) return;
       const targets = split(this.ctx.customRules.supportTargetRooms || "2号室,3号室");
@@ -1348,7 +1404,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.70</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.71</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
