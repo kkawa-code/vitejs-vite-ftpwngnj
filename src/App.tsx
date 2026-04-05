@@ -395,6 +395,7 @@ export class AutoAssigner {
   initCounts() { this.ctx.allStaff.forEach(s => { this.assignCounts[s] = 0; this.maxAssigns[s] = 1; this.roomCounts[s] = {}; SECTIONS.forEach(sec => this.roomCounts[s][sec] = 0); this.counts[s] = 0; }); this.pastDaysInMonth.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["CT", "MRI"].includes(sec)) { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) { this.roomCounts[c][sec]++; this.counts[c]++; } }); } }); }); this.pastDaysInWeek.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (!["CT", "MRI"].includes(sec)) { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) { this.roomCounts[c][sec]++; this.counts[c]++; } }); } }); }); }
 
   private getAbsenceHelpTagsForRoom(room: string): string[] {
+    const helpMap = parseAbsenceHelpMap(this.dayCells);
     if (Object.keys(helpMap).length === 0) return [];
     const roomMembers = split(this.dayCells[room] || "").map(extractStaffName);
     return split(this.dayCells["不在"] || "").flatMap((entry: string) => {
