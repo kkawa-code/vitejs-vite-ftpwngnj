@@ -193,7 +193,7 @@ export const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, c
   );
 };
 
-export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [] }: any) => {
+export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [], onAddHelp }: any) => {
   const members = split(value); const isTaiki = section === "待機"; const isFuzai = section === "不在"; const isHelp = section === "受付ヘルプ";
   const [pendingFuzai, setPendingFuzai] = React.useState("");
   const FUZAI_TIMES = ["","(AM)","(PM)","(〜8:30)","(〜9:00)","(〜9:30)","(〜10:00)","(〜10:30)","(〜11:00)","(〜11:30)","(〜12:00)","(〜12:30)","(〜13:00)","(〜13:30)","(〜14:00)","(〜14:30)","(〜15:00)","(〜15:30)","(〜16:00)","(〜16:30)","(〜17:00)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"];
@@ -226,6 +226,15 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
                         : <><option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>}
                 </select>
               )}
+              {isFuzai && currentMod !== "" && onAddHelp && (
+                <span style={{display:"flex",alignItems:"center",gap:2,marginLeft:4}}>
+                  <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>ヘルプ</span>
+                  <select defaultValue="" onChange={(e:any)=>{if(e.target.value){onAddHelp(coreName,e.target.value);e.target.value="";}}} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 16px 0 2px"}}>
+                    <option value="">不要</option>
+                    {["(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:15〜13:00)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map(t=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
+                  </select>
+                </span>
+              )}
               <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 6 }}>✖</span>
             </div>
           )
@@ -245,35 +254,6 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
   );
 };
 
-  const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
-  const handleTimeChange = (idx: number, newTime: string) => { if (noTime && !isFuzai) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
-  return (
-    <div className="card-hover" style={{ display: "flex", flexDirection: "column", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "16px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-      <label style={{ fontSize: 16, fontWeight: 800, color: "#475569", marginBottom: 12 }}>{section}</label>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        {members.map((m, i) => {
-          const coreName = extractStaffName(m); const currentMod = m.substring(coreName.length); const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
-          return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 16, padding: "8px 12px 8px 14px", fontSize: 15, display: "flex", alignItems: "center", gap: 6, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700 }}>
-              <span>{coreName}</span>
-              {(!noTime || isFuzai) && (
-                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: "inherit", cursor: "pointer", padding: "0 20px 0 6px" }}>
-                  {isFuzai ? <><option value="">全休</option><option value="(AM)">AM休</option><option value="(PM)">PM休</option><option value="(〜8:30)">〜8:30</option><option value="(〜9:00)">〜9:00</option><option value="(〜9:30)">〜9:30</option><option value="(〜10:00)">〜10:00</option><option value="(〜10:30)">〜10:30</option><option value="(〜11:00)">〜11:00</option><option value="(〜11:30)">〜11:30</option><option value="(〜12:00)">〜12:00</option><option value="(〜12:30)">〜12:30</option><option value="(〜13:00)">〜13:00</option><option value="(〜13:30)">〜13:30</option><option value="(〜14:00)">〜14:00</option><option value="(〜14:30)">〜14:30</option><option value="(〜15:00)">〜15:00</option><option value="(〜15:30)">〜15:30</option><option value="(〜16:00)">〜16:00</option><option value="(〜16:30)">〜16:30</option><option value="(〜17:00)">〜17:00</option><option value="(〜17:30)">〜17:30</option><option value="(8:30〜)">8:30〜</option><option value="(9:00〜)">9:00〜</option><option value="(9:30〜)">9:30〜</option><option value="(10:00〜)">10:00〜</option><option value="(10:30〜)">10:30〜</option><option value="(11:00〜)">11:00〜</option><option value="(11:30〜)">11:30〜</option><option value="(12:00〜)">12:00〜</option><option value="(12:30〜)">12:30〜</option><option value="(13:00〜)">13:00〜</option><option value="(13:30〜)">13:30〜</option><option value="(14:00〜)">14:00〜</option><option value="(14:30〜)">14:30〜</option><option value="(15:00〜)">15:00〜</option><option value="(15:30〜)">15:30〜</option><option value="(16:00〜)">16:00〜</option><option value="(16:30〜)">16:30〜</option><option value="(17:00〜)">17:00〜</option><option value="(17:30〜)">17:30〜</option></> : isTaiki ? <><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></> : <><option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>}
-                </select>
-              )}
-              <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 6 }}>✖</span>
-            </div>
-          )
-        })}
-        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 15, color: "#64748b", flex: 1, minWidth: 100, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "8px 24px 8px 12px" }}>
-          <option value="">＋追加</option>
-          <optgroup label="スタッフ">{activeStaff.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>
-          {customOptions.length > 0 && <optgroup label="担当枠（未定）">{customOptions.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>}
-        </select>
-      </div>
-    </div>
-  );
-};
 
 // ===================== 🌟 AutoAssigner =====================
 export class AutoAssigner {
@@ -841,7 +821,7 @@ export default function App(): any {
                     ) : null}
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} />)}
+                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? (staffName: string, timeTag: string) => { const cur = allDays[sel]?.["受付ヘルプ"] || ""; const entry = `${staffName}${timeTag}`; if (!cur.includes(staffName)) updateDay("受付ヘルプ", cur ? `${cur}、${entry}` : entry); } : undefined} />)}
                  </div>
                </div>
              ))}
