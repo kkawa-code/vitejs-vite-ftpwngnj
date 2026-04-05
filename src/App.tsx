@@ -42,6 +42,16 @@ const Row = ({children}:any) => <div className="rule-row">{children}</div>;
 const StaffSel = ({v, oC, list, ph="スタッフ", w}:any) => <select value={v} onChange={e=>oC(e.target.value)} className="rule-sel" style={{width:w, flex:"0 0 auto"}}><option value="">{ph}</option>{list.map((s:any)=><option key={s} value={s}>{s}</option>)}</select>;
 const RoomSel = ({v, oC, list, ph="場所", w}:any) => <select value={v} onChange={e=>oC(e.target.value)} className="rule-sel" style={{width:w, flex:"0 0 auto"}}><option value="">{ph}</option>{list.map((s:any)=><option key={s} value={s}>{s}</option>)}</select>;
 
+const MONTHLY_CATEGORIES: {key: string; label: string}[] = [
+  {key:"CT",label:"CT"},{key:"MRI",label:"MRI"},{key:"RI",label:"RI"},{key:"RIメイン",label:"RIメイン"},{key:"RIサブ",label:"RIサブ"},
+  {key:"MMG",label:"MMG"},{key:"治療",label:"治療"},{key:"治療サブ優先",label:"治療サブ優先"},{key:"治療サブ",label:"治療サブ"},
+  {key:"受付",label:"受付"},{key:"受付ヘルプ",label:"受付ヘルプ"},
+];
+const SectionEditor = ({section, value, activeStaff, onChange, noTime, customOptions}:any) => {
+  const opts = [...(activeStaff||[]), ...(customOptions||[])];
+  return <div style={{marginBottom:8}}><div style={{fontSize:13,fontWeight:700,color:"#64748b",marginBottom:4}}>{section}</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{sp(value).map((m:string,i:number)=><span key={i} style={{background:"#e0f2fe",color:"#0369a1",borderRadius:12,padding:"3px 10px",fontSize:14,fontWeight:700,display:"flex",alignItems:"center",gap:4}}>{m}<span onClick={()=>{const a=sp(value);a.splice(i,1);onChange(jn(a));}} style={{cursor:"pointer",opacity:0.6}}>✖</span></span>)}<select className="rule-sel" style={{fontSize:14,padding:"4px 8px"}} value="" onChange={e=>{if(e.target.value)onChange(jn([...sp(value),e.target.value]));e.target.value="";}}><option value="">＋追加</option>{opts.filter((s:any)=>!sp(value).includes(s)).map((s:any)=><option key={s} value={s}>{s}</option>)}</select>{!noTime&&TO.slice(0,6).map((t:string)=><button key={t} onClick={()=>{const last=sp(value).pop();if(last)onChange(jn([...sp(value),`${ex(last)}${t}`]));}} style={{fontSize:12,padding:"3px 8px",borderRadius:8,border:"1px solid #cbd5e1",background:"#f8fafc",cursor:"pointer"}}>{t}</button>)}</div></div>;
+};
+
 const rLog = (ls: string, i: number) => {
   if(ls.startsWith("・■")) return <li key={i} style={{marginTop:16,marginBottom:8,paddingBottom:4,borderBottom:"2px solid #cbd5e1",fontSize:18,fontWeight:800,color:"#334155"}}>{ls.substring(2)}</li>;
   const m=ls.match(/^・(.*?)\s\[(.*?)\]\s(.*)$/); if(!m) return <li key={i} style={{padding:"8px 12px",marginBottom:4,background:"#f8fafc",borderRadius:6,fontSize:14,color:"#475569",lineHeight:1.6}}>{ls.substring(1)}</li>;
@@ -544,7 +554,7 @@ export default function App(): any {
                     ) : null}
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} />)}
+                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={RE_SEC.includes(s) || s === "昼当番"} customOptions={PL_SEC.filter(p => p.startsWith(s))} />)}
                  </div>
                </div>
              ))}
@@ -685,7 +695,7 @@ export default function App(): any {
                     </div>
                     <div className="rule-row">
                       <span className="rule-label" style={{color:"#15803d", fontSize: 17}}>以下の部屋の担当者とメイン配置を交換する（※左の部屋から優先）:</span>
-                      <MP v={rule.sourceRooms} oC={(v: string) => updateRule("swapRules", idx, "sourceRooms", v)} opt={EXTENDED_RM_SEC} />
+                      <MP v={rule.sourceRooms} oC={(v: string) => updateRule("swapRules", idx, "sourceRooms", v)} opt={EX_SEC} />
                     </div>
                   </div>
               ))}<button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("swapRules", { targetRoom: "DSA", triggerRoom: "5号室", sourceRooms: "透視（6号）、1号室、2号室" })}>＋ 交換ルールを追加</button></>
@@ -731,7 +741,7 @@ export default function App(): any {
             
             <RC bg="#fffbeb" b="#fde68a" c="#b45309" ic="👑" t="部屋の割り当て優先順位" ch={
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
-                {(customRules.priorityRooms || DEFAULT_PRIORITY_ROOMS).map((room, idx, arr) => (
+                {(customRules.priorityRooms || (DEF_RULES.priorityRooms||[])).map((room, idx, arr) => (
                   <div key={room} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", padding: "10px 14px", borderRadius: 8, border: "1px solid #fcd34d" }}>
                     <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 17, fontWeight: 800, color: "#92400e", marginRight: 8 }}>{idx + 1}.</span><span style={{ fontSize: 19, fontWeight: 700, color: "#b45309" }}>{room}</span></div>
                     <div style={{ display: "flex", gap: 6 }}>
@@ -760,7 +770,7 @@ export default function App(): any {
             <RC bg="#fff" b="#e2e8f0" c="#334155" ic="📅" t="月間担当者の設定" ch={
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 24 }}>
                 {MONTHLY_CATEGORIES.map(({ key, label }) => {
-                  const opts = key === "受付ヘルプ" ? GENERAL_ROOMS : [];
+                  const opts = key === "受付ヘルプ" ? GEN_RM : [];
                   return ( <SectionEditor key={key} section={label} value={monthlyAssign[key] || ""} activeStaff={key === "受付" ? activeReceptionStaff : allStaff} onChange={(v: string) => updateMonthly(key, v)} noTime={true} customOptions={opts} /> );
                 })}
               </div>
@@ -779,7 +789,7 @@ export default function App(): any {
                         <RoomSel v={rule.targetRoom} oC={(v:any)=>updateRule("smartKenmu", idx, "targetRoom", v)} list={RM_SEC} ph="専任を外す部屋" />
                         <span style={{ fontSize: 17, fontWeight: 800, color: "#86198f" }}>] を、以下の担当者に兼務させる（※左から優先）:</span>
                       </div>
-                      <div style={{ marginLeft: 20, marginTop: 10, marginBottom: 6 }}><MP v={rule.sourceRooms} oC={(v: string) => updateRule("smartKenmu", idx, "sourceRooms", v)} opt={EXTENDED_RM_SEC} /></div>
+                      <div style={{ marginLeft: 20, marginTop: 10, marginBottom: 6 }}><MP v={rule.sourceRooms} oC={(v: string) => updateRule("smartKenmu", idx, "sourceRooms", v)} opt={EX_SEC} /></div>
                     </div>
                     <Del oC={()=>removeRule("smartKenmu", idx)} />
                   </div>
@@ -810,7 +820,7 @@ export default function App(): any {
                         <RoomSel v={rule.target} oC={(v:any)=>updateRule("linkedRooms", idx, "target", v)} list={RM_SEC} ph="兼務専用にする部屋" />
                         <span style={{ fontSize: 17, fontWeight: 800, color: "#065f46" }}>] には専任を置かず、[</span>
                       </div>
-                      <div style={{ marginLeft: 20, marginTop: 10, marginBottom: 10 }}><MP v={rule.sources} oC={(v: string) => updateRule("linkedRooms", idx, "sources", v)} opt={EXTENDED_RM_SEC} /></div>
+                      <div style={{ marginLeft: 20, marginTop: 10, marginBottom: 10 }}><MP v={rule.sources} oC={(v: string) => updateRule("linkedRooms", idx, "sources", v)} opt={EX_SEC} /></div>
                       <span style={{ fontSize: 17, fontWeight: 800, color: "#065f46" }}>] の担当者をセットで配置する（※左から優先）</span>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignItems: "center" }}>
@@ -831,7 +841,7 @@ export default function App(): any {
                         <RoomSel v={rule.targetRoom} oC={(v:any)=>updateRule("rescueRules", idx, "targetRoom", v)} list={RM_SEC} ph="（空室の部屋）" />
                         <span style={{ fontSize: 17, fontWeight: 800, color: "#854d0e" }}>が不足なら ➔ 以下の部屋から兼務を探す（※左から優先）</span>
                       </div>
-                      <div style={{ marginLeft: 20, marginTop: 10 }}><MP v={rule.sourceRooms} oC={(v: string) => updateRule("rescueRules", idx, "sourceRooms", v)} opt={EXTENDED_RM_SEC} /></div>
+                      <div style={{ marginLeft: 20, marginTop: 10 }}><MP v={rule.sourceRooms} oC={(v: string) => updateRule("rescueRules", idx, "sourceRooms", v)} opt={EX_SEC} /></div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignItems: "center" }}>
                       <button onClick={() => { const n = [...arr]; [n[idx-1], n[idx]] = [n[idx], n[idx-1]]; setCustomRules({...customRules, rescueRules: n}); }} disabled={idx === 0} style={{ border: "none", background: "#fef08a", borderRadius: 6, padding: "8px 12px", fontSize: 17, color: "#a16207" }}>▲</button>
@@ -886,7 +896,7 @@ export default function App(): any {
                     <span className="rule-label">は</span>
                     <select value={rule.role} onChange={(e: any) => updateRule("lunchRoleRules", idx, "role", e.target.value)} className="rule-sel" style={{flex:"0 0 auto", minWidth: "140px"}}><option value="">役割を選択</option>{MONTHLY_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
                     <span className="rule-label">担当を優先。引抜元（定員を満たしている場合のみ。※左から優先）:</span>
-                    <MP v={rule.sourceRooms} oC={(v: string) => updateRule("lunchRoleRules", idx, "sourceRooms", v)} opt={EXTENDED_RM_SEC} />
+                    <MP v={rule.sourceRooms} oC={(v: string) => updateRule("lunchRoleRules", idx, "sourceRooms", v)} opt={EX_SEC} />
                     <Del oC={()=>removeRule("lunchRoleRules", idx)} />
                   </div>
                 ))}
