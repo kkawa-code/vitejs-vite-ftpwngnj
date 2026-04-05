@@ -768,6 +768,12 @@ export class AutoAssigner {
       const memberRange = parseTimeTagRange(tag || "") || { start: 0, end: 24 * 60 };
       const overlap = memberRange.start < cut.end && memberRange.end > cut.start;
       if (!overlap) return member;
+
+      // タグなし終日勤務や AM/PM の粗いタグに対して、新しい細かい時刻タグを勝手に生成しない。
+      // 過員時は時間短縮ではなく、その部屋から外す。
+      const canSafelySplit = !!tag && /[:〜]/.test(tag);
+      if (!canSafelySplit) return null;
+
       const left = cut.start > memberRange.start ? { start: memberRange.start, end: Math.min(cut.start, memberRange.end) } : null;
       const right = cut.end < memberRange.end ? { start: Math.max(cut.end, memberRange.start), end: memberRange.end } : null;
       const segments = [left, right].filter((x): x is { start: number; end: number } => !!x && x.end > x.start);
