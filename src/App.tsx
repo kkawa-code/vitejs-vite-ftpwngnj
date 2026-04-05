@@ -52,7 +52,7 @@ const getAmt = (n: string) => PL_SEC.includes(ex(n)) ? 0 : (n.includes("(AM)")||
 function getMSt(sec: string, moAssign: Record<string, string>): string[] { let st: string[] = []; if (sec === "治療") st = [...sp(moAssign.治療), ...sp(moAssign.治療サブ優先), ...sp(moAssign.治療サブ)]; else if (sec === "RI") st = [...sp(moAssign.RI), ...sp(moAssign.RIサブ)]; else if (moAssign[sec] !== undefined) st = sp(moAssign[sec]); return st.map(ex); }
 
 // --- Style helpers ---
-const cellStyle = (isHeader=false, isHoliday=false, isSelected=false, isLabel=false, isZebra=false): React.CSSProperties => ({
+const cellStyle = (_isHeader=false, isHoliday=false, isSelected=false, _isLabel=false, isZebra=false): React.CSSProperties => ({
   background: isHoliday ? "#fef2f2" : isSelected ? "#eff6ff" : isZebra ? "#f8fafc" : "#ffffff",
   verticalAlign: "top",
 });
