@@ -825,6 +825,9 @@ export class AutoAssigner {
     this.enforcePriorityIntegrity();
     this.resolveSecondaryBackfills();
     this.enforcePriorityIntegrity();
+    this.enforceAbsenceConstraints();
+    this.normalizeTimedAssignments();
+    this.enforceKenmuPairCoverage();
     return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
   }
 
