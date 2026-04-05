@@ -98,7 +98,7 @@ const MONTHLY_CATEGORIES: {key: string; label: string}[] = [
   {key:"MMG",label:"MMG"},{key:"治療",label:"治療"},{key:"治療サブ優先",label:"治療サブ優先"},{key:"治療サブ",label:"治療サブ"},
   {key:"受付",label:"受付"},{key:"受付ヘルプ",label:"受付ヘルプ"},
 ];
-const SectionEditor = ({section, value, activeStaff, onChange, noTime, customOptions}:any) => {
+const SectionEditor = ({section, value, activeStaff, onChange, customOptions}:any) => {
   const opts = [...(activeStaff||[]), ...(customOptions||[])];
   return <div style={{marginBottom:4}}>
     <div style={{fontSize:13,fontWeight:700,color:"#64748b",marginBottom:2}}>{section}</div>
