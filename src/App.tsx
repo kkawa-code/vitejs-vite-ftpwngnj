@@ -726,7 +726,7 @@ export default function App(): any {
                                 else if (hasOrangeWarning) { tagBorder = "#ea580c"; } 
                                 else if (hasYellowWarning) { tagBorder = "#ca8a04"; }
 
-                                let inlineStyle: React.CSSProperties = { background: tagBg, color: tagColor, border: `2px solid ${tagBorder}`, padding: "6px 10px", borderRadius: "6px", display: "flex", alignItems: "center", fontSize: "16px", fontWeight: (hasRedWarning || isOverLimit) ? 800 : 700, transition: "all 0.2s ease" };
+                                let inlineStyle: React.CSSProperties = { background: tagBg, color: tagColor, border: `1px solid ${tagBorder}`, padding: "6px 10px", borderRadius: "6px", display: "flex", alignItems: "center", fontSize: "16px", fontWeight: (hasRedWarning || isOverLimit) ? 800 : 700, transition: "all 0.2s ease" };
                                 
                                 if (isHighlighted) {
                                   inlineStyle.background = "#2563eb"; inlineStyle.color = "#fff"; inlineStyle.borderColor = "#1d4ed8"; inlineStyle.boxShadow = "0 4px 12px rgba(37,99,235,0.4)"; inlineStyle.transform = "scale(1.05)"; inlineStyle.zIndex = 10; inlineStyle.position = "relative";
