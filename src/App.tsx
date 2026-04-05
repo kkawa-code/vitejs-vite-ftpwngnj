@@ -195,7 +195,27 @@ export const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, c
 
 export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [] }: any) => {
   const members = split(value); const isTaiki = section === "待機"; const isFuzai = section === "不在";
-  const handleAdd = (name: string) => { if (name) onChange(join([...members, isTaiki ? `${name}(17:00〜19:00)` : name])); };
+  const handleAdd = (name: string) => { 
+    if (!name) return;
+    if (isFuzai) {
+      const choice = window.prompt(
+        `「${name}」の不在区分を選んでください：\n\n` +
+        `1:全休 2:AM休 3:PM休\n4:〜8:30 5:〜9:00 6:〜9:30 7:〜10:00 8:〜10:30 9:〜11:00 10:〜11:30 11:〜12:00\n12:〜12:30 13:〜13:00 14:〜13:30 15:〜14:00 16:〜14:30 17:〜15:00 18:〜15:30 19:〜16:00\n20:〜16:30 21:〜17:00 22:8:30〜 23:9:00〜 24:9:30〜 25:10:00〜 26:10:30〜 27:11:00〜\n28:11:30〜 29:12:00〜 30:12:30〜 31:13:00〜 32:13:30〜 33:14:00〜 34:14:30〜 35:15:00〜\n36:15:30〜 37:16:00〜 38:16:30〜 39:17:00〜\n\n番号を入力:`,
+        '1'
+      );
+      if (choice === null) return;
+      const tagMap: Record<string,string> = {'1':'','2':'(AM)','3':'(PM)','4':'(〜8:30)','5':'(〜9:00)','6':'(〜9:30)','7':'(〜10:00)','8':'(〜10:30)','9':'(〜11:00)','10':'(〜11:30)','11':'(〜12:00)','12':'(〜12:30)','13':'(〜13:00)','14':'(〜13:30)','15':'(〜14:00)','16':'(〜14:30)','17':'(〜15:00)','18':'(〜15:30)','19':'(〜16:00)','20':'(〜16:30)','21':'(〜17:00)','22':'(8:30〜)','23':'(9:00〜)','24':'(9:30〜)','25':'(10:00〜)','26':'(10:30〜)','27':'(11:00〜)','28':'(11:30〜)','29':'(12:00〜)','30':'(12:30〜)','31':'(13:00〜)','32':'(13:30〜)','33':'(14:00〜)','34':'(14:30〜)','35':'(15:00〜)','36':'(15:30〜)','37':'(16:00〜)','38':'(16:30〜)','39':'(17:00〜)'};
+      const tag = tagMap[choice.trim()] ?? '';
+      const entry = `${name}${tag}`;
+      const needs = tag === '(AM)' ? 'PM帯' : tag === '(PM)' ? 'AM帯' : tag.startsWith('(〜') ? `${tag.replace(/[()]/g,'')}以降` : tag ? `${tag.replace(/[()]/g,'')}まで` : '';
+      onChange(join([...members, entry]));
+      if (needs) {
+        window.alert(`「${name}」を${entry ? entry.replace(name,'') : '全休'}で不在に設定しました。\n${needs}の補充が必要な場合は「自動割付」を実行してください。`);
+      }
+      return;
+    }
+    onChange(join([...members, isTaiki ? `${name}(17:00〜19:00)` : name]));
+  };
   const handleRemove = (idx: number) => { const next = [...members]; next.splice(idx, 1); onChange(join(next)); };
   const handleTimeChange = (idx: number, newTime: string) => { if (noTime && !isFuzai) return; const next = [...members]; next[idx] = extractStaffName(next[idx]) + newTime; onChange(join(next)); };
   return (
@@ -209,7 +229,7 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
               <span>{coreName}</span>
               {(!noTime || isFuzai) && (
                 <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: "inherit", cursor: "pointer", padding: "0 20px 0 6px" }}>
-                  {isFuzai ? <><option value="">全休</option><option value="(AM)">AM休</option><option value="(PM)">PM休</option></> : isTaiki ? <><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></> : <><option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>}
+                  {isFuzai ? <><option value="">全休</option><option value="(AM)">AM休</option><option value="(PM)">PM休</option><option value="(〜8:30)">〜8:30</option><option value="(〜9:00)">〜9:00</option><option value="(〜9:30)">〜9:30</option><option value="(〜10:00)">〜10:00</option><option value="(〜10:30)">〜10:30</option><option value="(〜11:00)">〜11:00</option><option value="(〜11:30)">〜11:30</option><option value="(〜12:00)">〜12:00</option><option value="(〜12:30)">〜12:30</option><option value="(〜13:00)">〜13:00</option><option value="(〜13:30)">〜13:30</option><option value="(〜14:00)">〜14:00</option><option value="(〜14:30)">〜14:30</option><option value="(〜15:00)">〜15:00</option><option value="(〜15:30)">〜15:30</option><option value="(〜16:00)">〜16:00</option><option value="(〜16:30)">〜16:30</option><option value="(〜17:00)">〜17:00</option><option value="(〜17:30)">〜17:30</option><option value="(8:30〜)">8:30〜</option><option value="(9:00〜)">9:00〜</option><option value="(9:30〜)">9:30〜</option><option value="(10:00〜)">10:00〜</option><option value="(10:30〜)">10:30〜</option><option value="(11:00〜)">11:00〜</option><option value="(11:30〜)">11:30〜</option><option value="(12:00〜)">12:00〜</option><option value="(12:30〜)">12:30〜</option><option value="(13:00〜)">13:00〜</option><option value="(13:30〜)">13:30〜</option><option value="(14:00〜)">14:00〜</option><option value="(14:30〜)">14:30〜</option><option value="(15:00〜)">15:00〜</option><option value="(15:30〜)">15:30〜</option><option value="(16:00〜)">16:00〜</option><option value="(16:30〜)">16:30〜</option><option value="(17:00〜)">17:00〜</option><option value="(17:30〜)">17:30〜</option></> : isTaiki ? <><option value="(17:00〜19:00)">17:00〜19:00</option><option value="(17:00〜22:00)">17:00〜22:00</option><option value="(17:00〜)">17:00〜</option></> : <><option value="">終日</option><option value="(AM)">AM</option><option value="(PM)">PM</option>{currentMod && !["", "(AM)", "(PM)"].includes(currentMod) && !TIME_OPTIONS.includes(currentMod) && (<option value={currentMod}>{currentMod.replace(/[()]/g, '')}</option>)}{TIME_OPTIONS.filter(t => t !== "(AM)" && t !== "(PM)").map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</>}
                 </select>
               )}
               <span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5, paddingLeft: 6 }}>✖</span>
