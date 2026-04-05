@@ -364,7 +364,7 @@ export class AutoAssigner {
     if (state.startsWith('UNTIL:')) return `(${formatMinutesToClock(Number(state.split(':')[1]))}〜)`;
     if (state.startsWith('FROM:')) return `(〜${formatMinutesToClock(Number(state.split(':')[1]))})`;
     if (state.startsWith('RANGE:')) {
-      const [, start, end] = state.split(':');
+      const [, , end] = state.split(':');
       return `(${formatMinutesToClock(Number(end))}〜)`;
     }
     return '';
