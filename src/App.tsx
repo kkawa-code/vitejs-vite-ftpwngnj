@@ -510,14 +510,6 @@ export class AutoAssigner {
     if (needTag === "(PM)" && eff.pmClosed) return false;
     return this.getRoomCoverageCount(room, needTag) < eff.cap;
   }
-  private getComplementTag(tag: string): string {
-    const range = parseTimeTagRange(tag);
-    if (!range) return "";
-    if (range.start <= 0 && range.end >= 24 * 60) return "";
-    if (range.start <= 0 && range.end < 24 * 60) return `(${formatMinutesToClock(range.end)}〜)`;
-    if (range.start > 0 && range.end >= 24 * 60) return `(〜${formatMinutesToClock(range.start)})`;
-    return "";
-  }
   private recomputeAssignedStateForStaff(staff: string) {
     let hasAm = false, hasPm = false;
     ROOM_SECTIONS.forEach(room => {
