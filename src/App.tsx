@@ -99,7 +99,7 @@ const SectionEditor = ({section, value, activeStaff, onChange, noTime, customOpt
     <div style={{fontSize:14,fontWeight:700,color:"#94a3b8",marginBottom:6}}>{section}</div>
     <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",marginBottom:noTime?0:8}}>
       {sp(value).map((m:string,i:number)=><div key={i} style={{background:"#eff6ff",color:"#1d4ed8",borderRadius:20,padding:"4px 12px",fontSize:15,fontWeight:700,border:"1px solid #bfdbfe",display:"flex",alignItems:"center",gap:6}}><span>{m}</span><span onClick={()=>{const a=sp(value);a.splice(i,1);onChange(jn(a));}} style={{cursor:"pointer",color:"#93c5fd",fontWeight:400}}>✕</span></div>)}
-      <select value="" onChange={e=>{if(e.target.value)onChange(jn([...sp(value),e.target.value]));e.target.value="";}} style={{padding:"4px 32px 4px 10px",borderRadius:8,border:"1px solid #cbd5e1",fontSize:14,fontWeight:600,background:"#f8fafc",cursor:"pointer",appearance:"none",backgroundImage:"url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")",backgroundRepeat:"no-repeat",backgroundPosition:"right 8px center",backgroundSize:"1em"}}>
+      <select value="" onChange={e=>{if(e.target.value)onChange(jn([...sp(value),e.target.value]));e.target.value="";}} className="rule-sel" style={{fontSize:14,padding:"4px 10px"}}>
         <option value="">＋追加</option>{opts.filter((s:any)=>!sp(value).map(ex).includes(s)).map((s:any)=><option key={s} value={s}>{s}</option>)}
       </select>
     </div>
