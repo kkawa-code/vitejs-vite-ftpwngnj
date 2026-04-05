@@ -748,6 +748,85 @@ export class AutoAssigner {
   cleanUpDayCells() { WORK_SECTIONS.forEach(sec => { if (["明け","入り","不在","土日休日代休"].includes(sec)) return; if (this.skipSections.includes(sec)) { this.dayCells[sec] = ""; return; } let members = split(this.dayCells[sec] || "").map(m => { const core = extractStaffName(m); if (ROLE_PLACEHOLDERS.includes(core)) return m; const block = this.blockMap.get(core) || 'NONE'; const currentTag = m.substring(core.length); if (block === 'ALL') return null; if (block === 'NONE') return m; const autoTag = this.getWorkTagFromAvailabilityState(block); if (!currentTag) return autoTag ? `${core}${autoTag}` : m; if (!this.canWorkNeedTag(block, currentTag)) return null; return m; }).filter(Boolean) as string[]; this.dayCells[sec] = join(members); }); }
   prepareAvailability() { const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName); this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => { if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0); return a.localeCompare(b, 'ja'); }); this.initialAvailSupport = this.initialAvailAll.filter(s => supportStaffList.includes(s)); this.initialAvailGeneral = this.initialAvailAll.filter(s => this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s)); this.initialAvailReception = this.initialAvailAll.filter(s => this.ctx.activeReceptionStaff.includes(s) || (this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s))); }
 
+  private enforceFinalCapacityLimits() {
+    const scoreForKeeping = (room: string, member: string): number => {
+      const staff = extractStaffName(member);
+      const tag = member.substring(staff.length);
+      let score = 0;
+      if ((this.ctx.customRules.fixed || []).some((r: any) => extractStaffName(r.staff) === staff && r.section === room)) score += 10000;
+      if (isMonthlyMainStaff(room, staff, this.ctx.monthlyAssign)) score += 3000;
+      if (!tag) score += 500;
+      if (tag === "(AM)" || tag === "(PM)") score += 200;
+      if (["MRI", "CT", "治療", "RI"].includes(room)) score -= this.getPastRoomCount(staff, room);
+      score -= (this.assignCounts[staff] || 0) * 10;
+      return score;
+    };
+
+    const trimMemberAgainstRange = (member: string, cut: { start: number; end: number }): string | null => {
+      const staff = extractStaffName(member);
+      const tag = member.substring(staff.length);
+      const memberRange = parseTimeTagRange(tag || "") || { start: 0, end: 24 * 60 };
+      const overlap = memberRange.start < cut.end && memberRange.end > cut.start;
+      if (!overlap) return member;
+      const left = cut.start > memberRange.start ? { start: memberRange.start, end: Math.min(cut.start, memberRange.end) } : null;
+      const right = cut.end < memberRange.end ? { start: Math.max(cut.end, memberRange.start), end: memberRange.end } : null;
+      const segments = [left, right].filter((x): x is { start: number; end: number } => !!x && x.end > x.start);
+      if (segments.length === 0) return null;
+      const chosen = segments.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+      return `${staff}${rangeToTimeTag(chosen)}`;
+    };
+
+    ROOM_SECTIONS.forEach(room => {
+      const baseCap = this.getSectionBaseCapacity(room);
+      const eff = this.getEffectiveTarget(room, baseCap);
+      if (eff.allClosed) {
+        this.dayCells[room] = "";
+        return;
+      }
+      let members = split(this.dayCells[room] || "");
+      if (members.length === 0) return;
+
+      let changed = true;
+      while (changed) {
+        changed = false;
+        const boundaries = Array.from(new Set([0, 24 * 60, ...members.flatMap(member => {
+          const staff = extractStaffName(member);
+          const tag = member.substring(staff.length);
+          const r = parseTimeTagRange(tag || "") || { start: 0, end: 24 * 60 };
+          return [r.start, r.end];
+        })])).sort((a, b) => a - b);
+
+        for (let i = 0; i < boundaries.length - 1; i++) {
+          const seg = { start: boundaries[i], end: boundaries[i + 1] };
+          if (seg.end <= seg.start) continue;
+          const capForSeg = seg.end <= 12 * 60 ? (eff.amClosed ? 0 : eff.cap) : (seg.start >= 12 * 60 ? (eff.pmClosed ? 0 : eff.cap) : eff.cap);
+          const active = members.filter(member => {
+            const staff = extractStaffName(member);
+            const tag = member.substring(staff.length);
+            const r = parseTimeTagRange(tag || "") || { start: 0, end: 24 * 60 };
+            return r.start < seg.end && r.end > seg.start;
+          });
+          if (active.length <= capForSeg) continue;
+
+          active.sort((a, b) => scoreForKeeping(room, a) - scoreForKeeping(room, b));
+          const toTrim = active[0];
+          const trimmed = trimMemberAgainstRange(toTrim, seg);
+          const idx = members.indexOf(toTrim);
+          if (idx >= 0) {
+            if (trimmed) members[idx] = trimmed;
+            else members.splice(idx, 1);
+            changed = true;
+            break;
+          }
+        }
+      }
+
+      this.dayCells[room] = join(members);
+    });
+  }
+
+
+
   execute(): DayData {
     this.logPhase("フェーズ1：前提処理"); this.initCounts();
     if (this.prevDay?.cells["入り"]) { const iriMems = split(this.prevDay.cells["入り"]).map(extractStaffName); this.dayCells["明け"] = join(Array.from(new Set([...split(this.dayCells["明け"]), ...iriMems]))); if (iriMems.length > 0) this.log(`[前日処理] 昨日の「入り」を「明け」に配置`); }
@@ -828,6 +907,7 @@ export class AutoAssigner {
     this.enforceAbsenceConstraints();
     this.normalizeTimedAssignments();
     this.enforceKenmuPairCoverage();
+    this.enforceFinalCapacityLimits();
     return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
   }
 
