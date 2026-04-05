@@ -718,7 +718,7 @@ export default function App(): any {
                                 const limit = customRules.alertMaxKenmu || 3;
                                 const isOverLimit = roomCount > limit; // ★ 上限を超えたときだけ警告表示
 
-                                let tagBg = "#f8fafc"; let tagColor = "#334155"; let tagBorder = "#cbd5e1";
+                                let tagBg = "#f0f4ff"; let tagColor = "#1e293b"; let tagBorder = "#94a3b8";
                                 
                                 if (isOverLimit) { tagBg = "#ffedd5"; tagColor = "#9a3412"; tagBorder = "#fdba74"; }
 
