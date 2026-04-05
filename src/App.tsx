@@ -229,9 +229,9 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
               {isFuzai && currentMod !== "" && onAddHelp && (
                 <span style={{display:"flex",alignItems:"center",gap:2,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:4}}>
                   <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>補充</span>
-                  <select defaultValue="" onChange={(e:any)=>{if(e.target.value){onAddHelp(e.target.value,currentMod);e.target.value="";}}} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 16px 0 2px"}}>
-                    <option value="">部屋選択</option>
-                    {["CT","MRI","RI","治療","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","検像"].map(r=><option key={r} value={r}>{r}</option>)}
+                  <select defaultValue="" onChange={(e:any)=>{if(e.target.value){onAddHelp(coreName,e.target.value,currentMod);e.target.value="";}}} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 16px 0 2px"}}>
+                    <option value="">何時から</option>
+                    {["(AM)","(PM)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map(t=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
                   </select>
                 </span>
               )}
@@ -821,7 +821,7 @@ export default function App(): any {
                     ) : null}
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? (roomName: string, absentMod: string) => { const cur = allDays[sel]?.[roomName] || ""; const tag = absentMod==="(AM)"?"(PM)":absentMod==="(PM)"?"(AM)":absentMod.startsWith("(〜")?absentMod.replace("〜","").replace(")","〜)"):"(PM)"; const entry = roomName+"枠"+tag; if (!cur.includes(entry)) updateDay(roomName, cur ? `${cur}、${entry}` : entry); } : undefined} />)}
+                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? (staffName: string, fromTime: string) => { const cells = allDays[sel] || {}; const rooms = ["CT","MRI","RI","治療","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","検像"]; const found = rooms.find(r => split(cells[r]||"").some((m:string)=>extractStaffName(m)===staffName)); if (found) { const cur = cells[found] || ""; const entry = found+"枠"+fromTime; if (!cur.includes(entry)) updateDay(found, cur ? `${cur}、${entry}` : entry); } } : undefined} />)}
                  </div>
                </div>
              ))}
