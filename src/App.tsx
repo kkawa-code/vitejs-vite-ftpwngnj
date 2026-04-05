@@ -100,7 +100,15 @@ const MONTHLY_CATEGORIES: {key: string; label: string}[] = [
 ];
 const SectionEditor = ({section, value, activeStaff, onChange, noTime, customOptions}:any) => {
   const opts = [...(activeStaff||[]), ...(customOptions||[])];
-  return <div style={{marginBottom:8}}><div style={{fontSize:13,fontWeight:700,color:"#64748b",marginBottom:4}}>{section}</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{sp(value).map((m:string,i:number)=><span key={i} style={{background:"#e0f2fe",color:"#0369a1",borderRadius:12,padding:"3px 10px",fontSize:14,fontWeight:700,display:"flex",alignItems:"center",gap:4}}>{m}<span onClick={()=>{const a=sp(value);a.splice(i,1);onChange(jn(a));}} style={{cursor:"pointer",opacity:0.6}}>✖</span></span>)}<select className="rule-sel" style={{fontSize:14,padding:"4px 8px"}} value="" onChange={e=>{if(e.target.value)onChange(jn([...sp(value),e.target.value]));e.target.value="";}}><option value="">＋追加</option>{opts.filter((s:any)=>!sp(value).includes(s)).map((s:any)=><option key={s} value={s}>{s}</option>)}</select>{!noTime&&TO.slice(0,6).map((t:string)=><button key={t} onClick={()=>{const last=sp(value).pop();if(last)onChange(jn([...sp(value),`${ex(last)}${t}`]));}} style={{fontSize:12,padding:"3px 8px",borderRadius:8,border:"1px solid #cbd5e1",background:"#f8fafc",cursor:"pointer"}}>{t}</button>)}</div></div>;
+  return <div style={{marginBottom:4}}>
+    <div style={{fontSize:13,fontWeight:700,color:"#64748b",marginBottom:2}}>{section}</div>
+    <div style={{display:"flex",flexWrap:"wrap",gap:4,alignItems:"center",background:"#f8fafc",borderRadius:6,padding:"4px 6px",border:"1px solid #e2e8f0",minHeight:32}}>
+      {sp(value).map((m:string,i:number)=><span key={i} style={{background:"#dbeafe",color:"#1e40af",borderRadius:10,padding:"2px 8px",fontSize:13,fontWeight:700,display:"inline-flex",alignItems:"center",gap:3}}>{m}<span onClick={()=>{const a=sp(value);a.splice(i,1);onChange(jn(a));}} style={{cursor:"pointer",opacity:0.5,fontSize:12}}>✖</span></span>)}
+      <select className="rule-sel" style={{fontSize:13,padding:"2px 6px",height:24,minWidth:80}} value="" onChange={e=>{if(e.target.value)onChange(jn([...sp(value),e.target.value]));e.target.value="";}}>
+        <option value="">＋</option>{opts.filter((s:any)=>!sp(value).includes(s)).map((s:any)=><option key={s} value={s}>{s}</option>)}
+      </select>
+    </div>
+  </div>;
 };
 
 const rLog = (ls: string, i: number) => {
@@ -216,7 +224,7 @@ class AutoAssigner {
       const vP=vN.filter(n=>pL.includes(n)); const vA=vN.filter(n=>!pL.includes(n));
       const sCnd=(cs:string[])=>{let ms=sp(this.cx.monthlyAssign[sec]).map(ex),sps=sp(this.cx.monthlyAssign[sec+"サブ優先"]).map(ex),ss=sp(this.cx.monthlyAssign[sec+"サブ"]).map(ex); if(sec==="治療"||sec==="RI"){ms=sp(this.cx.monthlyAssign[sec]).map(ex);if(sec==="治療"){sps=sp(this.cx.monthlyAssign.治療サブ優先).map(ex);ss=sp(this.cx.monthlyAssign.治療サブ).map(ex);}else{ss=sp(this.cx.monthlyAssign.RIサブ).map(ex);}} const hA=vN.some(s=>this.bm.get(s)==='PM'), hP=vN.some(s=>this.bm.get(s)==='AM'); return [...cs].sort((a,b)=>{const bA=this.bm.get(a),bB=this.bm.get(b); let sA=0,sB=0; if(ms.includes(a))sA+=10000;else if(sps.includes(a))sA+=5000;else if(ss.includes(a))sA+=2000; if(ms.includes(b))sB+=10000;else if(sps.includes(b))sB+=5000;else if(ss.includes(b))sB+=2000; if(this.iHB(a,sec).monthlyHalfException)sA-=3000; if(this.iHB(b,sec).monthlyHalfException)sB-=3000; const rw=["MRI","CT"].includes(sec)?200:100; sA-=(this.rc[a]?.[sec]||0)*rw; sB-=(this.rc[b]?.[sec]||0)*rw; if(this.iHNC(a,sec))sA-=500; if(this.iHNC(b,sec))sB-=500; if(sec==="ポータブル"){sA-=1000*this.gPR(a,sec);sB-=1000*this.gPR(b,sec);} if(nT===""){if(bA==='NONE')sA+=200;else if(hA&&hP&&(bA==='AM'||bA==='PM'))sA+=100;}else{if(nT==="(AM)"&&bA==='PM')sA+=200;if(nT==="(PM)"&&bA==='AM')sA+=200;if(bA==='NONE')sA+=100;} if(nT===""){if(bB==='NONE')sB+=200;else if(hA&&hP&&(bB==='AM'||bB==='PM'))sB+=100;}else{if(nT==="(AM)"&&bB==='PM')sB+=200;if(nT==="(PM)"&&bB==='AM')sB+=200;if(bB==='NONE')sB+=100;} return sB-sA||(this.ac[a]||0)-(this.ac[b]||0)||a.localeCompare(b,'ja');});};
       const pC=this.pk(vN,[...sCnd(vP),...sCnd(vA)],1,sec,cur.map(ex)); if(!pC.length)break;
-      const c=pC[0], b=this.bm.get(c); let t="", f=1; if(b==='AM'){t="(PM)";f=0.5;this.bm.set(c,'ALL');}else if(b==='PM'){t="(AM)";f=0.5;this.bm.set(c,'ALL');}else{if(nT){t=nT;f=0.5;this.bm.set(c,nT==="(AM)"?'AM':'PM');}else{this.bm.set(c,'ALL');}}
+      const c=pC[0], b=this.bm.get(c); let t="", f=1; if(b==='AM'){t="(PM)";f=0.5;this.bm.set(c,'ALL');}else if(b==='PM'){t="(AM)";f=0.5;this.bm.set(c,'ALL');}else{if(nT){t=nT;f=0.5;this.bm.set(c,nT==="(AM)"?'AM':'PM');}else if(e.pC){t="(AM)";f=0.5;this.bm.set(c,'AM');}else if(e.aC){t="(PM)";f=0.5;this.bm.set(c,'PM');}else{this.bm.set(c,'ALL');}}
       cur.push(`${c}${t}`); this.aU(c,f); this.lg(`✅ [配置] ${sec} に ${c}${t} ${fM}`);
     }
     this.dc[sec]=jn(cur);
