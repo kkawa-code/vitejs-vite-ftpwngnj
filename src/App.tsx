@@ -673,11 +673,11 @@ export default function App(): any {
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
               <thead className="sticky-table-header">
                 <tr>
-                  <th style={{...cellStyle(true, false, false, true), borderRight: "2px solid #e2e8f0", borderBottom: "2px solid #e2e8f0"}}>区分</th>
+                  <th style={{...cellStyle(true, false, false, true), borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0"}}>区分</th>
                   {days.map(day => {
                     const stats = getDailyStats(day.id); const warnings = getDayWarnings(day.id);
                     return (
-                      <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "2px solid #e2e8f0", cursor: "pointer"}}>
+                      <th key={day.id} onClick={() => setSel(day.id)} style={{...cellStyle(true, day.isPublicHoliday, day.id === sel), borderBottom: "1px solid #e2e8f0", cursor: "pointer"}}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 17 }}>{day.label}</span>
@@ -699,7 +699,7 @@ export default function App(): any {
               <tbody>
                 {SECTIONS.map((section, sIdx) => (
                   <tr key={section}>
-                    <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "2px solid #e2e8f0"}}>{section}</td>
+                    <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0"}}>{section}</td>
                     {days.map((day, dIdx) => {
                       const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) baseBgStyle.background = "#fef08a";
                       
