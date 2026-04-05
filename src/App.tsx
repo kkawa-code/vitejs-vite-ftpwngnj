@@ -20,7 +20,7 @@ const KEY_MONTHLY = 'shifto_monthly';
 const DEFAULT_MONTHLY_ASSIGN: Record<string,string> = { CT:"", MRI:"", RI:"", RIメイン:"", RIサブ:"", MMG:"", 治療:"", 治療サブ優先:"", 治療サブ:"", 受付:"", 受付ヘルプ:"" };
 const FALLBACK_HOLIDAYS: Record<string,string> = {};
 const formatDayForDisplay = (d: Date): string => { const days=["日","月","火","水","木","金","土"]; return `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]})`; };
-const WeekCalendarPicker = ({targetMonday, onChange}: {targetMonday:string, onChange:(v:string)=>void}) => {
+const WeekCalendarPicker = ({targetMonday, onChange}: {targetMonday:string, onChange:(v:string)=>void, nationalHolidays?:Record<string,string>, customHolidays?:string[]}) => {
   const [y,m,day] = targetMonday.split('-').map(Number);
   const opts: {id:string,label:string}[] = [];
   const base = new Date(y,m-1,day); base.setDate(base.getDate()-28);
@@ -134,11 +134,12 @@ class AutoAssigner {
   gTR(s: string) { let c=0; Object.keys(this.dc).forEach(k=>{if(RE_SEC.includes(k)||["待機","昼当番","受付","受付ヘルプ"].includes(k))return; sp(this.dc[k]).forEach(m=>{if(ex(m)===s&&!m.includes("17:")&&!m.includes("18:")&&!m.includes("19:")&&!m.includes("22:"))c++;});}); return c; }
   gTC(s: string) { let a=0,p=0; Object.keys(this.dc).forEach(k=>{if(["待機","昼当番","受付","受付ヘルプ"].includes(k)||RE_SEC.includes(k))return; sp(this.dc[k]).forEach(m=>{if(ex(m)===s){if(m.includes("(AM)"))a++;else if(m.includes("(PM)"))p++;else{a++;p++;}}});}); return {a,p}; }
   iU(n: string) { return (this.ac[n]||0) >= (this.ma[n]||1); } aU(n: string, f=1) { this.ac[n]=(this.ac[n]||0)+f; }
+  getPastLateShiftCount(s: string) { return [...this.pm,...this.pw].filter(d=>Object.values(d.cells).some(v=>sp(v).some(m=>ex(m)===s&&(m.includes("17:")||m.includes("18:")||m.includes("19:")||m.includes("22:"))))).length; }
   iFb(st: string, sc: string) { return (this.cx.customRules.forbidden||[]).some((r:any)=>ex(r.staff)===ex(st)&&sp(r.sections).includes(sc)); }
   hNG(c: string, ms: string[], sf: boolean) { return ms.some(m=>(this.cx.customRules.ngPairs||[]).some((n:any)=>{const mt=(ex(n.s1)===ex(c)&&ex(n.s2)===ex(m))||(ex(n.s1)===ex(m)&&ex(n.s2)===ex(c)); if(!mt)return false; return (n.level||"hard")==="hard"||(n.level==="soft"&&sf);})); }
   iFDO(r: string) { return sp(this.cx.customRules.fullDayOnlyRooms||"").includes(r); }
   noHD(r: string, tag: string) { return this.iFDO(r) && (tag.includes("AM") || tag.includes("PM")); }
-  iHB(st: string, sc: string) { if(!this.iFDO(sc)) return {h:false, m:false}; const fm=sp(this.dc["不在"]); const a=fm.some(m=>ex(m)===st&&m.includes("(AM)")); const p=fm.some(m=>ex(m)===st&&m.includes("(PM)")); if(!a&&!p)return {h:false, m:false}; return {h:!isMonthlyMainStaff(sc,st,this.cx.monthlyAssign), m:true}; }
+  iHB(st: string, sc: string) { if(!this.iFDO(sc)) return {h:false, m:false, monthlyHalfException:false}; const fm=sp(this.dc["不在"]); const a=fm.some(m=>ex(m)===st&&m.includes("(AM)")); const p=fm.some(m=>ex(m)===st&&m.includes("(PM)")); if(!a&&!p)return {h:false, m:false, monthlyHalfException:false}; const isMain=getMSt(sc,this.cx.monthlyAssign).includes(st); return {h:!isMain, m:true, monthlyHalfException:isMain}; }
   iHNC(s: string, r: string) { return this.pd ? sp(this.cx.customRules.noConsecutiveRooms).includes(r) && sp(this.pd.cells[r]).map(ex).includes(s) : false; }
   gRSc(src: string, tgt: string, st?: string) { let sc=0; const l=sp(this.cx.customRules.supportTargetRoomsLowImpact); const h=sp(this.cx.customRules.supportTargetRoomsHighImpact); if(src===tgt)sc+=9999; if(l.includes(src))sc-=1000; if(h.includes(src))sc+=1000; const sm=sp(this.dc[src]); const sL=sp(this.cx.customRules.supportStaffList).map(ex); if(sm.length>0&&sm.every(m=>sL.includes(ex(m))))sc+=5000; else{const a=sm.reduce((s,m)=>s+getAmt(m),0); if(a<=1)sc+=500; else if(a<=2)sc+=200;} if(st&&h.includes(src)&&(this.bm.get(st)==='AM'||this.bm.get(st)==='PM'))sc+=300; if(this.cl.includes(src)||this.sk.includes(src))sc+=5000; return sc; }
   uBM(c: string, p: string) { const cu=this.bm.get(c); this.bm.set(c, p.includes("(AM)")?(cu==='PM'||cu==='ALL'?'ALL':'AM'):p.includes("(PM)")?(cu==='AM'||cu==='ALL'?'ALL':'PM'):'ALL'); }
@@ -167,11 +168,11 @@ class AutoAssigner {
       (this.cx.customRules.priorityRooms||SEC).forEach((rm:string)=>{
         if(RE_SEC.includes(rm)||["昼当番","受付ヘルプ","待機","透析後胸部"].includes(rm)||(this.cx.customRules.linkedRooms||[]).some((r:any)=>r.target===rm))return;
         const e=this.gET(rm,this.cap[rm]||1); if(e.al)return;
-        let c=sp(this.dc[rm]); const getAmt=(arr:string[])=>arr.reduce((a,m)=>a+(PL_SEC.includes(ex(m))?0:getAmt(m)),0);
+        let c=sp(this.dc[rm]); const getAmtArr=(arr:string[])=>arr.reduce((a:number,m:string)=>a+(PL_SEC.includes(ex(m))?0:getAmt(m)),0);
         const isFx=(sn:string)=>(this.cx.customRules.fixed||[]).some((r:any)=>ex(r.staff)===ex(sn));
         let sA=[...this.iaGen].sort((a,b)=>(this.bm.get(a)==='NONE'?0:100)-(this.bm.get(b)==='NONE'?0:100)||this.gPR(a,rm)-this.gPR(b,rm));
-        while(getAmt(c)<e.cap){
-          const fs=sA.find(s=>{if(this.ac[s]>=1||(this.ac[s]===0.5&&(!["CT","MRI","治療","RI"].includes(rm)||!isMonthlyMainStaff(rm,s,this.cx.monthlyAssign))))return false; if(this.iFb(s,rm)||(rm==="MMG"&&!this.iMC(s))||!this.cAK(s,rm)||this.iHNC(s,rm)||isFx(s))return false; const b=this.bm.get(s); if((e.pC&&b==='AM')||(e.aC&&b==='PM')||this.noHD(rm,b||""))return false; return true;});
+        while(getAmtArr(c)<e.cap){
+          const fs=sA.find(s=>{if(this.ac[s]>=1||(this.ac[s]===0.5&&(!["CT","MRI","治療","RI"].includes(rm)||!getMSt(rm,this.cx.monthlyAssign).includes(s))))return false; if(this.iFb(s,rm)||(rm==="MMG"&&!this.iMC(s))||!this.cAK(s,rm)||this.iHNC(s,rm)||isFx(s))return false; const b=this.bm.get(s); if((e.pC&&b==='AM')||(e.aC&&b==='PM')||this.noHD(rm,b||""))return false; return true;});
           if(!fs)break; const b=this.bm.get(fs); let t="",p=1; if(b==='AM'){t="(PM)";p=0.5;}else if(b==='PM'){t="(AM)";p=0.5;}else if(e.pC){t="(AM)";p=0.5;}else if(e.aC){t="(PM)";p=0.5;} c.push(`${fs}${t}`); this.aU(fs,p); sA=sA.filter(x=>x!==fs); this.lg(`✅ [配置決定] ${rm} に ${fs}${t}`);
         } this.dc[rm]=jn(c);
       });
@@ -187,7 +188,7 @@ class AutoAssigner {
 
     this.lgP("メイン配置");
     const LTR=(this.cx.customRules.linkedRooms||[]).map((r:any)=>r.target);
-    (this.cx.customRules.priorityRooms||DEF_PRI_RMS).forEach((rm:string)=>{
+    (this.cx.customRules.priorityRooms||(DEF_RULES.priorityRooms||[])).forEach((rm:string)=>{
       if(this.sk.includes(rm)||["受付ヘルプ","昼当番","待機","透析後胸部"].includes(rm))return;
       let tC=this.cap[rm]!==undefined?this.cap[rm]:(["CT","MRI","治療"].includes(rm)?3:1);
       let cM=sp(this.dc[rm]); const ph=cM.filter(m=>PL_SEC.includes(ex(m))); if(ph.length>0){tC+=ph.length; this.dc[rm]=jn(cM.filter(m=>!PL_SEC.includes(ex(m))));}
@@ -195,7 +196,7 @@ class AutoAssigner {
         let cU=sp(this.dc["受付"]); sp(this.cx.monthlyAssign.受付).map(ex).forEach(n=>{if(this.iaAll.includes(n)&&!this.iU(n)&&!cU.map(ex).includes(n)){const b=this.bm.get(n);if(b==='ALL')return;let t=b==='AM'?"(PM)":b==='PM'?"(AM)":"";cU.push(`${n}${t}`);this.aU(n,t?0.5:1);this.bm.set(n,'ALL');}});
         let nU=tC-cU.reduce((s,m)=>s+getAmt(m),0); if(nU>0&&!LTR.includes(rm)){this.pk(this.iaRec,this.iaRec,Math.ceil(nU),"受付",cU).forEach((n:string)=>{const b=this.bm.get(n);let t=b==='AM'?"(PM)":b==='PM'?"(AM)":"";cU.push(`${n}${t}`);this.aU(n,t?0.5:1);this.bm.set(n,'ALL');});} this.dc["受付"]=jn(cU);
       } else {
-        let pL=(["治療","RI","CT","MRI","MMG"].includes(rm)?getMonthlyStaffForSection(rm,this.cx.monthlyAssign):sp(this.cx.monthlyAssign[rm]).map(ex)).filter(s=>this.iaGen.includes(s));
+        let pL=(["治療","RI","CT","MRI","MMG"].includes(rm)?getMSt(rm,this.cx.monthlyAssign):sp(this.cx.monthlyAssign[rm]).map(ex)).filter(s=>this.iaGen.includes(s));
         let cand=(["治療","RI","MMG"].includes(rm)&&pL.length>0)?pL:this.iaGen;
         if(!LTR.includes(rm)&&!(this.cx.customRules.kenmuPairs||[]).filter((p:any)=>p.s1===rm||p.s2===rm).map((p:any)=>p.s1===rm?p.s2:p.s1).some(pr=>sp(this.dc[pr]).reduce((s,m)=>s+getAmt(m),0)>0)){ this.fill(cand, rm, pL, tC); }
       }
@@ -210,7 +211,7 @@ class AutoAssigner {
     while(cur.reduce((s,m)=>s+getAmt(m),0)<e.cap) {
       const cA=cur.reduce((s,m)=>s+getAmt(m),0); if(cA===pA)break; pA=cA; let cAm=e.aC?999:0, cPm=e.pC?999:0; cur.forEach(x=>{if(x.includes("(AM)"))cAm++;else if(x.includes("(PM)"))cPm++;else{cAm++;cPm++;}});
       let nT=""; if(cAm>=tC&&cPm<tC)nT="(PM)"; else if(cPm>=tC&&cAm<tC)nT="(AM)"; else if(e.cap-cA===0.5){nT=cAm>cPm?"(PM)":cPm>cAm?"(AM)":"";}
-      const gFR=(name:string):RejectReason|null=>{if(cur.map(ex).includes(name))return{hard:true,msg:"配置済"}; if(this.iU(name))return{hard:true,msg:"他業務"}; if(this.iFb(name,sec))return{hard:true,msg:"不可"}; if(sec==="MMG"&&!this.iMC(name))return{hard:true,msg:"MMG外"}; if(!this.cAK(name,sec))return{hard:true,msg:"上限"}; const b=this.bm.get(name); if(nT&&b==='NONE'&&!e.pC&&!e.aC&&!isMonthlyMainStaff(sec,name,this.cx.monthlyAssign))return{hard:true,msg:"半端枠"}; if(b==='ALL')return{hard:true,msg:"全日ブ"}; if(nT==="(AM)"&&b==='AM')return{hard:true,msg:"AMブ"}; if(nT==="(PM)"&&b==='PM')return{hard:true,msg:"PMブ"}; if(e.pC&&b==='AM')return{hard:true,msg:"午後休"}; if(e.aC&&b==='PM')return{hard:true,msg:"午前休"}; if(this.noHD(sec,nT||b||""))return{hard:true,msg:"終日専任"}; if(this.iHB(name,sec).h)return{hard:true,msg:"終日専任"}; if(this.iHNC(name,sec))return{hard:false,msg:"連日"}; if(this.hNG(name,cur.map(ex),false))return{hard:true,msg:"NG"}; if(this.hNG(name,cur.map(ex),true))return{hard:false,msg:"NG軟"}; return null;};
+      const gFR=(name:string):{hard:boolean,msg:string}|null=>{if(cur.map(ex).includes(name))return{hard:true,msg:"配置済"}; if(this.iU(name))return{hard:true,msg:"他業務"}; if(this.iFb(name,sec))return{hard:true,msg:"不可"}; if(sec==="MMG"&&!this.iMC(name))return{hard:true,msg:"MMG外"}; if(!this.cAK(name,sec))return{hard:true,msg:"上限"}; const b=this.bm.get(name); if(nT&&b==='NONE'&&!e.pC&&!e.aC&&!getMSt(sec,this.cx.monthlyAssign).includes(name))return{hard:true,msg:"半端枠"}; if(b==='ALL')return{hard:true,msg:"全日ブ"}; if(nT==="(AM)"&&b==='AM')return{hard:true,msg:"AMブ"}; if(nT==="(PM)"&&b==='PM')return{hard:true,msg:"PMブ"}; if(e.pC&&b==='AM')return{hard:true,msg:"午後休"}; if(e.aC&&b==='PM')return{hard:true,msg:"午前休"}; if(this.noHD(sec,nT||b||""))return{hard:true,msg:"終日専任"}; if(this.iHB(name,sec).h)return{hard:true,msg:"終日専任"}; if(this.iHNC(name,sec))return{hard:false,msg:"連日"}; if(this.hNG(name,cur.map(ex),false))return{hard:true,msg:"NG"}; if(this.hNG(name,cur.map(ex),true))return{hard:false,msg:"NG軟"}; return null;};
       const cWR=avL.map(n=>({n,r:gFR(n)})); let vN=cWR.filter(c=>!c.r).map(c=>c.n); let fM=""; if(!vN.length){const sC=cWR.filter(c=>c.r&&!c.r.hard); if(sC.length>0){vN=sC.map(c=>c.n); fM="（⚠️特例）";}else break;}
       const vP=vN.filter(n=>pL.includes(n)); const vA=vN.filter(n=>!pL.includes(n));
       const sCnd=(cs:string[])=>{let ms=sp(this.cx.monthlyAssign[sec]).map(ex),sps=sp(this.cx.monthlyAssign[sec+"サブ優先"]).map(ex),ss=sp(this.cx.monthlyAssign[sec+"サブ"]).map(ex); if(sec==="治療"||sec==="RI"){ms=sp(this.cx.monthlyAssign[sec]).map(ex);if(sec==="治療"){sps=sp(this.cx.monthlyAssign.治療サブ優先).map(ex);ss=sp(this.cx.monthlyAssign.治療サブ).map(ex);}else{ss=sp(this.cx.monthlyAssign.RIサブ).map(ex);}} const hA=vN.some(s=>this.bm.get(s)==='PM'), hP=vN.some(s=>this.bm.get(s)==='AM'); return [...cs].sort((a,b)=>{const bA=this.bm.get(a),bB=this.bm.get(b); let sA=0,sB=0; if(ms.includes(a))sA+=10000;else if(sps.includes(a))sA+=5000;else if(ss.includes(a))sA+=2000; if(ms.includes(b))sB+=10000;else if(sps.includes(b))sB+=5000;else if(ss.includes(b))sB+=2000; if(this.iHB(a,sec).monthlyHalfException)sA-=3000; if(this.iHB(b,sec).monthlyHalfException)sB-=3000; const rw=["MRI","CT"].includes(sec)?200:100; sA-=(this.rc[a]?.[sec]||0)*rw; sB-=(this.rc[b]?.[sec]||0)*rw; if(this.iHNC(a,sec))sA-=500; if(this.iHNC(b,sec))sB-=500; if(sec==="ポータブル"){sA-=1000*this.gPR(a,sec);sB-=1000*this.gPR(b,sec);} if(nT===""){if(bA==='NONE')sA+=200;else if(hA&&hP&&(bA==='AM'||bA==='PM'))sA+=100;}else{if(nT==="(AM)"&&bA==='PM')sA+=200;if(nT==="(PM)"&&bA==='AM')sA+=200;if(bA==='NONE')sA+=100;} if(nT===""){if(bB==='NONE')sB+=200;else if(hA&&hP&&(bB==='AM'||bB==='PM'))sB+=100;}else{if(nT==="(AM)"&&bB==='PM')sB+=200;if(nT==="(PM)"&&bB==='AM')sB+=200;if(bB==='NONE')sB+=100;} return sB-sA||(this.ac[a]||0)-(this.ac[b]||0)||a.localeCompare(b,'ja');});};
@@ -289,11 +290,11 @@ class AutoAssigner {
     const pM=sp(this.dc["ポータブル"]), r2M=sp(this.dc["2号室"]), r2C=r2M.map(ex), r2A=r2M.reduce((s,m)=>s+(PL_SEC.includes(ex(m))?0:getAmt(m)),0); let nAH=false, nPH=false; r2M.forEach(rm=>{const c=ex(rm); const pm=pM.find(x=>ex(x)===c); if(pm){if(pm.includes("(AM)"))nAH=true; else if(pm.includes("(PM)"))nPH=true; else{nAH=true;nPH=true;}}});
     if(r2A<2&&(nAH||nPH)){
       const fC=(iA:boolean,exS:string[])=>[...sSL,...this.iaGen].filter((s,i,a)=>a.indexOf(s)===i).find(s=>{if(r2C.includes(s)||this.iFb(s,"2号室")||this.iHB(s,"2号室").h||this.hNG(s,r2C,false)||!this.cAK(s,"2号室")||this.iHNC(s,"2号室"))return false; const b=this.bm.get(s); if(b==='ALL'||(iA&&b==='AM')||(!iA&&b==='PM'))return false; if(exS.some(r=>sp(this.dc[r]).map(ex).includes(s)))return false; return true;});
-      if(nAH){let p=fC(true,["1号室","5号室"])??fC(true,[]); if(p){this.dc["2号室"]=jn([...sp(this.dc["2号室"]),`${p}(AM)`]); this.addU(p,0.5); this.bm.set(p,this.bm.get(p)==='PM'?'ALL':'AM'); this.lg(`🤝 [ポータブル特例] 2号室兼務(AM)のため ${p}`);}}
-      if(nPH){let p=fC(false,["1号室","5号室"])??fC(false,[]); if(p){this.dc["2号室"]=jn([...sp(this.dc["2号室"]),`${p}(PM)`]); this.addU(p,0.5); this.bm.set(p,this.bm.get(p)==='AM'?'ALL':'PM'); this.lg(`🤝 [ポータブル特例] 2号室兼務(PM)のため ${p}`);}}
+      if(nAH){let p=fC(true,["1号室","5号室"])??fC(true,[]); if(p){this.dc["2号室"]=jn([...sp(this.dc["2号室"]),`${p}(AM)`]); this.aU(p,0.5); this.bm.set(p,this.bm.get(p)==='PM'?'ALL':'AM'); this.lg(`🤝 [ポータブル特例] 2号室兼務(AM)のため ${p}`);}}
+      if(nPH){let p=fC(false,["1号室","5号室"])??fC(false,[]); if(p){this.dc["2号室"]=jn([...sp(this.dc["2号室"]),`${p}(PM)`]); this.aU(p,0.5); this.bm.set(p,this.bm.get(p)==='AM'?'ALL':'PM'); this.lg(`🤝 [ポータブル特例] 2号室兼務(PM)のため ${p}`);}}
     }
 
-    const pL=this.cx.customRules.priorityRooms||DEF_PRI_RMS;
+    const pL=this.cx.customRules.priorityRooms||(DEF_RULES.priorityRooms||[]);
     const dKT=RM_SEC.filter(r=>!["CT","MRI","治療","RI","待機","昼当番","受付","受付ヘルプ","透析後胸部"].includes(r)).sort((a,b)=>{let iA=pL.indexOf(a);if(iA===-1)iA=999;let iB=pL.indexOf(b);if(iB===-1)iB=999;return iB-iA;});
     const rP=[...RM_SEC].sort((a,b)=>{let iA=pL.indexOf(a);if(iA===-1)iA=999;let iB=pL.indexOf(b);if(iB===-1)iB=999;return iB-iA;});
     
