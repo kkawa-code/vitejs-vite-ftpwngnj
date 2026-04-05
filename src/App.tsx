@@ -639,6 +639,110 @@ export class AutoAssigner {
       if (!progressed) break;
     }
   }
+
+  private enforceAbsenceConstraints() {
+    const absentEntries = split(this.dayCells["不在"] || "");
+    for (const absentEntry of absentEntries) {
+      const staff = extractStaffName(absentEntry);
+      const absentTag = absentEntry.substring(staff.length);
+      const absentRange = parseTimeTagRange(absentTag || "") || { start: 0, end: 24 * 60 };
+      ROOM_SECTIONS.forEach(room => {
+        const members = split(this.dayCells[room] || "");
+        let changed = false;
+        const nextMembers: string[] = [];
+        for (const member of members) {
+          if (extractStaffName(member) !== staff) {
+            nextMembers.push(member);
+            continue;
+          }
+          const memberTag = member.substring(staff.length);
+          const memberRange = parseTimeTagRange(memberTag || "") || { start: 0, end: 24 * 60 };
+          const overlap = memberRange.start < absentRange.end && memberRange.end > absentRange.start;
+          if (!overlap) {
+            nextMembers.push(member);
+            continue;
+          }
+          const left = absentRange.start > memberRange.start ? { start: memberRange.start, end: Math.min(absentRange.start, memberRange.end) } : null;
+          const right = absentRange.end < memberRange.end ? { start: Math.max(absentRange.end, memberRange.start), end: memberRange.end } : null;
+          const segments = [left, right].filter((x): x is { start: number; end: number } => !!x && x.end > x.start);
+          if (segments.length === 0) {
+            changed = true;
+            continue;
+          }
+          const chosen = segments.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+          const newTag = rangeToTimeTag(chosen);
+          nextMembers.push(`${staff}${newTag}`);
+          if (`${staff}${newTag}` !== member) changed = true;
+        }
+        if (changed) this.dayCells[room] = join(nextMembers);
+      });
+      this.recomputeAssignedStateForStaff(staff);
+    }
+  }
+
+  private normalizeTimedAssignments() {
+    this.ctx.allStaff.forEach(staff => {
+      const entries: Array<{ room: string; member: string; tag: string; range: { start: number; end: number } }> = [];
+      ROOM_SECTIONS.forEach(room => {
+        split(this.dayCells[room] || "").forEach(member => {
+          if (extractStaffName(member) !== staff) return;
+          const tag = member.substring(staff.length);
+          const range = parseTimeTagRange(tag || "") || { start: 0, end: 24 * 60 };
+          entries.push({ room, member, tag, range });
+        });
+      });
+      const futureStarts = entries.map(e => e.range.start).filter(s => s > 12 * 60);
+      if (futureStarts.length === 0) return;
+      const earliestFutureStart = Math.min(...futureStarts);
+      const morningEntries = entries.filter(e => e.range.start <= 0 && e.range.end <= 12 * 60);
+      morningEntries.forEach(e => {
+        const desiredTag = rangeToTimeTag({ start: 0, end: earliestFutureStart });
+        if (!desiredTag || e.tag === desiredTag) return;
+        const members = split(this.dayCells[e.room] || "");
+        const idx = members.indexOf(e.member);
+        if (idx >= 0) {
+          members[idx] = `${staff}${desiredTag}`;
+          this.dayCells[e.room] = join(members);
+        }
+      });
+      this.recomputeAssignedStateForStaff(staff);
+    });
+  }
+
+  private enforceKenmuPairCoverage() {
+    const processPair = (sourceRoom: string, targetRoom: string) => {
+      const targetCap = this.getSectionBaseCapacity(targetRoom);
+      const eff = this.getEffectiveTarget(targetRoom, targetCap);
+      if (eff.allClosed) return;
+      let targetMembers = split(this.dayCells[targetRoom] || "");
+      const targetCoverage = () => targetMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
+      if (targetCoverage() >= eff.cap) return;
+      const targetNames = () => targetMembers.map(extractStaffName);
+      const sourceMembers = split(this.dayCells[sourceRoom] || "");
+      for (const member of sourceMembers) {
+        if (targetCoverage() >= eff.cap) break;
+        const staff = extractStaffName(member);
+        if (ROLE_PLACEHOLDERS.includes(staff) || targetNames().includes(staff)) continue;
+        if (this.isForbidden(staff, targetRoom) || this.isHardNoConsecutive(staff, targetRoom) || this.isHalfDayBlocked(staff, targetRoom).hard) continue;
+        if (this.hasNGPair(staff, targetNames(), false)) continue;
+        let pushTag = member.substring(staff.length);
+        if (!pushTag && targetRoom === "パノラマCT" && sourceRoom === "透視（6号）") pushTag = "(AM)";
+        if (pushTag && !this.canWorkNeedTag(this.blockMap.get(staff) || 'NONE', pushTag)) continue;
+        if (this.isTimeTagBlockedByFullDayRule(targetRoom, pushTag)) continue;
+        targetMembers.push(`${staff}${pushTag}`);
+        this.addUsage(staff, getTagTimeWeight(pushTag));
+        this.updateBlockMapAfterKenmu(staff, `${staff}${pushTag}`);
+        this.log(`🔁 [兼務補正] ${sourceRoom} の ${staff}${pushTag} を ${targetRoom} に補完`);
+      }
+      this.dayCells[targetRoom] = join(targetMembers);
+    };
+    (this.ctx.customRules.kenmuPairs || []).forEach((pair: any) => {
+      if (!pair?.s1 || !pair?.s2) return;
+      processPair(pair.s1, pair.s2);
+      processPair(pair.s2, pair.s1);
+    });
+  }
+
   applyDailyAdditions() { (this.ctx.customRules.dailyAdditions || []).forEach((rule: any) => { if (rule.date === this.day.id && rule.section && rule.count > 0 && rule.section !== "透析後胸部") { const placeholderName = rule.section + "枠" + (rule.time === "全日" || !rule.time ? "" : rule.time); let current = split(this.dayCells[rule.section]); if (!current.includes(placeholderName)) { for (let i = 0; i < rule.count; i++) current.push(placeholderName); this.dayCells[rule.section] = join(current); } } }); }
   evaluateEmergencies() { const tempAvailCount = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length; (this.ctx.customRules.emergencies || []).forEach((em: any) => { if (tempAvailCount <= Number(em.threshold)) { if (em.type === "role_assign" && em.role && em.section) this.roleAssignments[em.role] = em; if (em.type === "staff_assign" && em.staff && em.section) this.staffAssignments.push({ staff: em.staff, section: em.section }); if (em.type === "clear" && em.section) { this.skipSections.push(em.section); this.clearSections.push(em.section); } if (em.type === "change_capacity" && em.section) this.dynamicCapacity[em.section] = Number(em.newCapacity); } }); }
   cleanUpDayCells() { WORK_SECTIONS.forEach(sec => { if (["明け","入り","不在","土日休日代休"].includes(sec)) return; if (this.skipSections.includes(sec)) { this.dayCells[sec] = ""; return; } let members = split(this.dayCells[sec] || "").map(m => { const core = extractStaffName(m); if (ROLE_PLACEHOLDERS.includes(core)) return m; const block = this.blockMap.get(core) || 'NONE'; const currentTag = m.substring(core.length); if (block === 'ALL') return null; if (block === 'NONE') return m; const autoTag = this.getWorkTagFromAvailabilityState(block); if (!currentTag) return autoTag ? `${core}${autoTag}` : m; if (!this.canWorkNeedTag(block, currentTag)) return null; return m; }).filter(Boolean) as string[]; this.dayCells[sec] = join(members); }); }
