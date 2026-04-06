@@ -379,7 +379,7 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
 // ===================== 🌟 AutoAssigner =====================
 export class AutoAssigner {
   day: DayData; prevDay: DayData | null; pastDaysInMonth: DayData[]; pastDaysInWeek: DayData[]; ctx: AutoAssignContext; isSmartFix: boolean;
-  dayCells: Record<string, string>; blockMap: Map<string, string> = new Map();
+  dayCells: Record<string, string>; originalDayCells: Record<string, string>; blockMap: Map<string, string> = new Map();
   skipSections: string[] = []; clearSections: string[] = []; roleAssignments: Record<string, any> = {}; currentKenmu: any[] = [];
   dynamicCapacity: Record<string, number> = {}; assignCounts: Record<string, number> = {}; maxAssigns: Record<string, number> = {};
   counts: Record<string, number> = {}; roomCounts: Record<string, Record<string, number>> = {};
