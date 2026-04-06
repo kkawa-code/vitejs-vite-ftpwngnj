@@ -379,7 +379,7 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
 // ===================== 🌟 AutoAssigner =====================
 export class AutoAssigner {
   day: DayData; prevDay: DayData | null; pastDaysInMonth: DayData[]; pastDaysInWeek: DayData[]; ctx: AutoAssignContext; isSmartFix: boolean;
-  dayCells: Record<string, string>; blockMap: Map<string, string> = new Map();
+  dayCells: Record<string, string>; blockMap: Map<string, string> = new Map(); baseBlockMap: Map<string, string> = new Map();
   skipSections: string[] = []; clearSections: string[] = []; roleAssignments: Record<string, any> = {}; currentKenmu: any[] = [];
   dynamicCapacity: Record<string, number> = {}; assignCounts: Record<string, number> = {}; maxAssigns: Record<string, number> = {};
   counts: Record<string, number> = {}; roomCounts: Record<string, Record<string, number>> = {};
@@ -460,7 +460,7 @@ export class AutoAssigner {
   pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = []): string[] { const result: string[] = []; const uniqueList = Array.from(new Set(list.filter(Boolean))); const filterFn = (name: string, checkSoftNg: boolean) => { if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false; if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false; if (section && !this.canAddKenmu(name, section)) return false; return true; }; for (const name of uniqueList.filter(nm => filterFn(nm, true))) { result.push(name); if (result.length >= n) return result; } for (const name of uniqueList.filter(nm => filterFn(nm, false))) { result.push(name); if (result.length >= n) return result; } return result; }
 
   initCounts() { this.ctx.allStaff.forEach(s => { this.assignCounts[s] = 0; this.maxAssigns[s] = 1; this.roomCounts[s] = {}; SECTIONS.forEach(sec => this.roomCounts[s][sec] = 0); this.counts[s] = 0; }); this.pastDaysInMonth.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (["CT", "MRI"].includes(sec)) { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) { this.roomCounts[c][sec]++; this.counts[c]++; } }); } }); }); this.pastDaysInWeek.forEach(pd => { Object.entries(pd.cells).forEach(([sec, val]) => { if (!["CT", "MRI"].includes(sec)) { split(val as string).forEach(m => { const c = extractStaffName(m); if (this.roomCounts[c]) { this.roomCounts[c][sec]++; this.counts[c]++; } }); } }); }); }
-  buildBlockMap() { this.ctx.allStaff.forEach(s => this.blockMap.set(s, 'NONE')); ["明け","入り","土日休日代休"].forEach(sec => { split(this.dayCells[sec]).forEach(m => this.blockMap.set(extractStaffName(m), 'ALL')); }); split(this.dayCells["不在"]).forEach(m => { const core = extractStaffName(m); const tag = m.substring(core.length); this.blockMap.set(core, this.getAvailabilityStateFromTag(tag)); }); }
+  buildBlockMap() { this.ctx.allStaff.forEach(s => { this.blockMap.set(s, 'NONE'); this.baseBlockMap.set(s, 'NONE'); }); ["明け","入り","土日休日代休"].forEach(sec => { split(this.dayCells[sec]).forEach(m => { const core = extractStaffName(m); this.blockMap.set(core, 'ALL'); this.baseBlockMap.set(core, 'ALL'); }); }); split(this.dayCells["不在"] || "").forEach(m => { const core = extractStaffName(m); const tag = m.substring(core.length); const state = this.getAvailabilityStateFromTag(tag); this.blockMap.set(core, state); this.baseBlockMap.set(core, state); }); }
   private getAbsenceHelpTagsForRoom(room: string): string[] {
     const helpMap = parseAbsenceHelpMap(this.dayCells);
     if (Object.keys(helpMap).length === 0) return [];
@@ -513,22 +513,64 @@ export class AutoAssigner {
     if (needTag === "(PM)" && eff.pmClosed) return false;
     return this.getRoomCoverageCount(room, needTag) < eff.cap;
   }
+  private getAvailableRangesFromBlockState(state: string): Array<{ start: number; end: number }> {
+    const blocked = this.getUnavailableRangesFromState(state);
+    if (blocked.length === 0) return [{ start: 0, end: 24 * 60 }];
+    const sorted = [...blocked].sort((a, b) => a.start - b.start);
+    const merged: Array<{ start: number; end: number }> = [];
+    sorted.forEach(r => {
+      if (!merged.length || r.start > merged[merged.length - 1].end) merged.push({ ...r });
+      else merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, r.end);
+    });
+    const available: Array<{ start: number; end: number }> = [];
+    let cursor = 0;
+    merged.forEach(r => {
+      if (r.start > cursor) available.push({ start: cursor, end: r.start });
+      cursor = Math.max(cursor, r.end);
+    });
+    if (cursor < 24 * 60) available.push({ start: cursor, end: 24 * 60 });
+    return available.filter(r => r.end > r.start);
+  }
+  private subtractRangeList(source: Array<{ start: number; end: number }>, cut: { start: number; end: number }): Array<{ start: number; end: number }> {
+    const out: Array<{ start: number; end: number }> = [];
+    source.forEach(r => {
+      if (cut.end <= r.start || cut.start >= r.end) { out.push(r); return; }
+      if (cut.start > r.start) out.push({ start: r.start, end: Math.min(cut.start, r.end) });
+      if (cut.end < r.end) out.push({ start: Math.max(cut.end, r.start), end: r.end });
+    });
+    return out.filter(r => r.end > r.start);
+  }
+  private getRemainingBlockState(baseState: string, assignedRanges: Array<{ start: number; end: number }>): string {
+    let available = this.getAvailableRangesFromBlockState(baseState);
+    assignedRanges.forEach(r => { available = this.subtractRangeList(available, r); });
+    available = available.filter(r => r.end > r.start).sort((a, b) => a.start - b.start);
+    if (available.length === 0) return 'ALL';
+    if (available.length === 1) {
+      const only = available[0];
+      if (only.start <= 0 && only.end >= 24 * 60) return 'NONE';
+      if (only.start <= 0 && only.end === 12 * 60) return 'PM';
+      if (only.start === 12 * 60 && only.end >= 24 * 60) return 'AM';
+      if (only.start <= 0) return `FROM:${only.end}`;
+      if (only.end >= 24 * 60) return `UNTIL:${only.start}`;
+      return 'ALL';
+    }
+    if (available.length === 2 && available[0].start <= 0 && available[1].end >= 24 * 60) {
+      return `RANGE:${available[0].end}:${available[1].start}`;
+    }
+    return 'ALL';
+  }
   private recomputeAssignedStateForStaff(staff: string) {
-    let hasAm = false, hasPm = false;
+    const assignedRanges: Array<{ start: number; end: number }> = [];
     ROOM_SECTIONS.forEach(room => {
       if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return;
       split(this.dayCells[room] || "").forEach(member => {
         if (extractStaffName(member) !== staff) return;
         const tag = member.substring(staff.length);
-        const range = parseTimeTagRange(tag || "") || { start: 0, end: 24 * 60 };
-        if (range.start < 12 * 60) hasAm = true;
-        if (range.end > 12 * 60) hasPm = true;
+        assignedRanges.push(parseTimeTagRange(tag || "") || { start: 0, end: 24 * 60 });
       });
     });
-    if (hasAm && hasPm) this.blockMap.set(staff, 'ALL');
-    else if (hasAm) this.blockMap.set(staff, 'AM');
-    else if (hasPm) this.blockMap.set(staff, 'PM');
-    else this.blockMap.set(staff, 'NONE');
+    const baseState = this.baseBlockMap.get(staff) || 'NONE';
+    this.blockMap.set(staff, this.getRemainingBlockState(baseState, assignedRanges));
   }
   private enqueueSecondaryBackfill(room: string, tag: string, staff: string, targetRoom: string) {
     if (!this.secondaryBackfillQueue[room]) this.secondaryBackfillQueue[room] = [];
