@@ -565,7 +565,42 @@ export class AutoAssigner {
     });
 
     this.processAbsenceHelpAssignments();
-    this.processPostTasks(); return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
+    this.processPostTasks();
+    this.prepareAvailability();
+    this.processAbsenceHelpAssignments();
+    this.enforceSupportAssignments();
+    return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
+  }
+
+  private enforceSupportAssignments() {
+    const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
+    const targetRooms = split(this.ctx.customRules.supportTargetRooms || "");
+    const orderedRooms = [
+      ...targetRooms.filter(r => split(this.dayCells[r] || "").length > 0),
+      ...targetRooms.filter(r => split(this.dayCells[r] || "").length === 0),
+    ];
+    supportStaffList.forEach(staff => {
+      if (!this.ctx.activeGeneralStaff.includes(staff)) return;
+      if (this.isUsed(staff) || this.blockMap.get(staff) === 'ALL') return;
+      const alreadyAssigned = ROOM_SECTIONS.some(r => split(this.dayCells[r] || "").some(m => extractStaffName(m) === staff));
+      if (alreadyAssigned) return;
+      const membersWithTags = ROOM_SECTIONS.flatMap(r => split(this.dayCells[r] || ""));
+      const currentTag = membersWithTags.find(m => extractStaffName(m) === staff)?.substring(staff.length) || this.getAssignedWorkTag(staff);
+      for (const room of orderedRooms) {
+        if (!room || this.skipSections.includes(room) || room === "透析後胸部") continue;
+        if (this.isForbidden(staff, room) || this.isHardNoConsecutive(staff, room)) continue;
+        const currentMembers = split(this.dayCells[room] || "");
+        if (this.hasNGPair(staff, currentMembers.map(extractStaffName), false)) continue;
+        if (!this.canAddKenmu(staff, room)) continue;
+        if (this.isTimeTagBlockedByFullDayRule(room, currentTag)) continue;
+        this.dayCells[room] = join([...currentMembers, `${staff}${currentTag}`]);
+        this.addUsage(staff, currentTag ? 0.5 : 1);
+        this.blockMap.set(staff, 'ALL');
+        this.timeTagMap.delete(staff);
+        this.log(`🧑‍🤝‍🧑 [サポート固定] ${staff} を ${room} に配置`);
+        break;
+      }
+    });
   }
 
   fill(availList: string[], section: string, preferredList: string[], targetCount: number, forcedNeedTag: string = "") {
