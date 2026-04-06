@@ -167,6 +167,26 @@ export function getTagTimeWeight(tag: string): number {
   return duration < 24 * 60 ? 0.5 : 1;
 }
 
+
+export function getConservativeRemainingTag(originalTag: string, remaining: { start: number; end: number } | null): string {
+  if (!remaining || remaining.end <= remaining.start) return "";
+  if (!originalTag) return "";
+  const originalRange = parseTimeTagRange(originalTag);
+  if (!originalRange) return "";
+  if (originalTag === "(AM)" || originalTag === "(PM)") return "";
+  const isUntil = /^\(〜\d{1,2}:\d{2}\)$/.test(originalTag);
+  const isFrom = /^\(\d{1,2}:\d{2}〜\)$/.test(originalTag);
+  if (isUntil) {
+    if (remaining.start == 0) return `(${"〜"}${formatMinutesToClock(remaining.end)})`;
+    return "";
+  }
+  if (isFrom) {
+    if (remaining.end >= 24 * 60) return `(${formatMinutesToClock(remaining.start)}〜)`;
+    return "";
+  }
+  return "";
+}
+
 export function getStaffAmount(name: string) {
   if (ROLE_PLACEHOLDERS.includes(extractStaffName(name))) return 0;
   const tag = name.substring(extractStaffName(name).length);
@@ -475,21 +495,6 @@ export class AutoAssigner {
     });
   }
 
-  private getNoHelpRangesForRoom(room: string): Array<{ start: number; end: number }> {
-    const helpMap = parseAbsenceHelpMap(this.dayCells);
-    if (Object.keys(helpMap).length === 0) return [];
-    const roomMembers = split(this.dayCells[room] || "").map(extractStaffName);
-    const absentEntries = split(this.dayCells["不在"] || "");
-    return absentEntries.flatMap((entry: string) => {
-      const staff = extractStaffName(entry);
-      const absentTag = entry.substring(staff.length);
-      if (!roomMembers.includes(staff)) return [];
-      if (helpMap[staff] !== ABSENCE_HELP_NONE) return [];
-      const range = parseTimeTagRange(absentTag);
-      return range ? [range] : [];
-    });
-  }
-
   private getSectionBaseCapacity(room: string): number {
     if (this.dynamicCapacity[room] !== undefined) return this.dynamicCapacity[room];
     if (["CT", "MRI", "治療"].includes(room)) return 3;
@@ -570,7 +575,7 @@ export class AutoAssigner {
       if (originalTag === "(PM)" && targetRange.end < 12 * 60) {
         remaining = { start: targetRange.end, end: 24 * 60 };
       }
-      if (remaining && remaining.end > remaining.start) replacementTag = rangeToTimeTag(remaining);
+      if (remaining && remaining.end > remaining.start) replacementTag = getConservativeRemainingTag(originalTag, remaining);
     }
     let sourceMembers = split(this.dayCells[sourceRoom] || "");
     const idx = sourceMembers.findIndex(m => m === originalMember);
@@ -910,8 +915,8 @@ export class AutoAssigner {
 
       // タグなし終日勤務や AM/PM の粗いタグに対して、新しい細かい時刻タグを勝手に生成しない。
       // 過員時は時間短縮ではなく、その部屋から外す。
-      const canSafelySplit = !!tag && /[:〜]/.test(tag);
-      if (!canSafelySplit) return null;
+      const conservativeTag = getConservativeRemainingTag(tag, cut.start > memberRange.start ? { start: memberRange.start, end: Math.min(cut.start, memberRange.end) } : (cut.end < memberRange.end ? { start: Math.max(cut.end, memberRange.start), end: memberRange.end } : null));
+      if (!conservativeTag) return null;
 
       const left = cut.start > memberRange.start ? { start: memberRange.start, end: Math.min(cut.start, memberRange.end) } : null;
       const right = cut.end < memberRange.end ? { start: Math.max(cut.end, memberRange.start), end: memberRange.end } : null;
@@ -1025,7 +1030,8 @@ export class AutoAssigner {
       let targetCount = this.getSectionBaseCapacity(room);
       let cMems = split(this.dayCells[room]); const ph = cMems.filter(m => ROLE_PLACEHOLDERS.includes(extractStaffName(m)));
       const phTags: string[] = []; if (ph.length > 0) { ph.forEach(p => { const core = extractStaffName(p); const tag = p.substring(core.length); if (tag) phTags.push(tag); }); targetCount += ph.length; this.dayCells[room] = join(cMems.filter(m => !ROLE_PLACEHOLDERS.includes(extractStaffName(m)))); }
-      const absenceHelpTags = Array.from(new Set(this.getAbsenceHelpTagsForRoom(room)));
+      const absenceHelpTags = this.getAbsenceHelpTagsForRoom(room);
+      if (absenceHelpTags.length > 0) { phTags.push(...absenceHelpTags); targetCount += absenceHelpTags.length; }
       if (room === "受付") {
         let cUke = split(this.dayCells["受付"]); const ukeMo = split(this.ctx.monthlyAssign.受付 || "").map(extractStaffName);
         for (const n of ukeMo) { if (this.initialAvailAll.includes(n) && !this.isUsed(n) && !cUke.map(extractStaffName).includes(n)) { const b = this.blockMap.get(n) || 'NONE'; if (b === 'ALL') continue; let t = this.getWorkTagFromAvailabilityState(b); cUke.push(`${n}${t}`); this.addUsage(n, t?0.5:1); this.blockMap.set(n, 'ALL'); } }
@@ -1039,7 +1045,7 @@ export class AutoAssigner {
         let cand = (["治療", "RI", "MMG"].includes(room)) ? (pList.length > 0 ? pList : this.initialAvailGeneral) : this.initialAvailGeneral;
         const pRooms = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.s1 === room || p.s2 === room).map((p: any) => p.s1 === room ? p.s2 : p.s1);
         const hasPF = pRooms.some(pr => split(this.dayCells[pr]).reduce((sum, m) => sum + getStaffAmount(m), 0) > 0);
-        if (!((this.ctx.customRules.linkedRooms || []).some((r: any) => r.target === room)) && !hasPF) { this.fill(cand, room, pList, targetCount, phTags); absenceHelpTags.forEach((helpTag: string) => this.fill(cand, room, pList, targetCount, helpTag)); }
+        if (!((this.ctx.customRules.linkedRooms || []).some((r: any) => r.target === room)) && !hasPF) { this.fill(cand, room, pList, targetCount, phTags); }
       }
     });
 
@@ -1066,15 +1072,7 @@ export class AutoAssigner {
       const currentAmount = getCurrentAmount(current); if (currentAmount === prevAmount && forcedNeedTags.length === 0) break; prevAmount = currentAmount;
       const remaining = eff.cap - currentAmount; let curAm = eff.amClosed ? 999 : 0; let curPm = eff.pmClosed ? 999 : 0; let placeholderTag = ""; current.forEach(x => { const xc = extractStaffName(x); if (ROLE_PLACEHOLDERS.includes(xc)) {   const xt = x.substring(xc.length);   if (xt) placeholderTag = xt;   return; } if (x.includes("(AM)")) curAm++; else if (x.includes("(PM)")) curPm++; else { curAm++; curPm++; } });
       const queuedTag = forcedNeedTags.length > 0 ? forcedNeedTags[0] : "";
-      const explicitHelpTags = queuedTag ? [] : Array.from(new Set(this.getAbsenceHelpTagsForRoom(section)));
-      const noHelpRanges = queuedTag ? [] : this.getNoHelpRangesForRoom(section);
-      let needTag = queuedTag || placeholderTag || "";
-      if (!needTag && explicitHelpTags.length === 0) { if (curAm >= targetCount && curPm < targetCount) needTag = "(PM)"; else if (curPm >= targetCount && curAm < targetCount) needTag = "(AM)"; else if (remaining === 0.5) { if (curAm > curPm) needTag = "(PM)"; else if (curPm > curAm) needTag = "(AM)"; } }
-      if (!queuedTag && needTag) {
-        const needRange = parseTimeTagRange(needTag);
-        if (needRange && noHelpRanges.some(r => needRange.start < r.end && needRange.end > r.start)) break;
-      }
-      if (!needTag && explicitHelpTags.length > 0 && remaining <= 1) break;
+      let needTag = queuedTag || placeholderTag || ""; if (!needTag) { if (curAm >= targetCount && curPm < targetCount) needTag = "(PM)"; else if (curPm >= targetCount && curAm < targetCount) needTag = "(AM)"; else if (remaining === 0.5) { if (curAm > curPm) needTag = "(PM)"; else if (curPm > curAm) needTag = "(AM)"; } }
       const getFilterReason = (name: string): RejectReason | null => { if (current.map(extractStaffName).includes(name)) return { hard: true, msg: "同室配置済" }; if (this.isUsed(name)) return { hard: true, msg: "他業務配置済" }; if (this.isForbidden(name, section)) return { hard: true, msg: "担当不可" }; if (section === "MMG" && !this.isMmgCapable(name)) return { hard: true, msg: "MMG外" }; if (!this.canAddKenmu(name, section)) return { hard: true, msg: "兼務上限" }; const b = this.blockMap.get(name) || 'NONE'; const isForcedHelpSlot = !!queuedTag; if (needTag && b === 'NONE' && !isForcedHelpSlot) { if (!eff.pmClosed && !eff.amClosed && !isMonthlyMainStaff(section, name, this.ctx.monthlyAssign)) return { hard: true, msg: "半端枠" }; } if (b === 'ALL') return { hard: true, msg: "全日ブ" }; if (needTag && !this.canWorkNeedTag(b, needTag)) return { hard: true, msg: "時間帯ブ" }; if (eff.pmClosed && (b === 'AM' || b.startsWith('FROM:'))) return { hard: true, msg: "午後休" }; if (eff.amClosed && (b === 'PM' || b.startsWith('UNTIL:'))) return { hard: true, msg: "午前休" }; if (this.isTimeTagBlockedByFullDayRule(section, needTag || this.getWorkTagFromAvailabilityState(b) || "")) return { hard: true, msg: "終日専任" }; if (this.isHalfDayBlocked(name, section).hard) return { hard: true, msg: "終日専任" }; if (this.isHardNoConsecutive(name, section)) return { hard: false, msg: "連日禁止" }; if (this.hasNGPair(name, current.map(extractStaffName), false)) return { hard: true, msg: "絶対NG" }; if (this.hasNGPair(name, current.map(extractStaffName), true)) return { hard: false, msg: "なるべくNG" }; return null; };
       const cWR = availList.map(n => ({ n, r: getFilterReason(n) })); let vN = cWR.filter(c => !c.r).map(c => c.n); let fM = ""; if (!vN.length) { const sC = cWR.filter(c => c.r && !c.r.hard); if (sC.length > 0) { vN = sC.map(c => c.n); fM = "（⚠️特例）"; } else { if (queuedTag) { this.log(`⚠️ [補充未達] ${section} の ${queuedTag} 枠を埋められませんでした`); forcedNeedTags.shift(); prevAmount = -1; continue; } break; } }
       const vP = vN.filter(n => preferredList.includes(n)); const vA = vN.filter(n => !preferredList.includes(n));
@@ -1131,7 +1129,12 @@ export class AutoAssigner {
           continue;
         }
         for (const remain of remains) {
-          const tag = rangeToTimeTag(remain);
+          const originalTag = item.raw.substring(staff.length);
+          const tag = getConservativeRemainingTag(originalTag, remain);
+          if (!tag) {
+            this.enqueueSecondaryBackfill(item.room, originalTag, staff, kept[0]?.room || item.room);
+            continue;
+          }
           updates[item.room].push(`${staff}${tag}`);
           kept.push({ room: item.room, range: remain });
         }
