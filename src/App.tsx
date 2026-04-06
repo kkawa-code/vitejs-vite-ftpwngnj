@@ -131,6 +131,33 @@ export function getStaffAmount(name: string) {
 }
 
 
+export function parseClockToMinutes(text: string): number {
+  const [h, m] = text.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export function parseTimeTagRange(tag: string): { start: number; end: number } | null {
+  if (!tag) return { start: 0, end: 24 * 60 };
+  if (tag === "(AM)") return { start: 0, end: 12 * 60 };
+  if (tag === "(PM)") return { start: 12 * 60, end: 24 * 60 };
+  const body = tag.replace(/[()]/g, "").trim();
+  let m = body.match(/^〜(\d{1,2}:\d{2})$/);
+  if (m) return { start: 0, end: parseClockToMinutes(m[1]) };
+  m = body.match(/^(\d{1,2}:\d{2})〜$/);
+  if (m) return { start: parseClockToMinutes(m[1]), end: 24 * 60 };
+  m = body.match(/^(\d{1,2}:\d{2})〜(\d{1,2}:\d{2})$/);
+  if (m) return { start: parseClockToMinutes(m[1]), end: parseClockToMinutes(m[2]) };
+  return null;
+}
+
+export function tagsOverlap(tagA: string, tagB: string): boolean {
+  const a = parseTimeTagRange(tagA);
+  const b = parseTimeTagRange(tagB);
+  if (!a || !b) return true;
+  return a.start < b.end && b.start < a.end;
+}
+
+
 export const ABSENCE_HELP_KEY = "__absenceHelp";
 export const ABSENCE_HELP_NONE = "__NO_HELP__";
 
@@ -355,6 +382,21 @@ export class AutoAssigner {
   canAddKenmu(st: string, tgt: string, bypass: boolean = false): boolean { const limit = this.ctx.customRules.alertMaxKenmu || 3; const cRooms = this.getTodayRoomCount(st); if (!split(this.dayCells[tgt] || "").map(extractStaffName).includes(st) && cRooms >= limit) return false; const exPairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive); for (const p of exPairs) { const inS1 = split(this.dayCells[p.s1] || "").map(extractStaffName).includes(st); const inS2 = split(this.dayCells[p.s2] || "").map(extractStaffName).includes(st); if (inS1 || inS2) { if (tgt !== p.s1 && tgt !== p.s2) return false; } if (tgt === p.s1 || tgt === p.s2) { if (!bypass) { const curR = ROOM_SECTIONS.filter(r => split(this.dayCells[r] || "").map(extractStaffName).includes(st) && !["待機", "昼当番", "受付", "受付ヘルプ"].includes(r)); const hasOut = curR.some(r => r !== p.s1 && r !== p.s2); if (hasOut) return false; } } } return true; }
   isMmgCapable(st: string): boolean { return split(this.ctx.monthlyAssign.MMG || "").map(extractStaffName).includes(extractStaffName(st)); }
   getEffectiveTarget(room: string, baseCap: number) { const dayChar = this.day.label.match(/\((.*?)\)/)?.[1]; if (!dayChar) return { cap: baseCap, amClosed: false, pmClosed: false, allClosed: false }; const closed = (this.ctx.customRules.closedRooms || []).filter((r: any) => r.room === room && r.day === dayChar); let amClosed = false; let pmClosed = false; let allClosed = false; closed.forEach((r: any) => { if (r.time === "全日") allClosed = true; else if (r.time === "(AM)") amClosed = true; else if (r.time === "(PM)") pmClosed = true; }); if (amClosed && pmClosed) allClosed = true; if (allClosed) return { cap: 0, amClosed: true, pmClosed: true, allClosed: true }; if (amClosed || pmClosed) return { cap: baseCap / 2, amClosed, pmClosed, allClosed: false }; return { cap: baseCap, amClosed: false, pmClosed: false, allClosed: false }; }
+
+  private canStaffCoverNeedTag(staff: string, needTag: string): boolean {
+    const need = parseTimeTagRange(needTag);
+    if (!need) return true;
+    const block = this.blockMap.get(staff);
+    const tt = this.timeTagMap.get(staff) || "";
+    let available: { start: number; end: number }[] = [{ start: 0, end: 24 * 60 }];
+
+    if (block === 'ALL') available = [];
+    else if (block === 'AM') available = [tt ? (parseTimeTagRange(tt) || { start: 12 * 60, end: 24 * 60 }) : { start: 12 * 60, end: 24 * 60 }];
+    else if (block === 'PM') available = [tt ? (parseTimeTagRange(tt) || { start: 0, end: 12 * 60 }) : { start: 0, end: 12 * 60 }];
+    else if (tt) available = [parseTimeTagRange(tt) || { start: 0, end: 24 * 60 }];
+
+    return available.some(r => r.start < need.end && need.start < r.end);
+  }
   
   pick(availList: string[], list: string[], n: number, section?: string, currentAssigned: string[] = []): string[] { const result: string[] = []; const uniqueList = Array.from(new Set(list.filter(Boolean))); const filterFn = (name: string, checkSoftNg: boolean) => { if (!availList.includes(name) || this.isUsed(name) || (section && this.isForbidden(name, section))) return false; if (this.hasNGPair(name, [...currentAssigned, ...result].map(extractStaffName), checkSoftNg)) return false; if (section && !this.canAddKenmu(name, section)) return false; return true; }; for (const name of uniqueList.filter(nm => filterFn(nm, true))) { result.push(name); if (result.length >= n) return result; } for (const name of uniqueList.filter(nm => filterFn(nm, false))) { result.push(name); if (result.length >= n) return result; } return result; }
 
