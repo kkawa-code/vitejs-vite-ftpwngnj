@@ -61,7 +61,7 @@ type RejectReason = { hard: boolean, msg: string };
 type WarningInfo = { level: 'red' | 'orange' | 'yellow'; title: string; msg: string; staff?: string; room?: string; };
 
 interface CustomRules {
-  staffList: string; receptionStaffList: string; supportStaffList: string; supportTargetRooms: string; 
+  staffList: string; receptionStaffList: string; supportStaffList: string; femaleStaffList: string; supportTargetRooms: string; 
   supportTargetRoomsLowImpact: string; supportTargetRoomsHighImpact: string; 
   customHolidays: string; capacity: Record<string, number>; dailyCapacities: any[]; dailyAdditions: any[]; 
   priorityRooms: string[]; fullDayOnlyRooms: string; noConsecutiveRooms: string; consecutiveAlertRooms: string;
@@ -99,7 +99,7 @@ const DEFAULT_MONTHLY_ASSIGN: Record<string, string> = { CT: "", MRI: "", 治療
 const DEFAULT_PRIORITY_ROOMS = ["治療", "受付", "MMG", "RI", "MRI", "CT", "透視（6号）", "透視（11号）", "骨塩", "1号室", "5号室", "2号室", "ポータブル", "DSA", "検像", "パノラマCT", "3号室", "受付ヘルプ", "透析後胸部"];
 
 const DEFAULT_RULES: CustomRules = { 
-  staffList: "", receptionStaffList: "", supportStaffList: "", supportTargetRooms: "2号室, 3号室", 
+  staffList: "", receptionStaffList: "", supportStaffList: "", femaleStaffList: "", supportTargetRooms: "2号室, 3号室", 
   supportTargetRoomsLowImpact: "3号室,パノラマCT", 
   supportTargetRoomsHighImpact: "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像", 
   customHolidays: "", 
@@ -322,7 +322,10 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
                 const HELP_RMS = ["CT","MRI","RI","治療","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","検像"];
                 const mappedRoom = helpRoomMap?.[coreName] || null;
                 const mappedTime = helpTimeMap?.[coreName] || "";
-                const foundRm = mappedRoom || (dayCells ? HELP_RMS.find((r:string) => split(dayCells[r]||"").some((m:string) => extractStaffName(m) === coreName)) : null) || null;
+                const foundRm = mappedRoom
+                  || (mappedTime && dayCells ? HELP_RMS.find((r:string) => split(dayCells[r]||"").some((m:string) => m === `${r}枠${mappedTime}`)) : null)
+                  || (dayCells ? HELP_RMS.find((r:string) => split(dayCells[r]||"").some((m:string) => extractStaffName(m) === coreName)) : null)
+                  || null;
                 return (
                   <span style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:4}}>
                     <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>{foundRm ? `${foundRm} 補充` : "補充"}</span>
@@ -483,6 +486,23 @@ class AutoAssigner {
   }
 
   isMmgCapable(staff: string): boolean { return split(this.ctx.monthlyAssign.MMG || "").map(extractStaffName).includes(extractStaffName(staff)); }
+
+  isHalfDayRestrictedStaff(staff: string): boolean {
+    const b = this.blockMap.get(staff);
+    return b === "AM" || b === "PM" || this.timeTagMap.has(staff);
+  }
+
+  canAssignCoreModality(staff: string, section: string): boolean {
+    if (!["CT", "MRI"].includes(section)) return true;
+    return !this.isHalfDayRestrictedStaff(staff);
+  }
+
+  getEffectiveFemaleStaffList(): string[] {
+    const explicit = split(this.ctx.customRules.femaleStaffList || "").map(extractStaffName);
+    if (explicit.length > 0) return explicit;
+    return split(this.ctx.monthlyAssign.MMG || "").map(extractStaffName);
+  }
+
   getPreferredTagForStaff(staff: string): string {
     const b = this.blockMap.get(staff); const tt = this.timeTagMap.get(staff);
     if (b === 'AM') return '(PM)';
@@ -567,7 +587,7 @@ class AutoAssigner {
             const freeStaff = sortedAvail.find((s: string) => { 
                 if (this.assignCounts[s] >= 1) return false; 
                 if (this.assignCounts[s] === 0.5) { if (!["CT", "MRI", "治療", "RI"].includes(room)) return false; if (!isMonthlyMainStaff(room, s, this.ctx.monthlyAssign)) return false; } 
-                if (this.isForbidden(s, room)) return false; if (room === "MMG" && !this.isMmgCapable(s)) return false; if (!this.canAddKenmu(s, room)) return false; if (this.isHardNoConsecutive(s, room)) return false; if (isFixedToAny(s)) return false; 
+                if (!this.canAssignCoreModality(s, room)) return false; if (this.isForbidden(s, room)) return false; if (room === "MMG" && !this.isMmgCapable(s)) return false; if (!this.canAddKenmu(s, room)) return false; if (this.isHardNoConsecutive(s, room)) return false; if (isFixedToAny(s)) return false; 
                 const b = this.blockMap.get(s);
                 if (eff.pmClosed && b === 'AM') return false; 
                 if (eff.amClosed && b === 'PM') return false; 
@@ -590,7 +610,7 @@ class AutoAssigner {
       (this.ctx.customRules.fixed || []).forEach((rule: any) => { if (!rule.staff || !rule.section) return; Object.keys(this.dayCells).forEach(sec => { if (sec === rule.section) return; if (REST_SECTIONS.includes(sec)) return; const before = split(this.dayCells[sec]); const after = before.filter(m => extractStaffName(m) !== extractStaffName(rule.staff)); if (before.length !== after.length) { this.dayCells[sec] = join(after); this.assignCounts[extractStaffName(rule.staff)] = 0; this.blockMap.set(extractStaffName(rule.staff), 'NONE'); } }); });
       (this.ctx.customRules.fixed || []).forEach((rule: any) => { 
           const core = extractStaffName(rule.staff); 
-          if (!core || !rule.section || !this.initialAvailAll.includes(core) || this.isUsed(core) || this.isForbidden(core, rule.section)) return; 
+          if (!core || !rule.section || !this.initialAvailAll.includes(core) || this.isUsed(core) || this.isForbidden(core, rule.section) || !this.canAssignCoreModality(core, rule.section)) return; 
           if (this.isHardNoConsecutive(core, rule.section)) { this.log(`⚠️ [専従スキップ] ${core} は ${rule.section} の連日禁止ルールの対象のため固定配置をスキップしました`); return; }
           if (this.skipSections.includes(rule.section)) return; 
           const current = split(this.dayCells[rule.section]); 
@@ -600,7 +620,7 @@ class AutoAssigner {
       });
       this.staffAssignments.forEach((rule: any) => { 
           const core = extractStaffName(rule.staff); 
-          if (!core || !rule.section || !this.initialAvailAll.includes(core) || this.isUsed(core) || this.isForbidden(core, rule.section)) return; 
+          if (!core || !rule.section || !this.initialAvailAll.includes(core) || this.isUsed(core) || this.isForbidden(core, rule.section) || !this.canAssignCoreModality(core, rule.section)) return; 
           if (this.isHardNoConsecutive(core, rule.section)) { this.log(`⚠️ [緊急スキップ] ${core} は ${rule.section} の連日禁止ルールの対象のため強制配置をスキップしました`); return; }
           if (this.skipSections.includes(rule.section)) return; 
           const current = split(this.dayCells[rule.section]); 
@@ -608,14 +628,14 @@ class AutoAssigner {
           const tag = this.getPreferredTagForStaff(core); 
           this.blockMap.set(core, 'ALL'); this.dayCells[rule.section] = join([...current, `${core}${tag}`]); this.addU(core, this.getTagAmount(tag)); this.log(`🚨 [緊急専従] 人数不足のため ${core} を ${rule.section} に強制配置しました`); 
       });
-      Object.values(this.roleAssignments).forEach((ra: any) => { if (this.skipSections.includes(ra.section)) return; const candidates = split(this.ctx.monthlyAssign[ra.role] || "").map(extractStaffName); const targetAvail = ["受付"].includes(ra.role) ? this.initialAvailReception : this.initialAvailGeneral; const staff = candidates.find(s => targetAvail.includes(s) && !this.isUsed(s) && !this.isForbidden(s, ra.section)); if (staff && !split(this.dayCells[ra.section]).map(extractStaffName).includes(staff)) { const tag = this.getPreferredTagForStaff(staff); this.blockMap.set(staff, 'ALL'); this.dayCells[ra.section] = join([...split(this.dayCells[ra.section]), `${staff}${tag}`]); this.addU(staff, this.getTagAmount(tag)); this.log(`📌 [緊急役割] ${staff} を ${ra.section} に配置しました`); } });
+      Object.values(this.roleAssignments).forEach((ra: any) => { if (this.skipSections.includes(ra.section)) return; const candidates = split(this.ctx.monthlyAssign[ra.role] || "").map(extractStaffName); const targetAvail = ["受付"].includes(ra.role) ? this.initialAvailReception : this.initialAvailGeneral; const staff = candidates.find(s => targetAvail.includes(s) && !this.isUsed(s) && !this.isForbidden(s, ra.section) && this.canAssignCoreModality(s, ra.section)); if (staff && !split(this.dayCells[ra.section]).map(extractStaffName).includes(staff)) { const tag = this.getPreferredTagForStaff(staff); this.blockMap.set(staff, 'ALL'); this.dayCells[ra.section] = join([...split(this.dayCells[ra.section]), `${staff}${tag}`]); this.addU(staff, this.getTagAmount(tag)); this.log(`📌 [緊急役割] ${staff} を ${ra.section} に配置しました`); } });
       (this.ctx.customRules.substitutes || []).forEach((sub: any) => {
          const targets = split(sub.target).map(extractStaffName); 
          if (targets.length === 0 || !sub.section || this.skipSections.includes(sub.section)) return;
          const currentRoomStaff = split(this.dayCells[sub.section]).map(extractStaffName); if (targets.some(t => currentRoomStaff.includes(t))) return;
          const trigger = targets.every(t => !this.initialAvailAll.includes(t));
          if (trigger) {
-           const fallbackStaff = split(sub.subs).map(extractStaffName).filter(s => this.initialAvailGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section));
+           const fallbackStaff = split(sub.subs).map(extractStaffName).filter(s => this.initialAvailGeneral.includes(s) && !this.isUsed(s) && !this.isForbidden(s, sub.section) && this.canAssignCoreModality(s, sub.section));
            if (fallbackStaff.length > 0) {
              const currentRoomMembers = split(this.dayCells[sub.section]); 
              for (const f of fallbackStaff) {
@@ -837,6 +857,7 @@ class AutoAssigner {
       const getFilterReason = (name: string): RejectReason | null => {
          if (current.map(extractStaffName).includes(name)) return { hard: true, msg: "同室配置済" };
          if (this.isUsed(name)) return { hard: true, msg: "他業務で配置済" };
+         if (!this.canAssignCoreModality(name, section)) return { hard: true, msg: "半日者はCT/MRI不可" };
          if (this.isForbidden(name, section)) return { hard: true, msg: "担当不可設定" };
          if (section === "MMG" && !this.isMmgCapable(name)) return { hard: true, msg: "MMG月間担当外" };
          if (!this.canAddKenmu(name, section)) return { hard: true, msg: "兼務上限" };
@@ -978,72 +999,63 @@ class AutoAssigner {
     (this.ctx.customRules.swapRules || []).forEach((rule: any) => {
       const { targetRoom, triggerRoom, sourceRooms } = rule;
       if (!targetRoom || !triggerRoom || !sourceRooms) return;
-      const triggerMembers = split(this.dayCells[triggerRoom]); if (triggerMembers.length === 0) return;
-      const triggerCanTarget = triggerMembers.some(m => { const c = extractStaffName(m); if (ROLE_PLACEHOLDERS.includes(c) || this.isForbidden(c, targetRoom) || this.isHardNoConsecutive(c, targetRoom) || this.isHalfDayBlockedForFullDayRoom(c, targetRoom).hard) return false; return this.canAddKenmu(c, targetRoom, true); });
-      if (!triggerCanTarget) {
-          // UI注記どおり、交換元は左から優先で評価する
-          const swapSources = split(sourceRooms);
-          this.log(`🧭 [交換評価] ${targetRoom} の交換元を ${swapSources.map(s=>parseRoomCond(s).r).join(" → ")} の順で評価しました`);
-          let swapped = false;
-          for (const srcStrRoom of swapSources) {
-              const { r: srcRoom } = parseRoomCond(srcStrRoom); if (srcRoom === triggerRoom) continue;
-              const srcMembers = split(this.dayCells[srcRoom]);
-              let srcCands = srcMembers.filter(m =>
-                !ROLE_PLACEHOLDERS.includes(extractStaffName(m)) &&
-                !m.includes("17:") &&
-                !m.includes("19:") &&
-                !m.includes("22:") &&
-                !this.isForbidden(extractStaffName(m), targetRoom) &&
-                !this.isHalfDayBlockedForFullDayRoom(extractStaffName(m), targetRoom).hard &&
-                !this.isHardNoConsecutive(extractStaffName(m), targetRoom) &&
-                this.canAddKenmu(extractStaffName(m), targetRoom, true) &&
-                !this.isForbidden(extractStaffName(m), triggerRoom)
-              );
-              srcCands.sort((a, b) => this.getPastRoomCount(extractStaffName(a), targetRoom) - this.getPastRoomCount(extractStaffName(b), targetRoom));
-              for (const srcM of srcCands) {
-                  const srcCore = extractStaffName(srcM);
-                  const targetToKick = triggerMembers.find(m => { 
-                    const c = extractStaffName(m); 
-                    return !this.isForbidden(c, srcRoom) &&
-                           !this.isHalfDayBlockedForFullDayRoom(c, srcRoom).hard &&
-                           !this.hasNGPair(c, srcMembers.map(extractStaffName), false) &&
-                           this.canAddKenmu(c, srcRoom, true); 
-                  });
-                  if (targetToKick && this.canAddKenmu(srcCore, targetRoom, true)) {
-                      const kickCore = extractStaffName(targetToKick);
-                      // まずメイン配置同士を交換
-                      this.dayCells[triggerRoom] = join(triggerMembers.map(m => m === targetToKick ? m.replace(kickCore, srcCore) : m));
-                      this.dayCells[srcRoom] = join(srcMembers.map(m => m === srcM ? m.replace(srcCore, kickCore) : m));
+      const triggerMembers = split(this.dayCells[triggerRoom]);
+      if (triggerMembers.length === 0) return;
+      const triggerCanTarget = triggerMembers.some(m => {
+        const c = extractStaffName(m);
+        if (ROLE_PLACEHOLDERS.includes(c) || this.isForbidden(c, targetRoom) || this.isHardNoConsecutive(c, targetRoom) || this.isHalfDayBlockedForFullDayRoom(c, targetRoom).hard) return false;
+        return this.canAddKenmu(c, targetRoom, true);
+      });
+      if (triggerCanTarget) return;
 
-                      // 交換後、その人を targetRoom にも兼務投入する
-                      let currentTarget = split(this.dayCells[targetRoom]);
-                      if (!currentTarget.map(extractStaffName).includes(srcCore)) {
-                        const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
-                        const eff = this.getEffectiveTarget(targetRoom, targetCap);
-                        let curAm = eff.amClosed ? 999 : 0; let curPm = eff.pmClosed ? 999 : 0;
-                        currentTarget.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
-
-                        let tag = this.getPreferredTagForStaff(srcCore);
-                        if (!tag) {
-                          if (curAm < targetCap && curPm >= targetCap) tag = "(AM)";
-                          else if (curAm >= targetCap && curPm < targetCap) tag = "(PM)";
-                        }
-                        const targetAssign = `${srcCore}${tag}`;
-                        currentTarget.push(targetAssign);
-                        this.dayCells[targetRoom] = join(currentTarget);
-                        this.addU(srcCore, this.getTagAmount(tag));
-                        this.updateBlockMapAfterKenmu(srcCore, targetAssign);
-                        this.log(`🔄 [交換成立] ${kickCore} を ${srcRoom} へ、${srcCore} を ${triggerRoom} に回し、さらに ${targetRoom} に ${targetAssign} を配置しました`);
-                      } else {
-                        this.log(`🔄 [交換成立] ${kickCore} を ${srcRoom} へ、${srcCore} を ${triggerRoom} に回しました`);
-                      }
-                      swapped = true; break;
-                  }
-              }
-              if (swapped) break;
+      const swapSources = split(sourceRooms);
+      this.log(`🧭 [交換候補] ${targetRoom} の交換元を ${swapSources.map(s=>parseRoomCond(s).r).join(" → ")} の順で評価しました`);
+      let swapped = false;
+      for (const srcStrRoom of swapSources) {
+        const { r: srcRoom } = parseRoomCond(srcStrRoom);
+        if (srcRoom === triggerRoom) continue;
+        const srcMembers = split(this.dayCells[srcRoom]);
+        let srcCands = srcMembers.filter(m => {
+          const core = extractStaffName(m);
+          if (ROLE_PLACEHOLDERS.includes(core)) return false;
+          if (m.includes("17:")) return false;
+          if (!this.canAssignCoreModality(core, triggerRoom) || !this.canAssignCoreModality(core, targetRoom)) return false;
+          if (this.isForbidden(core, targetRoom) || this.isForbidden(core, triggerRoom)) return false;
+          if (this.isHalfDayBlockedForFullDayRoom(core, targetRoom).hard || this.isHalfDayBlockedForFullDayRoom(core, triggerRoom).hard) return false;
+          if (this.isHardNoConsecutive(core, targetRoom) || this.isHardNoConsecutive(core, triggerRoom)) return false;
+          return this.canAddKenmu(core, targetRoom, true) && this.canAddKenmu(core, triggerRoom, true);
+        });
+        srcCands.sort((a, b) => this.getPastRoomCount(extractStaffName(a), targetRoom) - this.getPastRoomCount(extractStaffName(b), targetRoom));
+        for (const srcM of srcCands) {
+          const srcCore = extractStaffName(srcM);
+          const targetToKick = triggerMembers.find(m => {
+            const c = extractStaffName(m);
+            return !this.isForbidden(c, srcRoom)
+              && !this.isHalfDayBlockedForFullDayRoom(c, srcRoom).hard
+              && !this.hasNGPair(c, srcMembers.filter(x => x !== srcM).map(extractStaffName), false)
+              && this.canAddKenmu(c, srcRoom, true);
+          });
+          if (!targetToKick) continue;
+          const kickCore = extractStaffName(targetToKick);
+          const nextTriggerMembers = triggerMembers.map(m => m === targetToKick ? srcM : m);
+          const kickReplacement = kickCore + (srcM.includes("(AM)") ? "(AM)" : srcM.includes("(PM)") ? "(PM)" : "");
+          const nextSourceMembers = srcMembers.map(m => m === srcM ? kickReplacement : m);
+          let targetMembers = split(this.dayCells[targetRoom]);
+          if (!targetMembers.map(extractStaffName).includes(srcCore)) {
+            targetMembers = [...targetMembers, srcM];
+            this.addU(srcCore, getStaffAmount(srcM));
+            this.updateBlockMapAfterKenmu(srcCore, srcM);
           }
-          if (!swapped) this.log(`⚠️ [交換失敗] ${targetRoom} 向けに ${triggerRoom} を入れ替えられる候補が見つかりませんでした`);
+          this.dayCells[triggerRoom] = join(nextTriggerMembers);
+          this.dayCells[srcRoom] = join(nextSourceMembers);
+          this.dayCells[targetRoom] = join(targetMembers);
+          this.log(`🔄 [交換] ${srcRoom} の ${srcCore} を ${triggerRoom} に入れ替え、${targetRoom} にも配置しました（${kickCore} → ${srcRoom}）`);
+          swapped = true;
+          break;
+        }
+        if (swapped) break;
       }
+      if (!swapped) this.log(`⚠️ [交換失敗] ${targetRoom} のための交換候補が見つかりませんでした`);
     });
 
     let uGen1 = this.initialAvailGeneral.filter(s => !this.isUsed(s) && this.blockMap.get(s) !== 'ALL');
@@ -1348,6 +1360,7 @@ class AutoAssigner {
     if (!this.skipSections.includes("昼当番")) {
       let currentLunch = split(this.dayCells["昼当番"]); let lunchTarget = this.ctx.customRules.lunchBaseCount ?? 3;
       const dayChar = this.day.label.match(/\((.*?)\)/)?.[1]; if (dayChar) { const sd = (this.ctx.customRules.lunchSpecialDays || []).find((x:any) => x.day === dayChar); if (sd) lunchTarget = Number(sd.count); }
+      const femaleStaffPool = this.getEffectiveFemaleStaffList();
       (this.ctx.customRules.lunchRoleRules || []).forEach((rule: any) => {
         if (rule.day === "毎日" || rule.day === dayChar) {
           const rStaff = split(this.ctx.monthlyAssign[rule.role] || "").map(extractStaffName); const tMems = split(this.dayCells[rule.role] || "").map(extractStaffName); let sel: string | null = null;
@@ -1359,6 +1372,25 @@ class AutoAssigner {
           if (sel && !currentLunch.includes(sel) && currentLunch.length < lunchTarget) { currentLunch.push(sel); this.log(`🍱 [昼当番(${rule.role}確保)] ${rule.day}曜ルールにより、${sel} を昼当番に配置しました`); }
         }
       });
+      if (femaleStaffPool.length > 0 && !currentLunch.some(n => femaleStaffPool.includes(n))) {
+        const femaleSearchRooms = Array.from(new Set(["MMG", "RI", ...split(this.ctx.customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT"), ...ROOM_SECTIONS]));
+        let femalePick: string | null = null;
+        for (const room of femaleSearchRooms) {
+          const picked = split(this.dayCells[room] || "").map(extractStaffName).find(n => femaleStaffPool.includes(n) && !currentLunch.includes(n) && !this.isForbidden(n, "昼当番") && !this.hasNGPair(n, currentLunch, false));
+          if (picked) { femalePick = picked; break; }
+        }
+        if (!femalePick) femalePick = this.initialAvailGeneral.find(n => femaleStaffPool.includes(n) && !currentLunch.includes(n) && !this.isForbidden(n, "昼当番") && !this.hasNGPair(n, currentLunch, false)) || null;
+        if (femalePick) {
+          if (currentLunch.length < lunchTarget) currentLunch.push(femalePick);
+          else {
+            const replaceIdx = currentLunch.findIndex(n => !femaleStaffPool.includes(n));
+            if (replaceIdx >= 0) currentLunch[replaceIdx] = femalePick;
+          }
+          this.log(`👩 [昼当番(女性確保)] 女性枠として ${femalePick} を昼当番に配置しました`);
+        } else {
+          this.log(`⚠️ [昼当番(女性確保失敗)] 女性枠を満たせる候補が見つかりませんでした`);
+        }
+      }
       const riMems = split(this.dayCells["RI"]).map(extractStaffName); riMems.forEach(n => { if (!currentLunch.includes(n) && currentLunch.length < lunchTarget && !this.isForbidden(n, "昼当番") && !this.hasNGPair(n, currentLunch, false)) currentLunch.push(n); });
       split(this.ctx.customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT").forEach(sec => { split(this.dayCells[sec]).forEach(n => { const core = extractStaffName(n); if (!currentLunch.includes(core) && currentLunch.length < lunchTarget && !this.isForbidden(core, "昼当番") && !this.hasNGPair(core, currentLunch, false)) currentLunch.push(core); }); });
       if (currentLunch.length < lunchTarget) {
@@ -1542,7 +1574,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.72</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.73</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {(highlightedStaff || hoveredStaff) && (
             <div style={{ background: "#2563eb", color: "#fff", padding: "6px 16px", borderRadius: "20px", fontWeight: 800, fontSize: "15px", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 6px rgba(37,99,235,0.3)", animation: "fadeIn 0.3s ease" }}>
@@ -2124,6 +2156,11 @@ export default function App(): any {
                   <span style={{ fontSize: 18, fontWeight: 800, color: "#3730a3" }}>基本の人数:</span>
                   <input type="number" min="0" value={customRules.lunchBaseCount ?? 3} onChange={(e: any) => setCustomRules({...customRules, lunchBaseCount: Number(e.target.value)})} style={{ width: 80, padding: "8px", borderRadius: 6, border: "1px solid #a5b4fc", textAlign: "center", fontWeight: 800, color: "#4f46e5", fontSize: 18 }} />
               </div>
+              <div style={{ background: "#fff", padding: 16, borderRadius: 10, border: "1px solid #c7d2fe", marginBottom: 20 }}>
+                <div style={{ fontWeight: 800, color: "#4338ca", marginBottom: 8 }}>女性スタッフ（未設定ならMMG担当を自動使用）</div>
+                <MultiPicker selected={customRules.femaleStaffList ?? ""} onChange={(v: string) => setCustomRules({...customRules, femaleStaffList: v})} options={allStaff} />
+                <div style={{ fontSize: 12, color: "#6366f1", marginTop: 4 }}>昼当番には最低1人、このリストのスタッフを入れます。空ならMMG担当者を女性グループとして扱います。</div>
+              </div>
 
               <div style={{ background: "#fff", padding: 24, borderRadius: 12, border: "1px solid #e0e7ff", marginBottom: 20 }}>
                 <h6 style={{ margin: "0 0 16px 0", fontSize: 16, color: "#4f46e5", fontWeight: 800 }}>👤 特定役割の確保（別部屋から引抜）</h6>
@@ -2326,4 +2363,3 @@ export default function App(): any {
     </div>
   );
 }
-
