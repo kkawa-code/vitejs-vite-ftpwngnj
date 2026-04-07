@@ -981,29 +981,68 @@ class AutoAssigner {
       const triggerMembers = split(this.dayCells[triggerRoom]); if (triggerMembers.length === 0) return;
       const triggerCanTarget = triggerMembers.some(m => { const c = extractStaffName(m); if (ROLE_PLACEHOLDERS.includes(c) || this.isForbidden(c, targetRoom) || this.isHardNoConsecutive(c, targetRoom) || this.isHalfDayBlockedForFullDayRoom(c, targetRoom).hard) return false; return this.canAddKenmu(c, targetRoom, true); });
       if (!triggerCanTarget) {
-          const swapSources = split(sourceRooms).sort((a, b) => this.getRescueSourceScore(parseRoomCond(a).r, targetRoom) - this.getRescueSourceScore(parseRoomCond(b).r, targetRoom));
-          this.log(`🧭 [低影響補充] ${targetRoom} の交換元を ${swapSources.map(s=>parseRoomCond(s).r).join(" → ")} の順で評価しました`);
+          // UI注記どおり、交換元は左から優先で評価する
+          const swapSources = split(sourceRooms);
+          this.log(`🧭 [交換評価] ${targetRoom} の交換元を ${swapSources.map(s=>parseRoomCond(s).r).join(" → ")} の順で評価しました`);
           let swapped = false;
           for (const srcStrRoom of swapSources) {
               const { r: srcRoom } = parseRoomCond(srcStrRoom); if (srcRoom === triggerRoom) continue;
               const srcMembers = split(this.dayCells[srcRoom]);
-              let srcCands = srcMembers.filter(m => !ROLE_PLACEHOLDERS.includes(extractStaffName(m)) && !this.isForbidden(extractStaffName(m), targetRoom) && !this.isHalfDayBlockedForFullDayRoom(extractStaffName(m), targetRoom).hard && !this.isHardNoConsecutive(extractStaffName(m), targetRoom) && this.canAddKenmu(extractStaffName(m), targetRoom, true) && !this.isForbidden(extractStaffName(m), triggerRoom));
+              let srcCands = srcMembers.filter(m =>
+                !ROLE_PLACEHOLDERS.includes(extractStaffName(m)) &&
+                !m.includes("17:") &&
+                !m.includes("19:") &&
+                !m.includes("22:") &&
+                !this.isForbidden(extractStaffName(m), targetRoom) &&
+                !this.isHalfDayBlockedForFullDayRoom(extractStaffName(m), targetRoom).hard &&
+                !this.isHardNoConsecutive(extractStaffName(m), targetRoom) &&
+                this.canAddKenmu(extractStaffName(m), targetRoom, true) &&
+                !this.isForbidden(extractStaffName(m), triggerRoom)
+              );
               srcCands.sort((a, b) => this.getPastRoomCount(extractStaffName(a), targetRoom) - this.getPastRoomCount(extractStaffName(b), targetRoom));
               for (const srcM of srcCands) {
                   const srcCore = extractStaffName(srcM);
                   const targetToKick = triggerMembers.find(m => { 
                     const c = extractStaffName(m); 
-                    return !this.isForbidden(c, srcRoom) && !this.isHalfDayBlockedForFullDayRoom(c, srcRoom).hard && !this.hasNGPair(c, srcMembers.map(extractStaffName), false) && this.canAddKenmu(c, srcRoom, true); 
+                    return !this.isForbidden(c, srcRoom) &&
+                           !this.isHalfDayBlockedForFullDayRoom(c, srcRoom).hard &&
+                           !this.hasNGPair(c, srcMembers.map(extractStaffName), false) &&
+                           this.canAddKenmu(c, srcRoom, true); 
                   });
                   if (targetToKick && this.canAddKenmu(srcCore, targetRoom, true)) {
                       const kickCore = extractStaffName(targetToKick);
+                      // まずメイン配置同士を交換
                       this.dayCells[triggerRoom] = join(triggerMembers.map(m => m === targetToKick ? m.replace(kickCore, srcCore) : m));
                       this.dayCells[srcRoom] = join(srcMembers.map(m => m === srcM ? m.replace(srcCore, kickCore) : m));
-                      this.log(`🔄 [交換] ${triggerRoom} の ${kickCore} と ${srcRoom} の ${srcCore} を入れ替えました`); swapped = true; break;
+
+                      // 交換後、その人を targetRoom にも兼務投入する
+                      let currentTarget = split(this.dayCells[targetRoom]);
+                      if (!currentTarget.map(extractStaffName).includes(srcCore)) {
+                        const targetCap = this.dynamicCapacity[targetRoom] !== undefined ? this.dynamicCapacity[targetRoom] : (["CT", "MRI", "治療"].includes(targetRoom) ? 3 : 1);
+                        const eff = this.getEffectiveTarget(targetRoom, targetCap);
+                        let curAm = eff.amClosed ? 999 : 0; let curPm = eff.pmClosed ? 999 : 0;
+                        currentTarget.forEach(x => { if (x.includes("(AM)")) curAm += 1; else if (x.includes("(PM)")) curPm += 1; else { curAm += 1; curPm += 1; } });
+
+                        let tag = this.getPreferredTagForStaff(srcCore);
+                        if (!tag) {
+                          if (curAm < targetCap && curPm >= targetCap) tag = "(AM)";
+                          else if (curAm >= targetCap && curPm < targetCap) tag = "(PM)";
+                        }
+                        const targetAssign = `${srcCore}${tag}`;
+                        currentTarget.push(targetAssign);
+                        this.dayCells[targetRoom] = join(currentTarget);
+                        this.addU(srcCore, this.getTagAmount(tag));
+                        this.updateBlockMapAfterKenmu(srcCore, targetAssign);
+                        this.log(`🔄 [交換成立] ${kickCore} を ${srcRoom} へ、${srcCore} を ${triggerRoom} に回し、さらに ${targetRoom} に ${targetAssign} を配置しました`);
+                      } else {
+                        this.log(`🔄 [交換成立] ${kickCore} を ${srcRoom} へ、${srcCore} を ${triggerRoom} に回しました`);
+                      }
+                      swapped = true; break;
                   }
               }
               if (swapped) break;
           }
+          if (!swapped) this.log(`⚠️ [交換失敗] ${targetRoom} 向けに ${triggerRoom} を入れ替えられる候補が見つかりませんでした`);
       }
     });
 
@@ -1366,6 +1405,8 @@ export default function App(): any {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importText, setImportText] = useState("");
   const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
+  const [highlightedStaff, setHighlightedStaff] = useState<string | null>(null);
+  const [hoveredStaff, setHoveredStaff] = useState<string | null>(null);
 
   useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
   useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); localStorage.setItem(KEY_RULES, JSON.stringify(customRules)); localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [allDays, customRules, monthlyAssign]);
@@ -1468,9 +1509,11 @@ export default function App(): any {
         const targetMonth = day.id.substring(0, 7);
         const pastDaysInMonthArray = Object.entries(nextAll).filter(([dateStr]) => dateStr.startsWith(targetMonth) && dateStr < day.id).map(([dateStr, cells]) => ({ id: dateStr, cells } as any));
         const pastDaysInWeekArray = days.slice(0, idx).map(d => ({ ...d, cells: nextAll[d.id] || d.cells }));
-        const worker = new AutoAssigner({ ...day, cells: nextAll[day.id] || day.cells }, prevDayObj, pastDaysInMonthArray, pastDaysInWeekArray, ctx, isSmart);
+        const originalCells = nextAll[day.id] || day.cells;
+        const preservedMeta = Object.fromEntries(Object.entries(originalCells).filter(([k]) => k.startsWith("__")));
+        const worker = new AutoAssigner({ ...day, cells: originalCells }, prevDayObj, pastDaysInMonthArray, pastDaysInWeekArray, ctx, isSmart);
         const res = worker.execute();
-        nextAll[day.id] = res.cells; newLogs[day.id] = res.logInfo || [];
+        nextAll[day.id] = { ...res.cells, ...preservedMeta }; newLogs[day.id] = res.logInfo || [];
        });
       setAssignLogs(newLogs); return nextAll;
     });
@@ -1501,6 +1544,12 @@ export default function App(): any {
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
         <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24, fontWeight: 900 }}>勤務割付システム Ver 2.72</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          {(highlightedStaff || hoveredStaff) && (
+            <div style={{ background: "#2563eb", color: "#fff", padding: "6px 16px", borderRadius: "20px", fontWeight: 800, fontSize: "15px", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 6px rgba(37,99,235,0.3)", animation: "fadeIn 0.3s ease" }}>
+              <span>✨ {highlightedStaff || hoveredStaff} さんをハイライト中</span>
+              {highlightedStaff && <button onClick={() => setHighlightedStaff(null)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", fontWeight: "bold", fontSize: "18px", padding: 0 }}>✖</button>}
+            </div>
+          )}
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()-7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>◀ 先週</button>
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
           <button className="btn-hover" onClick={() => setTargetMonday(prev => { const d=new Date(prev); d.setDate(d.getDate()+7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={{...btnStyle("#f1f5f9", "#475569"), border:"1px solid #cbd5e1"}}>来週 ▶</button>
@@ -1568,13 +1617,37 @@ export default function App(): any {
                                 const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section);
                                 const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName);
                                 const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
+                                const targetStaff = highlightedStaff || hoveredStaff;
+                                const isHighlighted = targetStaff === coreName;
+                                const isDimmed = targetStaff !== null && targetStaff !== coreName;
+
                                 let tagBg = "#f1f5f9"; let tagColor = "#334155"; let tagBorder = "#cbd5e1";
                                 if (hasRedWarning) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#fca5a5"; } else if (hasOrangeWarning) { tagBg = "#ffedd5"; tagColor = "#c2410c"; tagBorder = "#fdba74"; } else if (hasYellowWarning) { tagBg = "#fef08a"; tagColor = "#a16207"; tagBorder = "#fde047"; }
 
+                                const chipStyle: React.CSSProperties = { background: tagBg, color: tagColor, border: `1px solid ${tagBorder}`, padding: "4px 8px", borderRadius: "6px", display: "flex", alignItems: "center", fontSize: "14px", fontWeight: hasRedWarning ? 800 : 700, transition: "all 0.2s ease", cursor: "pointer" };
+                                if (isHighlighted) {
+                                  chipStyle.background = "#2563eb";
+                                  chipStyle.color = "#fff";
+                                  chipStyle.borderColor = "#1d4ed8";
+                                  chipStyle.boxShadow = "0 4px 12px rgba(37,99,235,0.35)";
+                                  chipStyle.transform = "scale(1.05)";
+                                  chipStyle.position = "relative";
+                                  chipStyle.zIndex = 5;
+                                } else if (isDimmed) {
+                                  chipStyle.opacity = 0.25;
+                                  chipStyle.filter = "grayscale(1)";
+                                }
+
                                 return (
-                                  <div key={mIdx} style={{ background: tagBg, color: tagColor, border: `1px solid ${tagBorder}`, padding: "4px 8px", borderRadius: "6px", display: "flex", alignItems: "center", fontSize: "14px", fontWeight: hasRedWarning ? 800 : 700 }}>
+                                  <div key={mIdx}
+                                    className="btn-hover"
+                                    onClick={(e) => { e.stopPropagation(); setHighlightedStaff(prev => prev === coreName ? null : coreName); }}
+                                    onMouseEnter={() => setHoveredStaff(coreName)}
+                                    onMouseLeave={() => setHoveredStaff(null)}
+                                    style={chipStyle}
+                                  >
                                     <span>{coreName}</span>
-                                    {mod && (mod.includes("(AM)") ? <span style={{ background: "#e0f2fe", color: "#0369a1", fontSize: "11px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span style={{ background: "#fce7f3", color: "#be185d", fontSize: "11px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span style={{ background: "#f3f4f6", color: "#4b5563", fontSize: "11px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>)}
+                                    {mod && (mod.includes("(AM)") ? <span style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "11px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "11px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "11px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>)}
                                   </div>
                                 );
                               })}
