@@ -997,7 +997,6 @@ class AutoAssigner {
         });
         if (candIdx === -1) break;
         const staff = uGen1[candIdx]; uGen1.splice(candIdx, 1);
-        const b = this.blockMap.get(staff); 
         let tag = this.getPreferredTagForStaff(staff); 
         
         if (tag === "") {
