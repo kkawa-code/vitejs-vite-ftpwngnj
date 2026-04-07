@@ -321,20 +321,16 @@ const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, 
               {isFuzai && currentMod !== "" && onAddHelp && (() => {
                 const HELP_RMS = ["CT","MRI","RI","治療","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","検像"];
                 const mappedRoom = helpRoomMap?.[coreName] || null;
-                const mappedTime = helpTimeMap?.[coreName] || null;
-                const foundRm = mappedRoom || (dayCells ? HELP_RMS.find((r:string) => split(dayCells[r]||"").some((m:string) => extractStaffName(m) === coreName)) : null);
-                const foundEntries = foundRm ? split(dayCells?.[foundRm] || "").filter((m:string) => m.startsWith(foundRm+"枠")) : [];
-                const foundEntry = foundEntries.length > 0 ? foundEntries[foundEntries.length - 1] : (foundRm && mappedTime ? `${foundRm}枠${mappedTime}` : null);
+                const mappedTime = helpTimeMap?.[coreName] || "";
+                const foundRm = mappedRoom || (dayCells ? HELP_RMS.find((r:string) => split(dayCells[r]||"").some((m:string) => extractStaffName(m) === coreName)) : null) || null;
                 return (
-                  <span style={{display:"flex",alignItems:"center",gap:2,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:4}}>
-                    {foundEntry
-                      ? <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>{foundRm} {foundEntry.substring((foundRm+"枠").length).replace(/[()]/g,"")} 補充済</span>
-                      : <><span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>補充</span>
-                        <select defaultValue="" onChange={(e:any)=>{if(e.target.value){onAddHelp(coreName,e.target.value);e.target.value="";}}} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 16px 0 2px"}}>
-                          <option value="">何時から</option>
-                          {["(AM)","(PM)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map((t:string)=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
-                        </select></>
-                    }
+                  <span style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:4}}>
+                    <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>{foundRm ? `${foundRm} 補充` : "補充"}</span>
+                    <select value={mappedTime} onChange={(e:any)=>onAddHelp(coreName, e.target.value)} style={{fontSize:11,border:"1px solid #c7d2fe",borderRadius:6,padding:"2px 18px 2px 6px",background:"#eef2ff",color:"#4338ca",fontWeight:700}}>
+                      <option value="">未設定</option>
+                      <option value="__NO_HELP__">補充なし</option>
+                      {HELP_TIMES.map(t => <option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
+                    </select>
                   </span>
                 );
               })()}
@@ -943,6 +939,40 @@ class AutoAssigner {
           }
         }
       }
+    });
+
+    (this.ctx.customRules.emergencies || []).forEach((em: any) => {
+      if (em.type !== "empty_room_swap" || !em.section || !em.sourceRooms) return;
+      const targetRoom = em.section;
+      if (this.skipSections.includes(targetRoom)) return;
+      let currentMems = split(this.dayCells[targetRoom]);
+      if (currentMems.length > 0) return;
+      const sourceRooms = split(em.sourceRooms || "");
+      let assigned = false;
+      for (const srcStr of sourceRooms) {
+        const { r: srcRoom, min } = parseRoomCond(srcStr);
+        const srcMembers = split(this.dayCells[srcRoom] || "");
+        if (min > 0 && srcMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
+        const candidate = srcMembers.find((m:string) => {
+          const core = extractStaffName(m);
+          if (ROLE_PLACEHOLDERS.includes(core)) return false;
+          if (m.includes("17:")) return false;
+          if (this.isForbidden(core, targetRoom)) return false;
+          if (this.isHalfDayBlockedForFullDayRoom(core, targetRoom).hard) return false;
+          if (this.isHardNoConsecutive(core, targetRoom)) return false;
+          if (this.hasNGPair(core, currentMems.map(extractStaffName), false)) return false;
+          return this.canAddKenmu(core, targetRoom, true);
+        });
+        if (!candidate) continue;
+        currentMems.push(candidate);
+        this.dayCells[targetRoom] = join(currentMems);
+        this.addU(extractStaffName(candidate), getStaffAmount(candidate));
+        this.updateBlockMapAfterKenmu(extractStaffName(candidate), candidate);
+        this.log(`🔁 [空室交換] ${targetRoom} が空のため、${srcRoom} の ${candidate} を兼務で追加しました`);
+        assigned = true;
+        break;
+      }
+      if (!assigned) this.log(`⚠️ [空室交換失敗] ${targetRoom} は空ですが、設定された交換元から安全に割り当てできませんでした`);
     });
 
     (this.ctx.customRules.swapRules || []).forEach((rule: any) => {
@@ -1601,7 +1631,7 @@ export default function App(): any {
                     )}
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? (staffName: string, fromTime: string) => { setAllDaysWithHistory((prev: any) => { const cells = { ...(prev[sel] || {}) }; const rooms = ["CT","MRI","RI","治療","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","検像"]; const found = rooms.find(r => split(cells[r]||"").some((m:string)=>extractStaffName(m)===staffName)); if (!found) return prev; const cur = cells[found] || ""; const entry = found+"枠"+fromTime; cells[found] = cur.includes(entry) ? cur : (cur ? `${cur}、${entry}` : entry); const helpMap = parseStoredMap(cells["__absenceHelp"] || ""); helpMap[staffName] = fromTime; cells["__absenceHelp"] = stringifyStoredMap(helpMap); const helpRoomMap = parseStoredMap(cells["__absenceHelpRooms"] || ""); helpRoomMap[staffName] = found; cells["__absenceHelpRooms"] = stringifyStoredMap(helpRoomMap); return { ...prev, [sel]: cells }; }); } : undefined} dayCells={s === "不在" ? (allDays[sel] || {}) : undefined} helpRoomMap={s === "不在" ? parseStoredMap((allDays[sel] || {})["__absenceHelpRooms"] || "") : undefined} helpTimeMap={s === "不在" ? parseStoredMap((allDays[sel] || {})["__absenceHelp"] || "") : undefined} />)}
+                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? (staffName: string, fromTime: string) => { setAllDaysWithHistory((prev: any) => { const cells = { ...(prev[sel] || {}) }; const rooms = ["CT","MRI","RI","治療","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","検像"]; const helpMap = parseStoredMap(cells["__absenceHelp"] || ""); const helpRoomMap = parseStoredMap(cells["__absenceHelpRooms"] || ""); const found = helpRoomMap[staffName] || rooms.find(r => split(cells[r]||"").some((m:string)=>extractStaffName(m)===staffName)); if (!found) return prev; const prevTime = helpMap[staffName] || ""; if (prevTime) cells[found] = join(split(cells[found] || "").filter((m:string) => m !== `${found}枠${prevTime}`)); if (!fromTime) { delete helpMap[staffName]; delete helpRoomMap[staffName]; cells["__absenceHelp"] = stringifyStoredMap(helpMap); cells["__absenceHelpRooms"] = stringifyStoredMap(helpRoomMap); return { ...prev, [sel]: cells }; } helpMap[staffName] = fromTime; helpRoomMap[staffName] = found; cells["__absenceHelp"] = stringifyStoredMap(helpMap); cells["__absenceHelpRooms"] = stringifyStoredMap(helpRoomMap); if (fromTime !== "__NO_HELP__") { const cur = cells[found] || ""; const entry = found+"枠"+fromTime; cells[found] = cur.includes(entry) ? cur : (cur ? `${cur}、${entry}` : entry); } return { ...prev, [sel]: cells }; }); } : undefined} dayCells={s === "不在" ? (allDays[sel] || {}) : undefined} helpRoomMap={s === "不在" ? parseStoredMap((allDays[sel] || {})["__absenceHelpRooms"] || "") : undefined} helpTimeMap={s === "不在" ? parseStoredMap((allDays[sel] || {})["__absenceHelp"] || "") : undefined} />)}
                  </div>
                </div>
              ))}
