@@ -511,7 +511,7 @@ class AutoAssigner {
     return true;
   }
 
-  canUseProjectedRooms(staff: string, rooms: string[]): boolean {
+  canUseProjectedRooms(rooms: string[]): boolean {
     const limit = this.ctx.customRules.alertMaxKenmu || 3;
     if (Array.from(new Set(rooms)).length > limit) return false;
     return this.respectsExclusivePairsForProjectedRooms(Array.from(new Set(rooms)));
