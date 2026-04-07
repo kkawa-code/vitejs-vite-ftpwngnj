@@ -292,7 +292,11 @@ export class AutoAssigner {
   hasNGPair(candidate: string, members: string[], checkSoft: boolean): boolean { return members.some(member => (this.ctx.customRules.ngPairs || []).some((ng: any) => { const match = (extractStaffName(ng.s1) === extractStaffName(candidate) && extractStaffName(ng.s2) === extractStaffName(member)) || (extractStaffName(ng.s1) === extractStaffName(member) && extractStaffName(ng.s2) === extractStaffName(candidate)); if (!match) return false; if ((ng.level || "hard") === "hard") return true; if ((ng.level || "hard") === "soft" && checkSoft) return true; return false; })); }
   
   isFullDayOnly(r: string) { return split(this.ctx.customRules.fullDayOnlyRooms || "").includes(r); }
-  isTimeTagBlockedByFullDayRule(r: string, tag: string) { return this.isFullDayOnly(r) && !!tag; }
+  isTimeTagBlockedByFullDayRule(r: string, tag: string) {
+    if (!this.isFullDayOnly(r) || !tag) return false;
+    if (tag === 'NONE' || tag === 'ALL') return false;
+    return /[（(].*[)）]/.test(tag) || tag.includes('AM') || tag.includes('PM');
+  }
 
   private getPreferredWorkTag(staff: string): string {
     const exactTag = this.timeTagMap.get(staff);
