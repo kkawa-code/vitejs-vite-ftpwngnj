@@ -1073,7 +1073,7 @@ class AutoAssigner {
           if (this.isHalfDayBlockedForFullDayRoom(core, targetRoom).hard || this.isHalfDayBlockedForFullDayRoom(core, triggerRoom).hard) return false;
           if (this.isHardNoConsecutive(core, targetRoom) || this.isHardNoConsecutive(core, triggerRoom)) return false;
           const projectedRooms = this.getProjectedRoomsForSwapSource(core, srcRoom, triggerRoom, targetRoom);
-          return this.canUseProjectedRooms(core, projectedRooms);
+          return this.canUseProjectedRooms(projectedRooms);
         });
         srcCands.sort((a, b) => this.getPastRoomCount(extractStaffName(a), targetRoom) - this.getPastRoomCount(extractStaffName(b), targetRoom));
         for (const srcM of srcCands) {
@@ -1084,7 +1084,7 @@ class AutoAssigner {
             if (this.isHalfDayBlockedForFullDayRoom(c, srcRoom).hard) return false;
             if (this.hasNGPair(c, srcMembers.filter(x => x !== srcM).map(extractStaffName), false)) return false;
             const projectedRooms = this.getProjectedRoomsForSwapKick(c, triggerRoom, srcRoom);
-            return this.canUseProjectedRooms(c, projectedRooms);
+            return this.canUseProjectedRooms(projectedRooms);
           });
           if (!targetToKick) continue;
           const kickCore = extractStaffName(targetToKick);
