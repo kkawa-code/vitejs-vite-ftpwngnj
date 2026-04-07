@@ -294,6 +294,15 @@ export class AutoAssigner {
   isFullDayOnly(r: string) { return split(this.ctx.customRules.fullDayOnlyRooms || "").includes(r); }
   isTimeTagBlockedByFullDayRule(r: string, tag: string) { return this.isFullDayOnly(r) && (tag.includes("AM") || tag.includes("PM")); }
 
+private getPreferredWorkTag(staff: string): string {
+  const exactTag = this.timeTagMap.get(staff);
+  if (exactTag) return exactTag;
+
+  const block = this.blockMap.get(staff);
+  if (block === 'AM') return "(PM)";
+  if (block === 'PM') return "(AM)";
+  return "";
+}
   private isHalfDayBlocked(staff: string, section: string): { hard: boolean; monthlyHalfException: boolean } { const fullDayOnlyList = split(this.ctx.customRules.fullDayOnlyRooms ?? ""); if (!fullDayOnlyList.includes(section)) return { hard: false, monthlyHalfException: false }; const fuzaiMems = split(this.dayCells["不在"]); const isFuzaiAm = fuzaiMems.some(m => extractStaffName(m) === staff && m.includes("(AM)")); const isFuzaiPm = fuzaiMems.some(m => extractStaffName(m) === staff && m.includes("(PM)")); if (!isFuzaiAm && !isFuzaiPm) return { hard: false, monthlyHalfException: false }; const monthly = isMonthlyMainStaff(section, staff, this.ctx.monthlyAssign); if (!monthly) return { hard: true, monthlyHalfException: false }; return { hard: false, monthlyHalfException: true }; }
   private isHardNoConsecutive(s: string, r: string): boolean { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!this.prevDay || !noC.includes(r)) return false; return split(this.prevDay.cells[r] || "").map(extractStaffName).includes(s); }
   private getRoomDependencyCount(r: string): number { let sc = 0; (this.ctx.customRules.linkedRooms || []).forEach((x: any) => { if (split(x.sources || "").some((y: string) => parseRoomCond(y).r === r)) sc += 3; if (x.target === r) sc += 1; }); (this.ctx.customRules.rescueRules || []).forEach((x: any) => { if (split(x.sourceRooms || "").some((y: string) => parseRoomCond(y).r === r)) sc += 2; if (x.targetRoom === r) sc += 1; }); (this.ctx.customRules.swapRules || []).forEach((x: any) => { if (split(x.sourceRooms || "").some((y: string) => parseRoomCond(y).r === r)) sc += 2; if (x.triggerRoom === r) sc += 1; if (x.targetRoom === r) sc += 1; }); (this.ctx.customRules.kenmuPairs || []).forEach((p: any) => { if (p.s1 === r || p.s2 === r) sc += 2; }); return sc; }
