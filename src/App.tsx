@@ -184,6 +184,31 @@ export function getStaffAmount(name: string) {
 }
 
 
+function parseClockTagToMinutes(clock: string): number {
+  const [h, m] = clock.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function formatMinutesToClock(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}:${String(m).padStart(2, "0")}`;
+}
+
+function parseTimeTagRange(tag: string): { start: number; end: number } | null {
+  if (!tag) return null;
+  if (tag === "(AM)") return { start: 0, end: 12 * 60 };
+  if (tag === "(PM)") return { start: 12 * 60, end: 24 * 60 };
+  const until = tag.match(/^\(〜(\d{1,2}:\d{2})\)$/);
+  if (until) return { start: 0, end: parseClockTagToMinutes(until[1]) };
+  const from = tag.match(/^\((\d{1,2}:\d{2})〜\)$/);
+  if (from) return { start: parseClockTagToMinutes(from[1]), end: 24 * 60 };
+  const between = tag.match(/^\((\d{1,2}:\d{2})〜(\d{1,2}:\d{2})\)$/);
+  if (between) return { start: parseClockTagToMinutes(between[1]), end: parseClockTagToMinutes(between[2]) };
+  return null;
+}
+
+
 export const ABSENCE_HELP_KEY = "__absenceHelp";
 export const ABSENCE_HELP_NONE = "__NO_HELP__";
 
