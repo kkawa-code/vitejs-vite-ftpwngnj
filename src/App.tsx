@@ -39,28 +39,29 @@ const globalStyle = `
   .modal-title { margin: 0; font-size: 24px; color: #0f172a; font-weight: 800; }
   .close-btn { background: #f1f5f9; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; color: #64748b; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; transition: 0.2s; }
   .close-btn:hover { background: #e2e8f0; }
-  @page { size: A4 landscape; margin: 4mm; }
+  @page { size: A4 landscape; margin: 2.5mm; }
   @media print {
     html, body, #root { width: 100% !important; max-width: none !important; background: #fff !important; }
-    body { background: #fff !important; color: #000 !important; font-size: 8px !important; }
+    body { background: #fff !important; color: #000 !important; font-size: 7px !important; }
     .no-print { display: none !important; }
     .print-area {
       box-shadow: none !important;
       border: none !important;
       padding: 0 !important;
       margin: 0 !important;
-      width: 128% !important;
+      width: 100% !important;
       background: #fff !important;
-      transform: scale(0.78) !important;
+      zoom: 0.62;
+      transform: none !important;
       transform-origin: top left !important;
     }
     .scroll-container { overflow: visible !important; border: none !important; background: #fff !important; }
-    table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; page-break-inside: avoid !important; }
+    table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; page-break-inside: auto !important; }
     th, td {
       border: 1px solid #000 !important;
-      padding: 1px 2px !important;
-      font-size: 6.6pt !important;
-      line-height: 1.08 !important;
+      padding: 0.5px 1.2px !important;
+      font-size: 5.4pt !important;
+      line-height: 1.0 !important;
       color: #000 !important;
       background: #fff !important;
       position: static !important;
@@ -69,9 +70,36 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
       vertical-align: top !important;
     }
-    th { font-size: 7.2pt !important; font-weight: 700 !important; }
+    th { font-size: 5.9pt !important; font-weight: 700 !important; }
     .sticky-table-header th { position: static !important; box-shadow: none !important; }
     .btn-hover { box-shadow: none !important; transform: none !important; filter: none !important; }
+    .print-area [data-print-chip='1'] {
+      display: inline-flex !important;
+      flex-direction: row !important;
+      align-items: baseline !important;
+      gap: 1px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: none !important;
+      background: transparent !important;
+      color: #000 !important;
+      box-shadow: none !important;
+      font-size: 5.1pt !important;
+      font-weight: 700 !important;
+      line-height: 1 !important;
+    }
+    .print-area [data-print-chip='1'] [data-print-name='1'] { margin-right: 1px !important; }
+    .print-area [data-print-chip='1'] [data-print-mod='1'],
+    .print-area [data-print-chip='1'] [data-print-badge='1'] {
+      border: none !important;
+      background: transparent !important;
+      color: #000 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      font-size: 4.7pt !important;
+      line-height: 1 !important;
+      border-radius: 0 !important;
+    }
     .print-area [style*='background'] { background: #fff !important; }
     .print-area [style*='color'] { color: #000 !important; }
     .print-area [style*='box-shadow'] { box-shadow: none !important; }
@@ -990,22 +1018,24 @@ export default function App(): any {
 
                                 let tagBg = "#f8fafc"; let tagColor = "#1e293b"; let tagBorder = "#cbd5e1"; let tagAccent = "#94a3b8";
                                 if (roomCount >= 4 || isOverLimit) { tagBg = "#fee2e2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
-                                else if (roomCount === 3) { tagBg = "#fed7aa"; tagColor = "#9a3412"; tagBorder = "#fb923c"; tagAccent = "#ea580c"; }
-                                else if (roomCount === 2) { tagBg = "#fffbeb"; tagColor = "#334155"; tagBorder = "#fde68a"; tagAccent = "#d97706"; }
+                                else if (roomCount === 3) { tagBg = "#fb923c"; tagColor = "#ffffff"; tagBorder = "#ea580c"; tagAccent = "#9a3412"; }
+                                else if (roomCount === 2) { tagBg = "#ffffff"; tagColor = "#334155"; tagBorder = "#fcd34d"; tagAccent = "#f59e0b"; }
 
                                 if (hasRedWarning) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
                                 else if (hasOrangeWarning) { tagBorder = "#ea580c"; tagAccent = "#ea580c"; }
                                 else if (hasYellowWarning && roomCount < 3) { tagBorder = "#ca8a04"; tagAccent = "#ca8a04"; }
 
+                                const isPairKenmu = roomCount === 2 && otherRooms.length === 1;
                                 let inlineStyle: React.CSSProperties = {
                                   background: tagBg,
                                   color: tagColor,
                                   border: `1px solid ${tagBorder}`,
-                                  padding: roomCount >= 2 ? "6px 10px 7px" : "6px 10px",
+                                  padding: roomCount >= 2 ? "6px 9px 7px" : "6px 10px",
                                   borderRadius: "8px",
                                   display: "flex",
-                                  alignItems: "center",
-                                  gap: "6px",
+                                  alignItems: isPairKenmu ? "flex-start" : "center",
+                                  flexDirection: isPairKenmu ? "column" : "row",
+                                  gap: isPairKenmu ? "3px" : "6px",
                                   fontSize: "16px",
                                   fontWeight: (hasRedWarning || isOverLimit || roomCount >= 3) ? 800 : 700,
                                   transition: "all 0.2s ease",
@@ -1021,19 +1051,24 @@ export default function App(): any {
                                 const otherRoomLabel = otherRooms.slice(0, 2).map(roomShortLabel).join("・");
                                 const restCount = Math.max(0, otherRooms.length - 2);
                                 const linkedBadgeText = otherRooms.length > 0 ? `↔ ${otherRoomLabel}${restCount > 0 ? ` +${restCount}` : ""}` : (roomCount >= 2 ? `計${roomCount}` : "");
+                                const pairBadgeText = isPairKenmu ? `↔ ${roomLinkLabel(otherRooms[0])}` : linkedBadgeText;
                                 const titleText = roomCount >= 2 ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
+                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: isPairKenmu ? 0 : "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: isPairKenmu ? 0 : "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: isPairKenmu ? 0 : "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>);
+
                                 return (
-                                  <div key={mIdx} className="btn-hover" 
+                                  <div key={mIdx} className="btn-hover" data-print-chip="1" 
                                     title={titleText}
                                     onClick={(e) => { e.stopPropagation(); setHighlightedStaff(prev => prev === coreName ? null : coreName); }}
                                     onMouseEnter={() => setHoveredStaff(coreName)}
                                     onMouseLeave={() => setHoveredStaff(null)}
                                     style={inlineStyle}
                                   >
-                                    <span>{coreName}</span>
-                                    {mod && (mod.includes("(AM)") ? <span style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>)}
-                                    {roomCount >= 2 && <span style={{ background: isHighlighted ? "rgba(255,255,255,0.22)" : roomCount >= 3 ? "#ffedd5" : "#fff7ed", color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#9a3412" : "#b45309"), fontSize: "11px", padding: "2px 5px", borderRadius: "999px", border: `1px solid ${isHighlighted ? 'rgba(255,255,255,0.35)' : (roomCount >= 3 ? '#fdba74' : '#fcd34d')}`, fontWeight: 800, letterSpacing: "0.01em" }}>{linkedBadgeText}</span>}
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                                      <span data-print-name="1">{coreName}</span>
+                                      {modNode}
+                                    </div>
+                                    {roomCount >= 2 && <span data-print-badge="1" style={{ background: isHighlighted ? "rgba(255,255,255,0.22)" : roomCount >= 3 ? "rgba(255,255,255,0.18)" : "#fff8db", color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#ffffff" : "#b45309"), fontSize: isPairKenmu ? "12px" : "11px", padding: isPairKenmu ? "2px 6px" : "2px 5px", borderRadius: isPairKenmu ? "6px" : "999px", border: `1px solid ${isHighlighted ? 'rgba(255,255,255,0.35)' : (roomCount >= 3 ? 'rgba(255,255,255,0.35)' : '#fcd34d')}`, fontWeight: 800, letterSpacing: "0.01em" }}>{pairBadgeText}</span>}
                                   </div>
                                 );
                               })}
@@ -1635,5 +1670,20 @@ export default function App(): any {
     "受付": "受",
     "受付ヘルプ": "受補"
   } as Record<string, string>)[room] || room.replace(/[（）()]/g, "");
+
+const roomLinkLabel = (room: string) => ({
+  "1号室": "1号室",
+  "2号室": "2号室",
+  "3号室": "3号室",
+  "5号室": "5号室",
+  "透視（6号）": "透視6",
+  "透視（11号）": "透視11",
+  "骨塩": "骨塩",
+  "パノラマCT": "パノラマ",
+  "ポータブル": "ポータブル",
+  "検像": "検像",
+  "DSA": "DSA",
+  "治療": "治療"
+} as Record<string, string>)[room] || room.replace(/[（）()]/g, "");
 
 
