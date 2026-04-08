@@ -39,19 +39,28 @@ const globalStyle = `
   .modal-title { margin: 0; font-size: 24px; color: #0f172a; font-weight: 800; }
   .close-btn { background: #f1f5f9; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; color: #64748b; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; transition: 0.2s; }
   .close-btn:hover { background: #e2e8f0; }
-  @page { size: A4 landscape; margin: 7mm; }
+  @page { size: A4 landscape; margin: 4mm; }
   @media print {
     html, body, #root { width: 100% !important; max-width: none !important; background: #fff !important; }
-    body { background: #fff !important; color: #000 !important; font-size: 10px !important; }
+    body { background: #fff !important; color: #000 !important; font-size: 8px !important; }
     .no-print { display: none !important; }
-    .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; background: #fff !important; }
+    .print-area {
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 128% !important;
+      background: #fff !important;
+      transform: scale(0.78) !important;
+      transform-origin: top left !important;
+    }
     .scroll-container { overflow: visible !important; border: none !important; background: #fff !important; }
     table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; page-break-inside: avoid !important; }
     th, td {
       border: 1px solid #000 !important;
-      padding: 2px 3px !important;
-      font-size: 8pt !important;
-      line-height: 1.2 !important;
+      padding: 1px 2px !important;
+      font-size: 6.6pt !important;
+      line-height: 1.08 !important;
       color: #000 !important;
       background: #fff !important;
       position: static !important;
@@ -60,11 +69,13 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
       vertical-align: top !important;
     }
-    th { font-size: 8.5pt !important; font-weight: 700 !important; }
+    th { font-size: 7.2pt !important; font-weight: 700 !important; }
     .sticky-table-header th { position: static !important; box-shadow: none !important; }
     .btn-hover { box-shadow: none !important; transform: none !important; filter: none !important; }
     .print-area [style*='background'] { background: #fff !important; }
     .print-area [style*='color'] { color: #000 !important; }
+    .print-area [style*='box-shadow'] { box-shadow: none !important; }
+    .print-area [style*='border-radius'] { border-radius: 0 !important; }
   }
 `;
 
@@ -753,6 +764,20 @@ export default function App(): any {
     return { workingCount: workingStaff.length, absentCount: allStaff.length - workingStaff.length, unassigned }; 
   };
   
+  const hhmmToMinutes = (s: string) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
+  const getMemberCoverageRange = (member: string) => {
+    if (member.includes("(AM)")) return { start: 0, end: 12 * 60 };
+    if (member.includes("(PM)")) return { start: 13 * 60, end: 24 * 60 };
+    const until = member.match(/\(〜(\d+:\d+)\)/)?.[1];
+    if (until) return { start: 0, end: hhmmToMinutes(until) };
+    const from = member.match(/\((\d+:\d+)〜\)/)?.[1];
+    if (from) return { start: hhmmToMinutes(from), end: 24 * 60 };
+    return { start: 0, end: 24 * 60 };
+  };
+  const roomHasCoverageAfter = (cells: Record<string, string>, room: string, minute: number) => {
+    return split(cells[room] || "").some(m => getMemberCoverageRange(m).end > minute);
+  };
+
   const getDayWarnings = (dayId: string): WarningInfo[] => { 
     const w: WarningInfo[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {}; 
     ROOM_SECTIONS.forEach(room => { split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }) }); 
@@ -761,6 +786,9 @@ export default function App(): any {
     Object.entries(staffMap).forEach(([staff, rms]) => { const limit = customRules.alertMaxKenmu || 3; const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:"); }).length; if(dayCount > limit) w.push({ level: 'orange', title: '兼務超過', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); }); 
     const targetEmptyRooms = split(customRules.alertEmptyRooms || "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"); 
     targetEmptyRooms.forEach(room => { if (split(cells[room]).length === 0) w.push({ level: 'yellow', title: '空室', room, msg: `「${room}」の担当者がいません` }); }); 
+    if (split(cells["ポータブル"] || "").length > 0 && !roomHasCoverageAfter(cells, "ポータブル", 11 * 60 + 30)) {
+      w.push({ level: 'orange', title: '午後不足', room: 'ポータブル', msg: 'ポータブルは11:30以降の担当者がいません' });
+    }
     const uTarget = customRules.capacity?.受付 ?? 2; 
     if (split(cells["受付"]).reduce((sum: number, m: string) => sum + getStaffAmount(m), 0) < uTarget && split(cells["受付ヘルプ"]).length === 0) { w.push({ level: 'yellow', title: '受付不足', room: '受付', msg: `受付が${uTarget}名未満ですが、受付ヘルプがいません` }); } 
     const curIdx = days.findIndex(d => d.id === dayId); 
@@ -854,6 +882,26 @@ export default function App(): any {
     return loads;
   }, [days, allDays]);
 
+  const dailyStaffRooms = useMemo(() => {
+    const roomsByDay: Record<string, Record<string, string[]>> = {};
+    days.forEach(day => {
+      const byStaff: Record<string, string[]> = {};
+      if (!day.isPublicHoliday) {
+        ROOM_SECTIONS.forEach(room => {
+          if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return;
+          split(allDays[day.id]?.[room]).forEach(m => {
+            if (m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")) return;
+            const core = extractStaffName(m);
+            if (!byStaff[core]) byStaff[core] = [];
+            if (!byStaff[core].includes(room)) byStaff[core].push(room);
+          });
+        });
+      }
+      roomsByDay[day.id] = byStaff;
+    });
+    return roomsByDay;
+  }, [days, allDays]);
+
   const getFinalAssignmentRows = (dayId: string) => {
     const cells = allDays[dayId] || {};
     return SECTIONS.filter(sec => !["土日休日代休"].includes(sec)).map(sec => ({ sec, val: String((cells as any)[sec] || "") })).filter(x => split(x.val).length > 0);
@@ -934,21 +982,35 @@ export default function App(): any {
                                 const isDimmed = targetStaff !== null && targetStaff !== coreName;
                                 
                                 const roomLoad = dailyStaffLoads[day.id]?.[coreName] || 0;
+                                const sameDayRooms = dailyStaffRooms[day.id]?.[coreName] || [];
+                                const roomCount = sameDayRooms.length;
+                                const otherRooms = sameDayRooms.filter(r => r !== section);
                                 const limit = customRules.alertMaxKenmu || 3;
                                 const isOverLimit = roomLoad > limit;
 
-                                let tagBg = "#f0f4ff"; let tagColor = "#1e293b"; let tagBorder = "#94a3b8"; let tagAccent = "";
-                                if (roomLoad >= 4) { tagBg = "#FED7AA"; tagColor = "#9a3412"; tagBorder = "#fb923c"; }
-                                else if (roomLoad === 3) { tagBg = "#FFF7ED"; tagColor = "#9a3412"; tagBorder = "#fdba74"; tagAccent = "#fb923c"; }
-                                else if (roomLoad === 2) { tagBg = "#ffffff"; tagColor = "#334155"; tagBorder = "#cbd5e1"; tagAccent = "#f59e0b"; }
-                                if (isOverLimit) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
+                                let tagBg = "#f8fafc"; let tagColor = "#1e293b"; let tagBorder = "#cbd5e1"; let tagAccent = "#94a3b8";
+                                if (roomCount >= 4 || isOverLimit) { tagBg = "#fee2e2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
+                                else if (roomCount === 3) { tagBg = "#fed7aa"; tagColor = "#9a3412"; tagBorder = "#fb923c"; tagAccent = "#ea580c"; }
+                                else if (roomCount === 2) { tagBg = "#fffbeb"; tagColor = "#334155"; tagBorder = "#fde68a"; tagAccent = "#d97706"; }
 
-                                if (hasRedWarning) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; } 
-                                else if (hasOrangeWarning) { tagBorder = "#ea580c"; if (!tagAccent) tagAccent = "#ea580c"; } 
-                                else if (hasYellowWarning) { tagBorder = "#ca8a04"; if (!tagAccent) tagAccent = "#ca8a04"; }
+                                if (hasRedWarning) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
+                                else if (hasOrangeWarning) { tagBorder = "#ea580c"; tagAccent = "#ea580c"; }
+                                else if (hasYellowWarning && roomCount < 3) { tagBorder = "#ca8a04"; tagAccent = "#ca8a04"; }
 
-                                let inlineStyle: React.CSSProperties = { background: tagBg, color: tagColor, border: `1px solid ${tagBorder}`, padding: "6px 10px", borderRadius: "6px", display: "flex", alignItems: "center", gap: "6px", fontSize: "16px", fontWeight: (hasRedWarning || isOverLimit) ? 800 : 700, transition: "all 0.2s ease" };
-                                if (roomLoad === 2 && !hasRedWarning && !isOverLimit) inlineStyle.boxShadow = `inset 3px 0 0 ${tagAccent || '#f59e0b'}`;
+                                let inlineStyle: React.CSSProperties = {
+                                  background: tagBg,
+                                  color: tagColor,
+                                  border: `1px solid ${tagBorder}`,
+                                  padding: roomCount >= 2 ? "6px 10px 7px" : "6px 10px",
+                                  borderRadius: "8px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  fontSize: "16px",
+                                  fontWeight: (hasRedWarning || isOverLimit || roomCount >= 3) ? 800 : 700,
+                                  transition: "all 0.2s ease",
+                                  boxShadow: roomCount >= 2 ? `inset 3px 0 0 ${tagAccent}` : "none"
+                                };
                                 
                                 if (isHighlighted) {
                                   inlineStyle.background = "#2563eb"; inlineStyle.color = "#fff"; inlineStyle.borderColor = "#1d4ed8"; inlineStyle.boxShadow = "0 4px 12px rgba(37,99,235,0.4)"; inlineStyle.transform = "scale(1.05)"; inlineStyle.zIndex = 10; inlineStyle.position = "relative";
@@ -956,8 +1018,14 @@ export default function App(): any {
                                   inlineStyle.opacity = 0.25; inlineStyle.filter = "grayscale(1)";
                                 }
 
+                                const otherRoomLabel = otherRooms.slice(0, 2).map(roomShortLabel).join("・");
+                                const restCount = Math.max(0, otherRooms.length - 2);
+                                const linkedBadgeText = otherRooms.length > 0 ? `↔ ${otherRoomLabel}${restCount > 0 ? ` +${restCount}` : ""}` : (roomCount >= 2 ? `計${roomCount}` : "");
+                                const titleText = roomCount >= 2 ? `兼務: ${sameDayRooms.join("、")}` : coreName;
+
                                 return (
                                   <div key={mIdx} className="btn-hover" 
+                                    title={titleText}
                                     onClick={(e) => { e.stopPropagation(); setHighlightedStaff(prev => prev === coreName ? null : coreName); }}
                                     onMouseEnter={() => setHoveredStaff(coreName)}
                                     onMouseLeave={() => setHoveredStaff(null)}
@@ -965,6 +1033,7 @@ export default function App(): any {
                                   >
                                     <span>{coreName}</span>
                                     {mod && (mod.includes("(AM)") ? <span style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>)}
+                                    {roomCount >= 2 && <span style={{ background: isHighlighted ? "rgba(255,255,255,0.22)" : roomCount >= 3 ? "#ffedd5" : "#fff7ed", color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#9a3412" : "#b45309"), fontSize: "11px", padding: "2px 5px", borderRadius: "999px", border: `1px solid ${isHighlighted ? 'rgba(255,255,255,0.35)' : (roomCount >= 3 ? '#fdba74' : '#fcd34d')}`, fontWeight: 800, letterSpacing: "0.01em" }}>{linkedBadgeText}</span>}
                                   </div>
                                 );
                               })}
@@ -1551,4 +1620,20 @@ export default function App(): any {
       )}
     </div>
   );
-}
+}  const roomShortLabel = (room: string) => ({
+    "1号室": "1",
+    "2号室": "2",
+    "3号室": "3",
+    "5号室": "5",
+    "透視（6号）": "6",
+    "透視（11号）": "11",
+    "骨塩": "骨",
+    "パノラマCT": "パノ",
+    "ポータブル": "ポ",
+    "検像": "検",
+    "治療": "治",
+    "受付": "受",
+    "受付ヘルプ": "受補"
+  } as Record<string, string>)[room] || room.replace(/[（）()]/g, "");
+
+
