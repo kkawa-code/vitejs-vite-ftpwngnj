@@ -473,7 +473,7 @@ export class AutoAssigner {
         if (!sM.length) { this.log(`↪️ [交換スキップ] ${r.targetRoom}: ${sR} に交換候補なし`); continue; }
         const sCandidates = sM.filter(m => {
           const c = extractStaffName(m);
-          return !ROLE_PLACEHOLDERS.includes(c) && !this.isForbidden(c, r.targetRoom) && !this.isHalfDayBlocked(c, r.targetRoom).hard && !this.isHardNoConsecutive(c, r.targetRoom) && this.canAddKenmu(c, r.targetRoom, true) && !this.isForbidden(c, r.triggerRoom) && !this.isTimeTagBlockedByFullDayRule(r.targetRoom, m);
+          return !ROLE_PLACEHOLDERS.includes(c) && !this.isForbidden(c, r.targetRoom) && !this.isHalfDayBlocked(c, r.targetRoom).hard && !this.isHardNoConsecutive(c, r.targetRoom) && !this.isForbidden(c, r.triggerRoom) && !this.isTimeTagBlockedByFullDayRule(r.targetRoom, m);
         });
         sCandidates.sort((a, b) => this.getTodayRoomLoad(extractStaffName(a)) - this.getTodayRoomLoad(extractStaffName(b)) || this.getPastRoomCount(extractStaffName(a), r.targetRoom) - this.getPastRoomCount(extractStaffName(b), r.targetRoom));
         if (!sCandidates.length) { this.log(`↪️ [交換スキップ] ${r.targetRoom}: ${sR} に ${r.targetRoom} 適格者なし`); continue; }
@@ -481,7 +481,7 @@ export class AutoAssigner {
           const sCo = extractStaffName(sm);
           const tTK = tM.find(m => {
             const tc = extractStaffName(m);
-            return !this.isForbidden(tc, sR) && !this.isHalfDayBlocked(tc, sR).hard && !this.hasNGPair(tc, sM.map(extractStaffName), false) && this.canAddKenmu(tc, sR, true);
+            return !this.isForbidden(tc, sR) && !this.isHalfDayBlocked(tc, sR).hard && !this.hasNGPair(tc, sM.map(extractStaffName), false);
           });
           if (!tTK) { this.log(`↪️ [交換スキップ] ${r.targetRoom}: ${sR} に戻せる ${r.triggerRoom} 担当がいない`); continue; }
           const targetMembers = split(this.dayCells[r.targetRoom]);
