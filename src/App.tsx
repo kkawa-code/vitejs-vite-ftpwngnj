@@ -1716,21 +1716,7 @@ export default function App(): any {
       )}
     </div>
   );
-}  const roomShortLabel = (room: string) => ({
-    "1号室": "1",
-    "2号室": "2",
-    "3号室": "3",
-    "5号室": "5",
-    "透視（6号）": "6",
-    "透視（11号）": "11",
-    "骨塩": "骨",
-    "パノラマCT": "パノ",
-    "ポータブル": "ポ",
-    "検像": "検",
-    "治療": "治",
-    "受付": "受",
-    "受付ヘルプ": "受補"
-  } as Record<string, string>)[room] || room.replace(/[（）()]/g, "");
+}
 
 const roomLinkLabel = (room: string) => ({
   "1号室": "1号室",
