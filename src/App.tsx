@@ -39,71 +39,89 @@ const globalStyle = `
   .modal-title { margin: 0; font-size: 24px; color: #0f172a; font-weight: 800; }
   .close-btn { background: #f1f5f9; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; color: #64748b; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; transition: 0.2s; }
   .close-btn:hover { background: #e2e8f0; }
-  @page { size: A4 landscape; margin: 2.5mm; }
+  .screen-weekly-table { display: block; }
+  .print-weekly-sheet { display: none; }
+  @page { size: A4 landscape; margin: 4mm; }
   @media print {
-    html, body, #root { width: 100% !important; max-width: none !important; background: #fff !important; }
-    body { background: #fff !important; color: #000 !important; font-size: 7px !important; }
-    .no-print { display: none !important; }
-    .print-area {
-      box-shadow: none !important;
-      border: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
+    html, body, #root {
       width: 100% !important;
+      max-width: none !important;
       background: #fff !important;
-      zoom: 0.62;
-      transform: none !important;
-      transform-origin: top left !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
-    .scroll-container { overflow: visible !important; border: none !important; background: #fff !important; }
-    table { width: 100% !important; border-collapse: collapse !important; table-layout: fixed !important; page-break-inside: auto !important; }
-    th, td {
-      border: 1px solid #000 !important;
-      padding: 0.5px 1.2px !important;
-      font-size: 5.4pt !important;
-      line-height: 1.0 !important;
-      color: #000 !important;
+    body {
       background: #fff !important;
-      position: static !important;
-      box-shadow: none !important;
+      color: #000 !important;
+      font-size: 8px !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    #root > div {
+      max-width: none !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .no-print { display: none !important; }
+    .screen-weekly-table { display: none !important; }
+    .print-weekly-sheet {
+      display: block !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .print-sheet-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      table-layout: fixed !important;
+      page-break-inside: avoid !important;
+    }
+    .print-sheet-table th,
+    .print-sheet-table td {
+      border: 1px solid #000 !important;
+      background: #fff !important;
+      color: #000 !important;
+      padding: 1.2mm 1mm !important;
+      font-size: 8px !important;
+      line-height: 1.14 !important;
+      vertical-align: top !important;
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
-      vertical-align: top !important;
     }
-    th { font-size: 5.9pt !important; font-weight: 700 !important; }
-    .sticky-table-header th { position: static !important; box-shadow: none !important; }
-    .btn-hover { box-shadow: none !important; transform: none !important; filter: none !important; }
-    .print-area [data-print-chip='1'] {
-      display: inline-flex !important;
-      flex-direction: row !important;
-      align-items: baseline !important;
-      gap: 1px !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      border: none !important;
-      background: transparent !important;
-      color: #000 !important;
-      box-shadow: none !important;
-      font-size: 5.1pt !important;
+    .print-sheet-table th {
+      font-size: 8.4px !important;
       font-weight: 700 !important;
-      line-height: 1 !important;
+      text-align: center !important;
     }
-    .print-area [data-print-chip='1'] [data-print-name='1'] { margin-right: 1px !important; }
-    .print-area [data-print-chip='1'] [data-print-mod='1'],
-    .print-area [data-print-chip='1'] [data-print-badge='1'] {
+    .print-sheet-table .p-sec {
+      width: 13% !important;
+      font-weight: 700 !important;
+      text-align: center !important;
+      vertical-align: middle !important;
+      white-space: nowrap !important;
+    }
+    .print-sheet-table .p-day {
+      font-size: 7.8px !important;
+      font-weight: 700 !important;
+      line-height: 1.1 !important;
+    }
+    .print-sheet-table .p-line {
+      margin: 0 !important;
+      padding: 0 !important;
+      font-size: 7px !important;
+      line-height: 1.12 !important;
+      white-space: pre-wrap !important;
+    }
+    .scroll-container,
+    .print-area {
+      overflow: visible !important;
       border: none !important;
-      background: transparent !important;
-      color: #000 !important;
+      background: #fff !important;
+      box-shadow: none !important;
       padding: 0 !important;
       margin: 0 !important;
-      font-size: 4.7pt !important;
-      line-height: 1 !important;
-      border-radius: 0 !important;
     }
-    .print-area [style*='background'] { background: #fff !important; }
-    .print-area [style*='color'] { color: #000 !important; }
-    .print-area [style*='box-shadow'] { box-shadow: none !important; }
-    .print-area [style*='border-radius'] { border-radius: 0 !important; }
   }
 `;
 
@@ -964,6 +982,7 @@ export default function App(): any {
 
       <div style={{ display: activeTab === 'calendar' ? 'block' : 'none' }}>
         <div className="print-area" style={{ ...panelStyle(), marginBottom: 32, padding: "16px" }}>
+          <div className="screen-weekly-table">
           <div className="scroll-container">
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
               <thead className="sticky-table-header">
@@ -1012,34 +1031,35 @@ export default function App(): any {
                                 const roomLoad = dailyStaffLoads[day.id]?.[coreName] || 0;
                                 const sameDayRooms = dailyStaffRooms[day.id]?.[coreName] || [];
                                 const roomCount = sameDayRooms.length;
-                                const otherRooms = sameDayRooms.filter(r => r !== section);
+                                const isRoomLikeSection = ROOM_SECTIONS.includes(section);
+                                const otherRooms = isRoomLikeSection ? sameDayRooms.filter(r => r !== section) : [];
+                                const showKenmuMeta = isRoomLikeSection && roomCount >= 2;
                                 const limit = customRules.alertMaxKenmu || 3;
                                 const isOverLimit = roomLoad > limit;
 
                                 let tagBg = "#f8fafc"; let tagColor = "#1e293b"; let tagBorder = "#cbd5e1"; let tagAccent = "#94a3b8";
-                                if (roomCount >= 4 || isOverLimit) { tagBg = "#fee2e2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
-                                else if (roomCount === 3) { tagBg = "#fb923c"; tagColor = "#ffffff"; tagBorder = "#ea580c"; tagAccent = "#9a3412"; }
-                                else if (roomCount === 2) { tagBg = "#ffffff"; tagColor = "#334155"; tagBorder = "#fcd34d"; tagAccent = "#f59e0b"; }
+                                if (showKenmuMeta && (roomCount >= 4 || isOverLimit)) { tagBg = "#fee2e2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#f59e0b"; tagColor = "#ffffff"; tagBorder = "#d97706"; tagAccent = "#92400e"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#1f2937"; tagBorder = "#cbd5e1"; tagAccent = "#94a3b8"; }
 
                                 if (hasRedWarning) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
                                 else if (hasOrangeWarning) { tagBorder = "#ea580c"; tagAccent = "#ea580c"; }
-                                else if (hasYellowWarning && roomCount < 3) { tagBorder = "#ca8a04"; tagAccent = "#ca8a04"; }
+                                else if (hasYellowWarning && (!showKenmuMeta || roomCount < 3)) { tagBorder = "#ca8a04"; tagAccent = "#ca8a04"; }
 
-                                const isPairKenmu = roomCount === 2 && otherRooms.length === 1;
                                 let inlineStyle: React.CSSProperties = {
                                   background: tagBg,
                                   color: tagColor,
                                   border: `1px solid ${tagBorder}`,
-                                  padding: roomCount >= 2 ? "6px 9px 7px" : "6px 10px",
+                                  padding: showKenmuMeta ? "6px 9px 7px" : "6px 10px",
                                   borderRadius: "8px",
                                   display: "flex",
-                                  alignItems: isPairKenmu ? "flex-start" : "center",
-                                  flexDirection: isPairKenmu ? "column" : "row",
-                                  gap: isPairKenmu ? "3px" : "6px",
+                                  alignItems: "flex-start",
+                                  flexDirection: "column",
+                                  gap: "3px",
                                   fontSize: "16px",
                                   fontWeight: (hasRedWarning || isOverLimit || roomCount >= 3) ? 800 : 700,
                                   transition: "all 0.2s ease",
-                                  boxShadow: roomCount >= 2 ? `inset 3px 0 0 ${tagAccent}` : "none"
+                                  boxShadow: showKenmuMeta ? `inset 3px 0 0 ${tagAccent}` : "none"
                                 };
                                 
                                 if (isHighlighted) {
@@ -1048,13 +1068,12 @@ export default function App(): any {
                                   inlineStyle.opacity = 0.25; inlineStyle.filter = "grayscale(1)";
                                 }
 
-                                const otherRoomLabel = otherRooms.slice(0, 2).map(roomShortLabel).join("・");
+                                const otherRoomLabel = otherRooms.slice(0, 2).map(roomLinkLabel).join("・");
                                 const restCount = Math.max(0, otherRooms.length - 2);
-                                const linkedBadgeText = otherRooms.length > 0 ? `↔ ${otherRoomLabel}${restCount > 0 ? ` +${restCount}` : ""}` : (roomCount >= 2 ? `計${roomCount}` : "");
-                                const pairBadgeText = isPairKenmu ? `↔ ${roomLinkLabel(otherRooms[0])}` : linkedBadgeText;
-                                const titleText = roomCount >= 2 ? `兼務: ${sameDayRooms.join("、")}` : coreName;
+                                const linkText = otherRooms.length > 0 ? `兼: ${otherRoomLabel}${restCount > 0 ? ` +${restCount}` : ""}` : "";
+                                const titleText = showKenmuMeta ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
-                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: isPairKenmu ? 0 : "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: isPairKenmu ? 0 : "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", marginLeft: isPairKenmu ? 0 : "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>);
+                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>);
 
                                 return (
                                   <div key={mIdx} className="btn-hover" data-print-chip="1" 
@@ -1068,12 +1087,54 @@ export default function App(): any {
                                       <span data-print-name="1">{coreName}</span>
                                       {modNode}
                                     </div>
-                                    {roomCount >= 2 && <span data-print-badge="1" style={{ background: isHighlighted ? "rgba(255,255,255,0.22)" : roomCount >= 3 ? "rgba(255,255,255,0.18)" : "#fff8db", color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#ffffff" : "#b45309"), fontSize: isPairKenmu ? "12px" : "11px", padding: isPairKenmu ? "2px 6px" : "2px 5px", borderRadius: isPairKenmu ? "6px" : "999px", border: `1px solid ${isHighlighted ? 'rgba(255,255,255,0.35)' : (roomCount >= 3 ? 'rgba(255,255,255,0.35)' : '#fcd34d')}`, fontWeight: 800, letterSpacing: "0.01em" }}>{pairBadgeText}</span>}
+                                    {showKenmuMeta && (
+                                      <div data-print-badge="1" style={{
+                                        fontSize: roomCount >= 3 ? "11px" : "10px",
+                                        lineHeight: 1.1,
+                                        fontWeight: roomCount >= 3 ? 800 : 700,
+                                        color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#fffbeb" : "#64748b"),
+                                        opacity: roomCount >= 3 ? 0.95 : 1
+                                      }}>
+                                        {linkText}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}
                             </div>
                           )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </div>
+          <div className="print-weekly-sheet">
+            <table className="print-sheet-table">
+              <thead>
+                <tr>
+                  <th className="p-sec">区分</th>
+                  {days.map(day => (
+                    <th key={`print-${day.id}`}>
+                      <div className="p-day">{day.label}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {SECTIONS.map((section) => (
+                  <tr key={`print-row-${section}`}>
+                    <td className="p-sec">{section}</td>
+                    {days.map(day => {
+                      const members = split(allDays[day.id]?.[section]);
+                      return (
+                        <td key={`print-${day.id}-${section}`}>
+                          {members.length === 0 ? <div className="p-line"></div> : members.map((m, idx) => (
+                            <div key={idx} className="p-line">{formatPrintMember(m)}</div>
+                          ))}
                         </td>
                       );
                     })}
@@ -1685,5 +1746,16 @@ const roomLinkLabel = (room: string) => ({
   "DSA": "DSA",
   "治療": "治療"
 } as Record<string, string>)[room] || room.replace(/[（）()]/g, "");
+
+const formatPrintMember = (m: string) => m
+  .replace(/（/g, "(")
+  .replace(/）/g, ")")
+  .replace("(AM)", " AM")
+  .replace("(PM)", " PM")
+  .replace("(〜", " ")
+  .replace("(17:00〜)", " 17:00〜")
+  .replace("(16:00〜)", " 16:00〜")
+  .replace("(12:15〜13:00)", " 12:15〜13:00")
+  .trim();
 
 
