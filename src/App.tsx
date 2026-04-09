@@ -41,10 +41,11 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 2.5mm; }
+  @page { size: A4 portrait; margin: 1.2mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
+      height: 100% !important;
       max-width: none !important;
       background: #fff !important;
       margin: 0 !important;
@@ -53,13 +54,14 @@ const globalStyle = `
     body {
       background: #fff !important;
       color: #000 !important;
-      font-size: 8px !important;
+      font-size: 8.2px !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     #root > div {
       max-width: none !important;
       width: 100% !important;
+      min-height: 0 !important;
       margin: 0 !important;
       padding: 0 !important;
     }
@@ -68,6 +70,8 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
+      height: 294mm !important;
+      max-height: 294mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
@@ -75,57 +79,64 @@ const globalStyle = `
     }
     .print-sheet-table {
       width: 100% !important;
+      height: 294mm !important;
+      max-height: 294mm !important;
       max-width: 100% !important;
       min-width: 0 !important;
       border-collapse: collapse !important;
       table-layout: fixed !important;
       page-break-inside: avoid !important;
     }
+    .print-sheet-table thead tr {
+      height: 8.5mm !important;
+    }
+    .print-sheet-table tbody tr {
+      height: calc((294mm - 8.5mm) / 24) !important;
+    }
     .print-sheet-table th,
     .print-sheet-table td {
       border: 0.18mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.75mm 0.4mm !important;
-      font-size: 6.9px !important;
-      line-height: 1.18 !important;
+      padding: 0.45mm 0.35mm !important;
+      font-size: 7.15px !important;
+      line-height: 1.14 !important;
       vertical-align: top !important;
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
-      word-break: keep-all !important;
-    }
-
-    .print-sheet-table tr {
-      height: 7.8mm !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
     }
     .print-sheet-table th {
-      font-size: 7.0px !important;
+      font-size: 7.2px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 8.8mm !important;
+      width: 7.2mm !important;
+      font-size: 6.55px !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 6.8px !important;
+      font-size: 7px !important;
       font-weight: 700 !important;
-      line-height: 1.05 !important;
+      line-height: 1.02 !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 6.4px !important;
-      line-height: 1.16 !important;
+      font-size: 6.75px !important;
+      line-height: 1.14 !important;
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
-      word-break: keep-all !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
     }
     .scroll-container,
     .print-area {
@@ -985,6 +996,35 @@ export default function App(): any {
   const handleCopyToClipboard = () => { const dataObj = { allDays, monthlyAssign, customRules: sanitizeRulesInput(customRules) }; navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => { alert("データをコピーしました！"); }).catch(() => { alert("コピーに失敗しました。"); }); };
   const handleTextImport = () => { if(!importText) return; try { const dataObj = JSON.parse(importText); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(sanitizeRulesInput(dataObj.customRules)); alert("テキストからデータを復元しました！"); setImportText(""); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("テキストの読み込みに失敗しました。"); } };
 
+  const formatYearMonth = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  const currentMonthKey = targetMonday.slice(0, 7);
+  const previousMonthKey = useMemo(() => {
+    const d = new Date(`${targetMonday}T12:00:00`);
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    return formatYearMonth(d);
+  }, [targetMonday]);
+  const removeMonthData = (prefix: string, label: string) => {
+    const targetKeys = Object.keys(allDays).filter(k => k.startsWith(prefix));
+    if (targetKeys.length === 0) {
+      alert(`${label}の保存データはありません。`);
+      return;
+    }
+    if (!window.confirm(`${label}の保存データ ${targetKeys.length} 日分を削除しますか？
+設定と月間担当は残ります。`)) return;
+    setAllDaysWithHistory((prev: any) => {
+      const next = { ...prev };
+      targetKeys.forEach(k => { delete next[k]; });
+      return next;
+    });
+    setAssignLogs(prev => {
+      const next = { ...prev };
+      targetKeys.forEach(k => { delete next[k]; });
+      return next;
+    });
+    if (showLogDay && showLogDay.startsWith(prefix)) setShowLogDay(null);
+  };
+
   const dailyStaffRooms = useMemo(() => {
     const roomsByDay: Record<string, Record<string, string[]>> = {};
     days.forEach(day => {
@@ -1318,6 +1358,12 @@ export default function App(): any {
              <button className="btn-hover" onClick={handleCopyToClipboard} style={btnStyle("#db2777")}>📋 テキストコピー</button>
              <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "10px 16px", fontSize: 17, borderRadius: 8, border: "2px solid #f9a8d4" }} />
              <button className="btn-hover" onClick={handleTextImport} style={btnStyle("#be185d")}>✨ 復元</button>
+          </div>
+          <div style={{ marginTop: 18, paddingTop: 18, borderTop: "2px dashed #f9a8d4", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+             <span style={{ fontWeight: 800, color: "#9d174d", fontSize: 16 }}>🧹 保存データ整理</span>
+             <button className="btn-hover" onClick={() => removeMonthData(currentMonthKey, `${currentMonthKey}（表示月）`)} style={btnStyle("#fff1f2", "#be123c")}>表示月をリセット</button>
+             <button className="btn-hover" onClick={() => removeMonthData(previousMonthKey, `${previousMonthKey}（先月）`)} style={btnStyle("#fef3c7", "#b45309")}>先月データを削除</button>
+             <span style={{ fontSize: 14, color: "#64748b" }}>日別配置だけを削除します。設定と月間担当は残ります。</span>
           </div>
         </div>
 
