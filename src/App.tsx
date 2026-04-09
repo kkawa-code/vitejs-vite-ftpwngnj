@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 4mm; }
+  @page { size: A4 portrait; margin: 3mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -53,7 +53,7 @@ const globalStyle = `
     body {
       background: #fff !important;
       color: #000 !important;
-      font-size: 8px !important;
+      font-size: 7px !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -67,55 +67,59 @@ const globalStyle = `
     .screen-weekly-table { display: none !important; }
     .print-weekly-sheet {
       display: block !important;
-      width: 202mm !important;
-      max-width: 202mm !important;
-      min-width: 202mm !important;
+      width: 204mm !important;
+      max-width: 204mm !important;
+      min-width: 204mm !important;
       margin: 0 auto !important;
       padding: 0 !important;
     }
     .print-sheet-table {
-      width: 202mm !important;
-      max-width: 202mm !important;
-      min-width: 202mm !important;
+      width: 204mm !important;
+      max-width: 204mm !important;
+      min-width: 204mm !important;
       border-collapse: collapse !important;
       table-layout: fixed !important;
       page-break-inside: avoid !important;
     }
     .print-sheet-table th,
     .print-sheet-table td {
-      border: 0.22mm solid #111 !important;
+      border: 0.2mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.35mm 0.5mm !important;
-      font-size: 7px !important;
-      line-height: 1.02 !important;
+      padding: 0.18mm 0.28mm !important;
+      font-size: 5.7px !important;
+      line-height: 1 !important;
       vertical-align: top !important;
-      word-break: break-word !important;
-      overflow-wrap: anywhere !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: clip !important;
     }
     .print-sheet-table th {
-      font-size: 7.2px !important;
+      font-size: 6px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 12mm !important;
+      width: 11mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 7.1px !important;
+      font-size: 5.9px !important;
       font-weight: 700 !important;
-      line-height: 1.02 !important;
+      line-height: 1 !important;
+      white-space: nowrap !important;
     }
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 6.6px !important;
-      line-height: 1.02 !important;
-      white-space: pre-wrap !important;
+      font-size: 5.55px !important;
+      line-height: 1 !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: clip !important;
     }
     .scroll-container,
     .print-area {
@@ -374,15 +378,16 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
                 const displayRoom = foundEntry ? foundRm : (metaTime && metaTime !== "__NO_HELP__" ? metaRoom : "");
                 const helpValue = metaTime && metaTime !== "__NO_HELP__" ? metaTime : "";
                 return (
-                  <span style={{display:"flex",alignItems:"center",gap:6,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:6,flexWrap:"nowrap",whiteSpace:"nowrap",minWidth:0}}>
-                    <span style={{fontSize:11,color:"#6366f1",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis"}}>
-                      {displayRoom || "補充先"}
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:6,whiteSpace:"nowrap",maxWidth:"100%",overflow:"hidden"}}>
+                    <span style={{fontSize:11,color:"#6366f1",fontWeight:800,flexShrink:0}}>補充</span>
+                    <span style={{fontSize:11,color:"#6366f1",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",maxWidth:72}}>
+                      {displayRoom ? roomLinkLabel(displayRoom) : "未設定"}
                     </span>
-                    <select value={helpValue} onChange={(e:any)=>{ if (e.target.value) onAddHelp(coreName, e.target.value); else if (onClearHelp) onClearHelp(coreName); }} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:12,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 14px 0 0",minWidth:0}}>
-                      <option value="">補充なし</option>
+                    <select value={helpValue} onChange={(e:any)=>{ if (e.target.value) onAddHelp(coreName, e.target.value); else if (onClearHelp) onClearHelp(coreName); }} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:11,fontWeight:800,color:"#6366f1",cursor:"pointer",padding:"0 12px 0 2px",minWidth:56,flexShrink:0}}>
+                      <option value="">なし</option>
                       {["(AM)","(PM)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map((t:string)=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
                     </select>
-                    {helpValue && onClearHelp && <button type="button" onClick={(e)=>{e.stopPropagation(); onClearHelp(coreName);}} style={{border:"none",background:"transparent",color:"#6366f1",fontSize:11,fontWeight:800,cursor:"pointer",padding:0,flexShrink:0}}>✕</button>}
+                    {helpValue && onClearHelp && <button type="button" onClick={(e)=>{e.stopPropagation(); onClearHelp(coreName);}} style={{border:"none",background:"transparent",color:"#6366f1",fontSize:11,fontWeight:800,cursor:"pointer",padding:0,flexShrink:0}}>解除</button>}
                   </span>
                 );
               })()}
@@ -1081,20 +1086,18 @@ export default function App(): any {
                                 const isHighlighted = targetStaff === coreName;
                                 const isDimmed = targetStaff !== null && targetStaff !== coreName;
                                 
-                                const roomLoad = dailyStaffLoads[day.id]?.[coreName] || 0;
                                 const sameDayRooms = dailyStaffRooms[day.id]?.[coreName] || [];
                                 const roomCount = sameDayRooms.length;
-                                const isRoomLikeSection = ROOM_SECTIONS.includes(section);
+                                const isRoomLikeSection = ROOM_SECTIONS.includes(section) && !["不在","明け","入り","土日休日代休"].includes(section);
                                 const otherRooms = isRoomLikeSection ? sameDayRooms.filter(r => r !== section) : [];
                                 const showKenmuMeta = isRoomLikeSection && roomCount >= 2;
-                                const limit = customRules.alertMaxKenmu || 3;
 
                                 let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#475569";
                                 let footerBg = "#f8fafc"; let footerColor = "#64748b"; let footerBorder = "#e2e8f0";
                                 let dangerDot: string | null = null;
                                 if (showKenmuMeta && roomCount >= 4) { tagBg = "#fef2f2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; footerBg = "#fee2e2"; footerColor = "#991b1b"; footerBorder = "#fecaca"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fff4ea"; tagColor = "#8a3b12"; tagBorder = "#efc29a"; footerBg = "#ffeddc"; footerColor = "#9a3412"; footerBorder = "#f6c79c"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#475569"; footerBg = "#f8fafc"; footerColor = "#64748b"; footerBorder = "#e2e8f0"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fff8f1"; tagColor = "#8a3b12"; tagBorder = "#475569"; footerBg = "#fff1df"; footerColor = "#9a3412"; footerBorder = "#f6d2a7"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#475569"; footerBg = "#f8fafc"; footerColor = "#475569"; footerBorder = "#cbd5e1"; }
 
                                 if (hasRedWarning) { tagBg = "#fef2f2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; footerBg = "#fee2e2"; footerColor = "#b91c1c"; footerBorder = "#fecaca"; }
                                 else if (hasOrangeWarning) { dangerDot = "#f59e0b"; }
@@ -1109,7 +1112,7 @@ export default function App(): any {
                                   display: "flex",
                                   alignItems: "flex-start",
                                   flexDirection: "column",
-                                  gap: "4px",
+                                  gap: roomCount === 2 ? "3px" : "4px",
                                   fontSize: "16px",
                                   fontWeight: (hasRedWarning || roomCount >= 4) ? 800 : 700,
                                   transition: "all 0.2s ease",
@@ -1141,25 +1144,25 @@ export default function App(): any {
                                     </div>
                                     {showKenmuMeta && (
                                       <div data-print-badge="1" style={{
-                                        display: "flex",
+                                        display: "inline-flex",
                                         alignItems: "center",
-                                        gap: "6px",
-                                        marginTop: "1px",
-                                        padding: roomCount >= 3 ? "2px 6px" : "2px 6px",
+                                        gap: "5px",
+                                        marginTop: roomCount === 2 ? "0px" : "1px",
+                                        padding: roomCount >= 3 ? "2px 7px" : "1px 6px",
                                         background: isHighlighted ? "rgba(255,255,255,0.16)" : footerBg,
                                         color: isHighlighted ? "#fff" : footerColor,
                                         border: isHighlighted ? "1px solid rgba(255,255,255,0.32)" : `1px solid ${footerBorder}`,
                                         borderRadius: "999px",
-                                        fontSize: roomCount >= 3 ? "10px" : "9px",
-                                        fontWeight: roomCount >= 3 ? 800 : 700,
-                                        lineHeight: 1.15,
+                                        fontSize: roomCount >= 3 ? "10px" : "10px",
+                                        fontWeight: roomCount >= 3 ? 700 : 700,
+                                        lineHeight: 1.1,
                                         whiteSpace: "nowrap",
-                                        maxWidth: "100%",
+                                        maxWidth: roomCount === 2 ? "120px" : "140px",
                                         overflow: "hidden",
                                         textOverflow: "ellipsis"
                                       }}>
                                         <span style={{opacity:0.72, flexShrink:0}}>↔</span>
-                                        <span style={{overflow:"hidden", textOverflow:"ellipsis"}}>{otherRooms.map(roomLinkLabel).join(" ・ ")}</span>
+                                        <span style={{overflow:"hidden", textOverflow:"ellipsis"}}>{otherRooms.map(roomLinkLabel).join(roomCount === 2 ? "" : " ・ ")}</span>
                                       </div>
                                     )}
                                   </div>
