@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 landscape; margin: 4mm; }
+  @page { size: A4 landscape; margin: 3mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -67,50 +67,54 @@ const globalStyle = `
     .screen-weekly-table { display: none !important; }
     .print-weekly-sheet {
       display: block !important;
-      width: 100% !important;
+      width: 291mm !important;
+      max-width: 291mm !important;
+      min-width: 291mm !important;
       margin: 0 !important;
       padding: 0 !important;
     }
     .print-sheet-table {
-      width: 100% !important;
+      width: 291mm !important;
+      max-width: 291mm !important;
+      min-width: 291mm !important;
       border-collapse: collapse !important;
       table-layout: fixed !important;
       page-break-inside: avoid !important;
     }
     .print-sheet-table th,
     .print-sheet-table td {
-      border: 1px solid #000 !important;
+      border: 0.25mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 1.2mm 1mm !important;
-      font-size: 8px !important;
-      line-height: 1.14 !important;
+      padding: 0.6mm 0.8mm !important;
+      font-size: 9.2px !important;
+      line-height: 1.12 !important;
       vertical-align: top !important;
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table th {
-      font-size: 8.4px !important;
+      font-size: 9.4px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 13% !important;
+      width: 17mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 7.8px !important;
+      font-size: 9px !important;
       font-weight: 700 !important;
-      line-height: 1.1 !important;
+      line-height: 1.08 !important;
     }
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 7px !important;
-      line-height: 1.12 !important;
+      font-size: 8.6px !important;
+      line-height: 1.08 !important;
       white-space: pre-wrap !important;
     }
     .scroll-container,
@@ -325,7 +329,7 @@ export const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, c
   );
 };
 
-export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [], onAddHelp, dayCells }: any) => {
+export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [], onAddHelp, onClearHelp, dayCells }: any) => {
   const members = split(value); const isTaiki = section === "待機"; const isFuzai = section === "不在"; const isHelp = section === "受付ヘルプ";
   const [pendingFuzai, setPendingFuzai] = React.useState("");
   const FUZAI_TIMES = ["","(AM)","(PM)","(〜8:30)","(〜9:00)","(〜9:30)","(〜10:00)","(〜10:30)","(〜11:00)","(〜11:30)","(〜12:00)","(〜12:30)","(〜13:00)","(〜13:30)","(〜14:00)","(〜14:30)","(〜15:00)","(〜15:30)","(〜16:00)","(〜16:30)","(〜17:00)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"];
@@ -369,16 +373,17 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
                 const metaRoom = helpRoomMap[coreName] || "";
                 const displayRoom = foundEntry ? foundRm : (metaTime && metaTime !== "__NO_HELP__" ? metaRoom : "");
                 const displayTime = foundEntry ? foundEntry.substring((foundRm+"枠").length).replace(/[()]/g,"") : (metaTime && metaTime !== "__NO_HELP__" ? metaTime.replace(/[()]/g,"") : "");
+                const helpValue = metaTime && metaTime !== "__NO_HELP__" ? metaTime : "";
                 return (
-                  <span style={{display:"flex",alignItems:"center",gap:2,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:4}}>
-                    {displayRoom && displayTime
-                      ? <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>{displayRoom} {displayTime} 補充済</span>
-                      : <><span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>補充</span>
-                        <select defaultValue="" onChange={(e:any)=>{if(e.target.value){onAddHelp(coreName,e.target.value);e.target.value="";}}} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 16px 0 2px"}}>
-                          <option value="">何時から</option>
-                          {["(AM)","(PM)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map((t:string)=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
-                        </select></>
-                    }
+                  <span style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:4,flexWrap:"wrap"}}>
+                    <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>
+                      {displayRoom && displayTime ? `${displayRoom} ${displayTime} 補充` : "補充"}
+                    </span>
+                    <select value={helpValue} onChange={(e:any)=>{ if (e.target.value) onAddHelp(coreName, e.target.value); else if (onClearHelp) onClearHelp(coreName); }} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 16px 0 2px"}}>
+                      <option value="">なし</option>
+                      {["(AM)","(PM)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map((t:string)=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
+                    </select>
+                    {helpValue && onClearHelp && <button type="button" onClick={(e)=>{e.stopPropagation(); onClearHelp(coreName);}} style={{border:"none",background:"transparent",color:"#6366f1",fontSize:11,fontWeight:800,cursor:"pointer",padding:0}}>解除</button>}
                   </span>
                 );
               })()}
@@ -823,6 +828,14 @@ export default function App(): any {
   const roomHasCoverageAfter = (cells: Record<string, string>, room: string, minute: number) => {
     return split(cells[room] || "").some(m => getMemberCoverageRange(m).end > minute);
   };
+  const requestedStartMinute = (tag: string) => {
+    if (!tag) return 0;
+    if (tag === "(PM)") return 13 * 60;
+    if (tag === "(AM)") return 0;
+    const from = tag.match(/\((\d+:\d+)〜\)/)?.[1];
+    if (from) return hhmmToMinutes(from);
+    return 0;
+  };
 
   const getDayWarnings = (dayId: string): WarningInfo[] => { 
     const w: WarningInfo[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {}; 
@@ -835,6 +848,20 @@ export default function App(): any {
     if (split(cells["ポータブル"] || "").length > 0 && !roomHasCoverageAfter(cells, "ポータブル", 11 * 60 + 30)) {
       w.push({ level: 'orange', title: '午後不足', room: 'ポータブル', msg: 'ポータブルは11:30以降の担当者がいません' });
     }
+    const helpMap = parseLooseJsonMap(cells["__absenceHelp"]);
+    const helpRoomMap = parseLooseJsonMap(cells["__absenceHelpRooms"]);
+    Object.entries(helpMap).forEach(([staff, fromTime]) => {
+      if (!fromTime || fromTime === "__NO_HELP__") return;
+      const room = helpRoomMap[staff];
+      if (!room) {
+        w.push({ level: 'orange', title: '補充不足', staff, msg: `${staff}さんの${fromTime.replace(/[()]/g, '')}以降の補充先が見つかっていません` });
+        return;
+      }
+      const minute = requestedStartMinute(fromTime);
+      if (!roomHasCoverageAfter(cells, room, minute)) {
+        w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}は${fromTime.replace(/[()]/g, '')}以降の担当者がいません` });
+      }
+    });
     const uTarget = customRules.capacity?.受付 ?? 2; 
     if (split(cells["受付"]).reduce((sum: number, m: string) => sum + getStaffAmount(m), 0) < uTarget && split(cells["受付ヘルプ"]).length === 0) { w.push({ level: 'yellow', title: '受付不足', room: '受付', msg: `受付が${uTarget}名未満ですが、受付ヘルプがいません` }); } 
     const curIdx = days.findIndex(d => d.id === dayId); 
@@ -854,20 +881,44 @@ export default function App(): any {
   const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); return next; }); };
   const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev, [sel]: { ...(prev[sel] || {}), [k]: v } }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
 
+  const clearAbsenceHelp = (staffName: string) => {
+    setAllDaysWithHistory((prev: any) => {
+      const cells = { ...(prev[sel] || {}) };
+      const helpMap = parseLooseJsonMap(cells["__absenceHelp"]);
+      const helpRoomMap = parseLooseJsonMap(cells["__absenceHelpRooms"]);
+      const prevTime = helpMap[staffName];
+      const prevRoom = helpRoomMap[staffName];
+      if (prevRoom && prevTime && prevTime !== "__NO_HELP__") {
+        cells[prevRoom] = join(split(cells[prevRoom] || "").filter((m: string) => m !== `${prevRoom}枠${prevTime}`));
+      }
+      delete helpMap[staffName];
+      delete helpRoomMap[staffName];
+      cells["__absenceHelp"] = stringifyJsonMap(helpMap);
+      cells["__absenceHelpRooms"] = stringifyJsonMap(helpRoomMap);
+      return { ...prev, [sel]: cells };
+    });
+  };
+
   const addAbsenceHelp = (staffName: string, fromTime: string) => {
     setAllDaysWithHistory((prev: any) => {
       const cells = { ...(prev[sel] || {}) };
       const rooms = ["CT","MRI","RI","治療","1号室","2号室","3号室","5号室","透視（6号）","透視（11号）","MMG","骨塩","パノラマCT","ポータブル","DSA","検像"];
-      const found = rooms.find(r => split(cells[r] || "").some((m: string) => extractStaffName(m) === staffName));
-      if (found) {
-        const cur = cells[found] || "";
-        const entry = found + "枠" + fromTime;
-        if (!split(cur).includes(entry)) cells[found] = cur ? `${cur}、${entry}` : entry;
-      }
       const helpMap = parseLooseJsonMap(cells["__absenceHelp"]);
       const helpRoomMap = parseLooseJsonMap(cells["__absenceHelpRooms"]);
+      const prevTime = helpMap[staffName];
+      const prevRoom = helpRoomMap[staffName];
+      if (prevRoom && prevTime && prevTime !== "__NO_HELP__") {
+        cells[prevRoom] = join(split(cells[prevRoom] || "").filter((m: string) => m !== `${prevRoom}枠${prevTime}`));
+      }
+      const found = rooms.find(r => split(cells[r] || "").some((m: string) => extractStaffName(m) === staffName));
+      const targetRoom = found || prevRoom || "";
+      if (targetRoom) {
+        const cur = cells[targetRoom] || "";
+        const entry = targetRoom + "枠" + fromTime;
+        if (!split(cur).includes(entry)) cells[targetRoom] = cur ? `${cur}、${entry}` : entry;
+        helpRoomMap[staffName] = targetRoom;
+      }
       helpMap[staffName] = fromTime;
-      if (found) helpRoomMap[staffName] = found;
       cells["__absenceHelp"] = stringifyJsonMap(helpMap);
       cells["__absenceHelpRooms"] = stringifyJsonMap(helpRoomMap);
       return { ...prev, [sel]: cells };
@@ -1039,8 +1090,8 @@ export default function App(): any {
 
                                 let tagBg = "#f8fafc"; let tagColor = "#1e293b"; let tagBorder = "#cbd5e1"; let tagAccent = "#94a3b8";
                                 if (showKenmuMeta && (roomCount >= 4 || isOverLimit)) { tagBg = "#fee2e2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#f59e0b"; tagColor = "#ffffff"; tagBorder = "#d97706"; tagAccent = "#92400e"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#1f2937"; tagBorder = "#cbd5e1"; tagAccent = "#94a3b8"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fdba74"; tagColor = "#7c2d12"; tagBorder = "#fb923c"; tagAccent = "#ea580c"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#fffdfa"; tagColor = "#1f2937"; tagBorder = "#e5e7eb"; tagAccent = "#cbd5e1"; }
 
                                 if (hasRedWarning) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
                                 else if (hasOrangeWarning) { tagBorder = "#ea580c"; tagAccent = "#ea580c"; }
@@ -1050,7 +1101,7 @@ export default function App(): any {
                                   background: tagBg,
                                   color: tagColor,
                                   border: `1px solid ${tagBorder}`,
-                                  padding: showKenmuMeta ? "6px 9px 7px" : "6px 10px",
+                                  padding: showKenmuMeta ? "6px 9px 8px" : "6px 10px",
                                   borderRadius: "8px",
                                   display: "flex",
                                   alignItems: "flex-start",
@@ -1068,9 +1119,7 @@ export default function App(): any {
                                   inlineStyle.opacity = 0.25; inlineStyle.filter = "grayscale(1)";
                                 }
 
-                                const otherRoomLabel = otherRooms.slice(0, 2).map(roomLinkLabel).join("・");
                                 const restCount = Math.max(0, otherRooms.length - 2);
-                                const linkText = otherRooms.length > 0 ? `兼: ${otherRoomLabel}${restCount > 0 ? ` +${restCount}` : ""}` : "";
                                 const titleText = showKenmuMeta ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
                                 const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>);
@@ -1089,13 +1138,41 @@ export default function App(): any {
                                     </div>
                                     {showKenmuMeta && (
                                       <div data-print-badge="1" style={{
-                                        fontSize: roomCount >= 3 ? "11px" : "10px",
-                                        lineHeight: 1.1,
-                                        fontWeight: roomCount >= 3 ? 800 : 700,
-                                        color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#fffbeb" : "#64748b"),
-                                        opacity: roomCount >= 3 ? 0.95 : 1
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: "4px",
+                                        marginTop: "1px"
                                       }}>
-                                        {linkText}
+                                        {otherRooms.slice(0, 2).map((r, idx) => (
+                                          <span key={idx} style={{
+                                            fontSize: roomCount >= 3 ? "10px" : "9px",
+                                            lineHeight: 1.1,
+                                            fontWeight: roomCount >= 3 ? 800 : 700,
+                                            color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#7c2d12" : "#64748b"),
+                                            background: isHighlighted ? "rgba(255,255,255,0.18)" : (roomCount >= 3 ? "rgba(255,247,237,0.8)" : "#f8fafc"),
+                                            border: isHighlighted ? "1px solid rgba(255,255,255,0.35)" : (roomCount >= 3 ? "1px solid #fdba74" : "1px solid #e2e8f0"),
+                                            borderRadius: "999px",
+                                            padding: "2px 6px",
+                                            whiteSpace: "nowrap"
+                                          }}>
+                                            ↔ {roomLinkLabel(r)}
+                                          </span>
+                                        ))}
+                                        {restCount > 0 && (
+                                          <span style={{
+                                            fontSize: "9px",
+                                            lineHeight: 1.1,
+                                            fontWeight: 700,
+                                            color: isHighlighted ? "#fff" : "#64748b",
+                                            background: isHighlighted ? "rgba(255,255,255,0.18)" : "#f8fafc",
+                                            border: isHighlighted ? "1px solid rgba(255,255,255,0.35)" : "1px solid #e2e8f0",
+                                            borderRadius: "999px",
+                                            padding: "2px 6px",
+                                            whiteSpace: "nowrap"
+                                          }}>
+                                            +{restCount}
+                                          </span>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1179,7 +1256,7 @@ export default function App(): any {
                     ) : null}
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? addAbsenceHelp : undefined} dayCells={s === "不在" ? (allDays[sel] || {}) : undefined} />)}
+                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? addAbsenceHelp : undefined} onClearHelp={s === "不在" ? clearAbsenceHelp : undefined} dayCells={s === "不在" ? (allDays[sel] || {}) : undefined} />)}
                  </div>
                </div>
              ))}
