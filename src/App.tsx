@@ -41,11 +41,11 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 3mm 2.5mm 3mm 2.5mm; }
+  @page { size: A4 portrait; margin: 5mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
-      height: auto !important;
+      height: 100% !important;
       max-width: none !important;
       background: #fff !important;
       margin: 0 !important;
@@ -54,67 +54,63 @@ const globalStyle = `
     body {
       background: #fff !important;
       color: #000 !important;
-      font-size: 7.4px !important;
+      font-size: 8px !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     #root > div {
       max-width: none !important;
       width: 100% !important;
-      min-height: 0 !important;
       margin: 0 !important;
       padding: 0 !important;
     }
     .no-print { display: none !important; }
     .screen-weekly-table { display: none !important; }
+
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
+      height: 285mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
       padding: 0 !important;
+      overflow: hidden !important;
+      page-break-after: avoid !important;
     }
     .print-sheet-table {
       width: 100% !important;
-      height: calc(297mm - 6mm) !important;
-      max-height: calc(297mm - 6mm) !important;
+      height: 100% !important;
       max-width: 100% !important;
       min-width: 0 !important;
       border-collapse: collapse !important;
       table-layout: fixed !important;
       page-break-inside: avoid !important;
-      break-inside: avoid-page !important;
-    }
-    .print-sheet-table thead tr {
-      height: 7.2mm !important;
-    }
-    .print-sheet-table tbody tr {
-      height: calc((297mm - 6mm - 7.2mm) / 25) !important;
     }
     .print-sheet-table th,
     .print-sheet-table td {
       border: 0.18mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.35mm 0.28mm !important;
-      font-size: 7.2px !important;
-      line-height: 1.12 !important;
-      vertical-align: top !important;
+      padding: 0.5mm 0.4mm !important;
+      font-size: 6.5px !important;
+      line-height: 1.1 !important;
+      vertical-align: middle !important;
       white-space: normal !important;
       overflow: hidden !important;
       text-overflow: clip !important;
-      overflow-wrap: anywhere !important;
-      word-break: break-word !important;
+      word-break: break-all !important;
+    }
+    .print-sheet-table tr {
+      height: auto !important;
     }
     .print-sheet-table th {
-      font-size: 7.2px !important;
+      font-size: 7.0px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 4.6mm !important;
-      font-size: 6.5px !important;
+      width: 9.5mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
@@ -123,19 +119,18 @@ const globalStyle = `
     .print-sheet-table .p-day {
       font-size: 6.8px !important;
       font-weight: 700 !important;
-      line-height: 1.04 !important;
+      line-height: 1.05 !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 6.6px !important;
-      line-height: 1.09 !important;
+      font-size: 6.4px !important;
+      line-height: 1.16 !important;
       white-space: normal !important;
-      overflow: hidden !important;
+      overflow: visible !important;
       text-overflow: clip !important;
-      overflow-wrap: anywhere !important;
-      word-break: break-word !important;
+      word-break: keep-all !important;
     }
     .scroll-container,
     .print-area {
@@ -146,8 +141,7 @@ const globalStyle = `
       padding: 0 !important;
       margin: 0 !important;
     }
-  }
-`;
+  }`;
 
 // ===================== 🌟 Types & Constants =====================
 export type RenderGroup = { title: string; color: string; sections: string[] };
@@ -995,35 +989,6 @@ export default function App(): any {
   const handleCopyToClipboard = () => { const dataObj = { allDays, monthlyAssign, customRules: sanitizeRulesInput(customRules) }; navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => { alert("データをコピーしました！"); }).catch(() => { alert("コピーに失敗しました。"); }); };
   const handleTextImport = () => { if(!importText) return; try { const dataObj = JSON.parse(importText); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(sanitizeRulesInput(dataObj.customRules)); alert("テキストからデータを復元しました！"); setImportText(""); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("テキストの読み込みに失敗しました。"); } };
 
-  const formatYearMonth = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-  const currentMonthKey = targetMonday.slice(0, 7);
-  const previousMonthKey = useMemo(() => {
-    const d = new Date(`${targetMonday}T12:00:00`);
-    d.setDate(1);
-    d.setMonth(d.getMonth() - 1);
-    return formatYearMonth(d);
-  }, [targetMonday]);
-  const removeMonthData = (prefix: string, label: string) => {
-    const targetKeys = Object.keys(allDays).filter(k => k.startsWith(prefix));
-    if (targetKeys.length === 0) {
-      alert(`${label}の保存データはありません。`);
-      return;
-    }
-    if (!window.confirm(`${label}の保存データ ${targetKeys.length} 日分を削除しますか？
-設定と月間担当は残ります。`)) return;
-    setAllDaysWithHistory((prev: any) => {
-      const next = { ...prev };
-      targetKeys.forEach(k => { delete next[k]; });
-      return next;
-    });
-    setAssignLogs(prev => {
-      const next = { ...prev };
-      targetKeys.forEach(k => { delete next[k]; });
-      return next;
-    });
-    if (showLogDay && showLogDay.startsWith(prefix)) setShowLogDay(null);
-  };
-
   const dailyStaffRooms = useMemo(() => {
     const roomsByDay: Record<string, Record<string, string[]>> = {};
     days.forEach(day => {
@@ -1136,8 +1101,8 @@ export default function App(): any {
                                 let countBg = "#e2e8f0"; let countColor = "#475569";
                                 let dangerDot: string | null = null;
                                 if (showKenmuMeta && roomCount >= 4) { tagBg = "#fff7f7"; tagColor = "#991b1b"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#991b1b"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#991b1b"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fffaf2"; tagColor = "#0f172a"; tagBorder = "#cbd5e1"; metaBg = "#fff7ed"; metaColor = "#9a3412"; metaBorder = "#fed7aa"; countBg = "#fde7c2"; countColor = "#9a3412"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#475569"; metaBg = "#f8fafc"; metaColor = "#475569"; metaBorder = "#e2e8f0"; countBg = "#eef2f7"; countColor = "#475569"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fffaf5"; tagColor = "#0f172a"; tagBorder = "#e7c9a3"; metaBg = "#ffedd5"; metaColor = "#9a3412"; metaBorder = "#fdba74"; countBg = "#fed7aa"; countColor = "#9a3412"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#f8fbff"; tagColor = "#0f172a"; tagBorder = "#93c5fd"; metaBg = "#eff6ff"; metaColor = "#1d4ed8"; metaBorder = "#bfdbfe"; countBg = "#dbeafe"; countColor = "#1d4ed8"; }
 
                                 if (hasRedWarning) { tagBg = "#fff7f7"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#b91c1c"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#b91c1c"; }
                                 else if (hasOrangeWarning) { dangerDot = "#f59e0b"; }
@@ -1357,12 +1322,6 @@ export default function App(): any {
              <button className="btn-hover" onClick={handleCopyToClipboard} style={btnStyle("#db2777")}>📋 テキストコピー</button>
              <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "10px 16px", fontSize: 17, borderRadius: 8, border: "2px solid #f9a8d4" }} />
              <button className="btn-hover" onClick={handleTextImport} style={btnStyle("#be185d")}>✨ 復元</button>
-          </div>
-          <div style={{ marginTop: 18, paddingTop: 18, borderTop: "2px dashed #f9a8d4", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-             <span style={{ fontWeight: 800, color: "#9d174d", fontSize: 16 }}>🧹 保存データ整理</span>
-             <button className="btn-hover" onClick={() => removeMonthData(currentMonthKey, `${currentMonthKey}（表示月）`)} style={btnStyle("#fff1f2", "#be123c")}>表示月をリセット</button>
-             <button className="btn-hover" onClick={() => removeMonthData(previousMonthKey, `${previousMonthKey}（先月）`)} style={btnStyle("#fef3c7", "#b45309")}>先月データを削除</button>
-             <span style={{ fontSize: 14, color: "#64748b" }}>日別配置だけを削除します。設定と月間担当は残ります。</span>
           </div>
         </div>
 
