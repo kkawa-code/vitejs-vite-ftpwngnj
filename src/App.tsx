@@ -71,7 +71,7 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
-      height: 285mm !important;
+      height: 282mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
@@ -136,10 +136,10 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table thead tr {
-      height: 8.2mm !important;
+      height: 7.8mm !important;
     }
     .print-sheet-table tbody tr {
-      height: 10.85mm !important;
+      height: 10.15mm !important;
     }
     .scroll-container,
     .print-area {
@@ -1085,13 +1085,13 @@ export default function App(): any {
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0"}}>{section}</td>
                     {days.map((day, dIdx) => {
-                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "#f3f4f6"; baseBgStyle.boxShadow = "inset 0 0 0 2px #cbd5e1"; }
+                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "#e5e7eb"; baseBgStyle.boxShadow = "inset 0 0 0 2px #94a3b8"; }
                       
                       return (
                         <td key={day.id + section} style={baseBgStyle}>
                           {!day.isPublicHoliday && (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4" }}>
-                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#e5e7eb", border: "1px dashed #9ca3af", color: "#4b5563", fontSize: 13, fontWeight: 800 }}>空欄</div>}
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4", alignItems: "flex-start" }}>
+                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#d1d5db", border: "1px solid #6b7280", color: "#374151", fontSize: 13, fontWeight: 800 }}>空欄</div>}
                               {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
                                 
@@ -1130,7 +1130,8 @@ export default function App(): any {
                                   fontSize: "15px",
                                   fontWeight: hasRedWarning ? 800 : 700,
                                   transition: "all 0.2s ease",
-                                  boxShadow: "none"
+                                  boxShadow: "none",
+                                  alignSelf: "flex-start"
                                 };
                                 
                                 if (isHighlighted) {
