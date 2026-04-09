@@ -1218,8 +1218,7 @@ export default function App(): any {
                       );
                     })}
                   </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
           </div>
@@ -1259,7 +1258,8 @@ export default function App(): any {
                       );
                     })}
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
