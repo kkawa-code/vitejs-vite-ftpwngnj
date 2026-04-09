@@ -71,7 +71,7 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
-      height: 279mm !important;
+      height: 280.5mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
@@ -136,10 +136,10 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table thead tr {
-      height: 7.1mm !important;
+      height: 7.2mm !important;
     }
     .print-sheet-table tbody tr {
-      height: 9.35mm !important;
+      height: 9.65mm !important;
     }
     .scroll-container,
     .print-area {
@@ -1085,13 +1085,14 @@ export default function App(): any {
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0"}}>{section}</td>
                     {days.map((day, dIdx) => {
-                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "#e5e7eb"; baseBgStyle.boxShadow = "inset 0 0 0 2px #94a3b8"; }
+                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const hasPmGap = section === 'ポータブル' && warnings.some(w => w.room === section && w.title === '午後不足'); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "repeating-linear-gradient(135deg, #d9dde3 0 8px, #cfd5dc 8px 16px)"; baseBgStyle.boxShadow = "inset 0 0 0 2px #8b949e"; } else if (hasPmGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(to right, rgba(255,255,255,1) 0 56%, #d9dde3 56% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 2px #b7bec7"; }
                       
                       return (
                         <td key={day.id + section} style={baseBgStyle}>
                           {!day.isPublicHoliday && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4", alignItems: "flex-start" }}>
-                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#d1d5db", border: "1px solid #6b7280", color: "#374151", fontSize: 13, fontWeight: 800 }}>空欄</div>}
+                              {currentMems.length === 0 && isRoomEmpty && <div aria-hidden style={{ width: "100%", minHeight: 26, borderRadius: 8, border: "1px dashed #7f8893", background: "rgba(255,255,255,0.34)" }} />}
+                              {hasPmGap && currentMems.length > 0 && <div style={{ padding: "4px 8px", borderRadius: 999, background: "#eef1f4", border: "1px solid #b7bec7", color: "#4b5563", fontSize: 12, fontWeight: 800, lineHeight: 1 }}>PM空室</div>}
                               {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
                                 
