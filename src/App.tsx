@@ -71,71 +71,67 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
-      height: 258mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
       padding: 0 !important;
-      overflow: hidden !important;
+      overflow: visible !important;
       page-break-after: avoid !important;
     }
     .print-sheet-table {
       width: 100% !important;
-      height: 100% !important;
       max-width: 100% !important;
       min-width: 0 !important;
       border-collapse: collapse !important;
-      table-layout: fixed !important;
+      table-layout: auto !important;
       page-break-inside: avoid !important;
-    }
-    .print-sheet-table thead tr {
-      height: 6.6mm !important;
-    }
-    .print-sheet-table tbody tr {
-      height: 9.7mm !important;
     }
     .print-sheet-table th,
     .print-sheet-table td {
-      border: 0.18mm solid #111 !important;
+      border: 0.2mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.18mm 0.22mm !important;
-      font-size: 8.7px !important;
-      line-height: 1.02 !important;
+      padding: 1.0mm 0.9mm !important;
+      font-size: 10.8pt !important;
+      line-height: 1.12 !important;
       vertical-align: middle !important;
       white-space: normal !important;
-      overflow: hidden !important;
+      overflow: visible !important;
       text-overflow: clip !important;
-      word-break: break-all !important;
+      word-break: keep-all !important;
+      overflow-wrap: anywhere !important;
     }
     .print-sheet-table th {
-      font-size: 9.1px !important;
+      font-size: 11pt !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 6.4mm !important;
+      width: 8mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
-      font-size: 7.9px !important;
+      font-size: 8.8pt !important;
+      padding-left: 0.4mm !important;
+      padding-right: 0.4mm !important;
     }
     .print-sheet-table .p-day {
-      font-size: 8.8px !important;
+      font-size: 10.2pt !important;
       font-weight: 700 !important;
-      line-height: 1.0 !important;
+      line-height: 1.04 !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 8.4px !important;
-      line-height: 1.08 !important;
+      font-size: 10.6pt !important;
+      line-height: 1.12 !important;
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
       word-break: keep-all !important;
+      overflow-wrap: anywhere !important;
     }
     .scroll-container,
     .print-area {
@@ -1087,7 +1083,7 @@ export default function App(): any {
                         <td key={day.id + section} style={baseBgStyle}>
                           {!day.isPublicHoliday && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4" }}>
-                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#fff7ed", border: "1px dashed #f59e0b", color: "#b45309", fontSize: 13, fontWeight: 800 }}>空欄</div>}
+                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#f3f4f6", border: "1px dashed #cbd5e1", color: "#6b7280", fontSize: 13, fontWeight: 800 }}>空欄</div>}
                               {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
                                 
