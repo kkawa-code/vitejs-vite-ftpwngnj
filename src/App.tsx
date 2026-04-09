@@ -139,7 +139,19 @@ const globalStyle = `
       height: 7.2mm !important;
     }
     .print-sheet-table tbody tr {
-      height: 9.65mm !important;
+      height: auto !important;
+    }
+    .print-sheet-table tbody tr.p-row-short {
+      height: 7.9mm !important;
+    }
+    .print-sheet-table tbody tr.p-row-default {
+      height: 9.9mm !important;
+    }
+    .print-sheet-table tbody tr.p-row-tall {
+      height: 11.1mm !important;
+    }
+    .print-sheet-table tbody tr.p-row-verytall {
+      height: 12.2mm !important;
     }
     .scroll-container,
     .print-area {
@@ -1085,13 +1097,13 @@ export default function App(): any {
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0"}}>{section}</td>
                     {days.map((day, dIdx) => {
-                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const hasPmGap = section === 'ポータブル' && warnings.some(w => w.room === section && w.title === '午後不足'); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "repeating-linear-gradient(135deg, #d9dde3 0 8px, #cfd5dc 8px 16px)"; baseBgStyle.boxShadow = "inset 0 0 0 2px #8b949e"; } else if (hasPmGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(to right, rgba(255,255,255,1) 0 56%, #d9dde3 56% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 2px #b7bec7"; }
+                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const hasPmGap = section === 'ポータブル' && warnings.some(w => w.room === section && w.title === '午後不足'); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(180deg, #e8ebf0 0%, #dde2e8 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b2bac4"; } else if (hasPmGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(to right, rgba(255,255,255,1) 0 56%, #dde2e8 56% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b8c0c9"; }
                       
                       return (
                         <td key={day.id + section} style={baseBgStyle}>
                           {!day.isPublicHoliday && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4", alignItems: "flex-start" }}>
-                              {currentMems.length === 0 && isRoomEmpty && <div aria-hidden style={{ width: "100%", minHeight: 26, borderRadius: 8, border: "1px dashed #7f8893", background: "rgba(255,255,255,0.34)" }} />}
+                              {currentMems.length === 0 && isRoomEmpty && <div aria-hidden style={{ width: "100%", minHeight: 28, borderRadius: 10, border: "1px dashed #8f98a3", background: "linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.10) 100%)", position: "relative" }}><span style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 26, height: 4, borderRadius: 999, background: "#8f98a3", opacity: 0.78 }} /></div>}
                               {hasPmGap && currentMems.length > 0 && <div style={{ padding: "4px 8px", borderRadius: 999, background: "#eef1f4", border: "1px solid #b7bec7", color: "#4b5563", fontSize: 12, fontWeight: 800, lineHeight: 1 }}>PM空室</div>}
                               {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
@@ -1206,7 +1218,8 @@ export default function App(): any {
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1224,8 +1237,16 @@ export default function App(): any {
                 </tr>
               </thead>
               <tbody>
-                {SECTIONS.map((section) => (
-                  <tr key={`print-row-${section}`}>
+                {SECTIONS.map((section) => {
+                  const rowClass = ["土日休日代休", "待機", "透析後胸部", "3号室"].includes(section)
+                    ? "p-row-short"
+                    : ["不在", "治療", "昼当番"].includes(section)
+                    ? "p-row-verytall"
+                    : ["受付ヘルプ", "受付", "パノラマCT"].includes(section)
+                    ? "p-row-tall"
+                    : "p-row-default";
+                  return (
+                  <tr key={`print-row-${section}`} className={rowClass}>
                     <td className="p-sec">{section}</td>
                     {days.map(day => {
                       const members = split(allDays[day.id]?.[section]);
