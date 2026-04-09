@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 2mm; }
+  @page { size: A4 portrait; margin: 4mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -83,43 +83,45 @@ const globalStyle = `
     }
     .print-sheet-table th,
     .print-sheet-table td {
-      border: 0.2mm solid #111 !important;
+      border: 0.18mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.08mm 0.16mm !important;
-      font-size: 4.8px !important;
-      line-height: 0.96 !important;
+      padding: 0.45mm 0.55mm !important;
+      font-size: 6.1px !important;
+      line-height: 1.12 !important;
       vertical-align: top !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
+      white-space: normal !important;
+      overflow: visible !important;
       text-overflow: clip !important;
+      word-break: keep-all !important;
     }
     .print-sheet-table th {
-      font-size: 5.1px !important;
+      font-size: 6.3px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 10mm !important;
+      width: 11.5mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 5px !important;
+      font-size: 6.2px !important;
       font-weight: 700 !important;
-      line-height: 1 !important;
+      line-height: 1.05 !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 4.65px !important;
-      line-height: 0.96 !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
+      font-size: 5.8px !important;
+      line-height: 1.08 !important;
+      white-space: normal !important;
+      overflow: visible !important;
       text-overflow: clip !important;
+      word-break: keep-all !important;
     }
     .scroll-container,
     .print-area {
@@ -1055,12 +1057,13 @@ export default function App(): any {
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0"}}>{section}</td>
                     {days.map((day, dIdx) => {
-                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) baseBgStyle.background = "#fef08a";
+                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "#fef3c7"; baseBgStyle.boxShadow = "inset 0 0 0 2px #f59e0b"; }
                       
                       return (
                         <td key={day.id + section} style={baseBgStyle}>
                           {!day.isPublicHoliday && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4" }}>
+                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#fff7ed", border: "1px dashed #f59e0b", color: "#b45309", fontSize: 13, fontWeight: 800 }}>空欄</div>}
                               {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
                                 
@@ -1074,14 +1077,15 @@ export default function App(): any {
                                 const otherRooms = isRoomLikeSection ? sameDayRooms.filter(r => r !== section) : [];
                                 const showKenmuMeta = isRoomLikeSection && roomCount >= 2;
 
-                                let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#334155";
-                                let footerBg = "#f8fafc"; let footerColor = "#64748b"; let footerBorder = "#e2e8f0";
+                                let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#475569";
+                                let metaBg = "#f8fafc"; let metaColor = "#475569"; let metaBorder = "#e2e8f0";
+                                let countBg = "#e2e8f0"; let countColor = "#475569";
                                 let dangerDot: string | null = null;
-                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#fff7f7"; tagColor = "#991b1b"; tagBorder = "#ef4444"; footerBg = "#fef2f2"; footerColor = "#991b1b"; footerBorder = "#fecaca"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#334155"; footerBg = "#fff7ed"; footerColor = "#9a3412"; footerBorder = "#fed7aa"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#334155"; footerBg = "#f8fafc"; footerColor = "#475569"; footerBorder = "#e2e8f0"; }
+                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#fff7f7"; tagColor = "#991b1b"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#991b1b"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#991b1b"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fffaf2"; tagColor = "#0f172a"; tagBorder = "#cbd5e1"; metaBg = "#fff7ed"; metaColor = "#9a3412"; metaBorder = "#fed7aa"; countBg = "#fde7c2"; countColor = "#9a3412"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#475569"; metaBg = "#f8fafc"; metaColor = "#475569"; metaBorder = "#e2e8f0"; countBg = "#eef2f7"; countColor = "#475569"; }
 
-                                if (hasRedWarning) { tagBg = "#fff7f7"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; footerBg = "#fef2f2"; footerColor = "#b91c1c"; footerBorder = "#fecaca"; }
+                                if (hasRedWarning) { tagBg = "#fff7f7"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#b91c1c"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#b91c1c"; }
                                 else if (hasOrangeWarning) { dangerDot = "#f59e0b"; }
                                 else if (hasYellowWarning) { dangerDot = "#eab308"; }
 
@@ -1092,9 +1096,9 @@ export default function App(): any {
                                   padding: showKenmuMeta ? "6px 9px 7px" : "6px 10px",
                                   borderRadius: "8px",
                                   display: "flex",
-                                  alignItems: "flex-start",
+                                  alignItems: "stretch",
                                   flexDirection: "column",
-                                  gap: roomCount === 2 ? "3px" : "4px",
+                                  gap: "4px",
                                   fontSize: "15px",
                                   fontWeight: hasRedWarning ? 800 : 700,
                                   transition: "all 0.2s ease",
@@ -1119,31 +1123,47 @@ export default function App(): any {
                                     onMouseLeave={() => setHoveredStaff(null)}
                                     style={inlineStyle}
                                   >
-                                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                                      <span data-print-name="1">{coreName}</span>
-                                      {dangerDot && !isHighlighted && <span style={{width:8,height:8,borderRadius:"50%",background:dangerDot,display:"inline-block",flexShrink:0}} />}
-                                      {modNode}
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
+                                        <span data-print-name="1">{coreName}</span>
+                                        {dangerDot && !isHighlighted && <span style={{width:8,height:8,borderRadius:"50%",background:dangerDot,display:"inline-block",flexShrink:0}} />}
+                                        {modNode}
+                                      </div>
+                                      {showKenmuMeta && (
+                                        <span style={{
+                                          flexShrink: 0,
+                                          padding: roomCount >= 4 ? "1px 6px" : "1px 5px",
+                                          background: isHighlighted ? "rgba(255,255,255,0.16)" : countBg,
+                                          color: isHighlighted ? "#fff" : countColor,
+                                          border: isHighlighted ? "1px solid rgba(255,255,255,0.28)" : "1px solid transparent",
+                                          borderRadius: "999px",
+                                          fontSize: "10px",
+                                          fontWeight: 800,
+                                          lineHeight: 1.2
+                                        }}>{roomCount}件</span>
+                                      )}
                                     </div>
                                     {showKenmuMeta && (
                                       <div data-print-badge="1" style={{
                                         display: "inline-flex",
                                         alignItems: "center",
                                         gap: "5px",
+                                        alignSelf: "flex-start",
                                         marginTop: "1px",
                                         padding: roomCount >= 3 ? "2px 7px" : "2px 6px",
-                                        background: isHighlighted ? "rgba(255,255,255,0.16)" : footerBg,
-                                        color: isHighlighted ? "#fff" : footerColor,
-                                        border: isHighlighted ? "1px solid rgba(255,255,255,0.32)" : `1px solid ${footerBorder}`,
+                                        background: isHighlighted ? "rgba(255,255,255,0.16)" : metaBg,
+                                        color: isHighlighted ? "#fff" : metaColor,
+                                        border: isHighlighted ? "1px solid rgba(255,255,255,0.32)" : `1px solid ${metaBorder}`,
                                         borderRadius: "999px",
                                         fontSize: roomCount >= 3 ? "10.5px" : "10.5px",
-                                        fontWeight: roomCount >= 3 ? 700 : 700,
+                                        fontWeight: 700,
                                         lineHeight: 1.1,
                                         whiteSpace: "nowrap",
-                                        maxWidth: roomCount === 2 ? "138px" : "150px",
+                                        maxWidth: roomCount === 2 ? "138px" : "156px",
                                         overflow: "hidden",
                                         textOverflow: "ellipsis"
                                       }}>
-                                        <span style={{opacity:0.72, flexShrink:0}}>{roomCount === 2 ? "兼:" : "兼務:"}</span>
+                                        <span style={{opacity:0.72, flexShrink:0}}>兼</span>
                                         <span style={{overflow:"hidden", textOverflow:"ellipsis"}}>{otherRooms.map(roomLinkLabel).join(" ・ ")}</span>
                                       </div>
                                     )}
