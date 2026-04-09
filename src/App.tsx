@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 3mm; }
+  @page { size: A4 portrait; margin: 2mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -67,16 +67,16 @@ const globalStyle = `
     .screen-weekly-table { display: none !important; }
     .print-weekly-sheet {
       display: block !important;
-      width: 204mm !important;
-      max-width: 204mm !important;
-      min-width: 204mm !important;
-      margin: 0 auto !important;
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      margin: 0 !important;
       padding: 0 !important;
     }
     .print-sheet-table {
-      width: 204mm !important;
-      max-width: 204mm !important;
-      min-width: 204mm !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
       border-collapse: collapse !important;
       table-layout: fixed !important;
       page-break-inside: avoid !important;
@@ -86,28 +86,28 @@ const globalStyle = `
       border: 0.2mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.18mm 0.28mm !important;
-      font-size: 5.7px !important;
-      line-height: 1 !important;
+      padding: 0.08mm 0.16mm !important;
+      font-size: 4.8px !important;
+      line-height: 0.96 !important;
       vertical-align: top !important;
       white-space: nowrap !important;
       overflow: hidden !important;
       text-overflow: clip !important;
     }
     .print-sheet-table th {
-      font-size: 6px !important;
+      font-size: 5.1px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 11mm !important;
+      width: 10mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 5.9px !important;
+      font-size: 5px !important;
       font-weight: 700 !important;
       line-height: 1 !important;
       white-space: nowrap !important;
@@ -115,8 +115,8 @@ const globalStyle = `
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 5.55px !important;
-      line-height: 1 !important;
+      font-size: 4.65px !important;
+      line-height: 0.96 !important;
       white-space: nowrap !important;
       overflow: hidden !important;
       text-overflow: clip !important;
@@ -378,16 +378,16 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
                 const displayRoom = foundEntry ? foundRm : (metaTime && metaTime !== "__NO_HELP__" ? metaRoom : "");
                 const helpValue = metaTime && metaTime !== "__NO_HELP__" ? metaTime : "";
                 return (
-                  <span style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:6,whiteSpace:"nowrap",maxWidth:"100%",overflow:"hidden"}}>
-                    <span style={{fontSize:11,color:"#6366f1",fontWeight:800,flexShrink:0}}>補充</span>
-                    <span style={{fontSize:11,color:"#6366f1",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",maxWidth:72}}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:6,whiteSpace:"nowrap",flexWrap:"nowrap",overflow:"hidden",maxWidth:"100%"}}>
+                    <span style={{fontSize:10.5,color:"#6366f1",fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",maxWidth:96}}>
                       {displayRoom ? roomLinkLabel(displayRoom) : "未設定"}
                     </span>
-                    <select value={helpValue} onChange={(e:any)=>{ if (e.target.value) onAddHelp(coreName, e.target.value); else if (onClearHelp) onClearHelp(coreName); }} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:11,fontWeight:800,color:"#6366f1",cursor:"pointer",padding:"0 12px 0 2px",minWidth:56,flexShrink:0}}>
-                      <option value="">なし</option>
+                    <select value={helpValue} onChange={(e:any)=>{ if (e.target.value) onAddHelp(coreName, e.target.value); else if (onClearHelp) onClearHelp(coreName); }} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:10.5,fontWeight:800,color:"#6366f1",cursor:"pointer",padding:"0 10px 0 0",minWidth:52,maxWidth:72,flexShrink:0}}>
+                      <option value="">補充なし</option>
                       {["(AM)","(PM)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map((t:string)=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
                     </select>
-                    {helpValue && onClearHelp && <button type="button" onClick={(e)=>{e.stopPropagation(); onClearHelp(coreName);}} style={{border:"none",background:"transparent",color:"#6366f1",fontSize:11,fontWeight:800,cursor:"pointer",padding:0,flexShrink:0}}>解除</button>}
+                    {helpValue && <span style={{fontSize:10,color:"#7c3aed",fontWeight:700,flexShrink:0}}>補充</span>}
+                    {helpValue && onClearHelp && <button type="button" onClick={(e)=>{e.stopPropagation(); onClearHelp(coreName);}} style={{border:"none",background:"transparent",color:"#6366f1",fontSize:10.5,fontWeight:800,cursor:"pointer",padding:0,flexShrink:0}}>解除</button>}
                   </span>
                 );
               })()}
@@ -968,24 +968,6 @@ export default function App(): any {
   const handleCopyToClipboard = () => { const dataObj = { allDays, monthlyAssign, customRules }; navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => { alert("データをコピーしました！"); }).catch(() => { alert("コピーに失敗しました。"); }); };
   const handleTextImport = () => { if(!importText) return; try { const dataObj = JSON.parse(importText); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(dataObj.customRules); alert("テキストからデータを復元しました！"); setImportText(""); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("テキストの読み込みに失敗しました。"); } };
 
-  const dailyStaffLoads = useMemo(() => {
-    const loads: Record<string, Record<string, number>> = {};
-    days.forEach(day => {
-      loads[day.id] = {};
-      if (day.isPublicHoliday) return;
-      ROOM_SECTIONS.forEach(rs => {
-        if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(rs)) return;
-        split(allDays[day.id]?.[rs]).forEach(m => {
-          const core = extractStaffName(m);
-          if (!m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:")) {
-            loads[day.id][core] = (loads[day.id][core] || 0) + getStaffAmount(m);
-          }
-        });
-      });
-    });
-    return loads;
-  }, [days, allDays]);
-
   const dailyStaffRooms = useMemo(() => {
     const roomsByDay: Record<string, Record<string, string[]>> = {};
     days.forEach(day => {
@@ -1092,14 +1074,14 @@ export default function App(): any {
                                 const otherRooms = isRoomLikeSection ? sameDayRooms.filter(r => r !== section) : [];
                                 const showKenmuMeta = isRoomLikeSection && roomCount >= 2;
 
-                                let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#475569";
+                                let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#334155";
                                 let footerBg = "#f8fafc"; let footerColor = "#64748b"; let footerBorder = "#e2e8f0";
                                 let dangerDot: string | null = null;
-                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#fef2f2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; footerBg = "#fee2e2"; footerColor = "#991b1b"; footerBorder = "#fecaca"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fff8f1"; tagColor = "#8a3b12"; tagBorder = "#475569"; footerBg = "#fff1df"; footerColor = "#9a3412"; footerBorder = "#f6d2a7"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#475569"; footerBg = "#f8fafc"; footerColor = "#475569"; footerBorder = "#cbd5e1"; }
+                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#fff7f7"; tagColor = "#991b1b"; tagBorder = "#ef4444"; footerBg = "#fef2f2"; footerColor = "#991b1b"; footerBorder = "#fecaca"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#334155"; footerBg = "#fff7ed"; footerColor = "#9a3412"; footerBorder = "#fed7aa"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#334155"; footerBg = "#f8fafc"; footerColor = "#475569"; footerBorder = "#e2e8f0"; }
 
-                                if (hasRedWarning) { tagBg = "#fef2f2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; footerBg = "#fee2e2"; footerColor = "#b91c1c"; footerBorder = "#fecaca"; }
+                                if (hasRedWarning) { tagBg = "#fff7f7"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; footerBg = "#fef2f2"; footerColor = "#b91c1c"; footerBorder = "#fecaca"; }
                                 else if (hasOrangeWarning) { dangerDot = "#f59e0b"; }
                                 else if (hasYellowWarning) { dangerDot = "#eab308"; }
 
@@ -1113,8 +1095,8 @@ export default function App(): any {
                                   alignItems: "flex-start",
                                   flexDirection: "column",
                                   gap: roomCount === 2 ? "3px" : "4px",
-                                  fontSize: "16px",
-                                  fontWeight: (hasRedWarning || roomCount >= 4) ? 800 : 700,
+                                  fontSize: "15px",
+                                  fontWeight: hasRedWarning ? 800 : 700,
                                   transition: "all 0.2s ease",
                                   boxShadow: "none"
                                 };
@@ -1147,22 +1129,22 @@ export default function App(): any {
                                         display: "inline-flex",
                                         alignItems: "center",
                                         gap: "5px",
-                                        marginTop: roomCount === 2 ? "0px" : "1px",
-                                        padding: roomCount >= 3 ? "2px 7px" : "1px 6px",
+                                        marginTop: "1px",
+                                        padding: roomCount >= 3 ? "2px 7px" : "2px 6px",
                                         background: isHighlighted ? "rgba(255,255,255,0.16)" : footerBg,
                                         color: isHighlighted ? "#fff" : footerColor,
                                         border: isHighlighted ? "1px solid rgba(255,255,255,0.32)" : `1px solid ${footerBorder}`,
                                         borderRadius: "999px",
-                                        fontSize: roomCount >= 3 ? "10px" : "10px",
+                                        fontSize: roomCount >= 3 ? "10.5px" : "10.5px",
                                         fontWeight: roomCount >= 3 ? 700 : 700,
                                         lineHeight: 1.1,
                                         whiteSpace: "nowrap",
-                                        maxWidth: roomCount === 2 ? "120px" : "140px",
+                                        maxWidth: roomCount === 2 ? "138px" : "150px",
                                         overflow: "hidden",
                                         textOverflow: "ellipsis"
                                       }}>
-                                        <span style={{opacity:0.72, flexShrink:0}}>↔</span>
-                                        <span style={{overflow:"hidden", textOverflow:"ellipsis"}}>{otherRooms.map(roomLinkLabel).join(roomCount === 2 ? "" : " ・ ")}</span>
+                                        <span style={{opacity:0.72, flexShrink:0}}>{roomCount === 2 ? "兼:" : "兼務:"}</span>
+                                        <span style={{overflow:"hidden", textOverflow:"ellipsis"}}>{otherRooms.map(roomLinkLabel).join(" ・ ")}</span>
                                       </div>
                                     )}
                                   </div>
@@ -1258,7 +1240,7 @@ export default function App(): any {
         <div style={{ ...panelStyle(), marginBottom: 24 }}>
           <h3 style={{ fontWeight: 900, color: "#3b82f6", fontSize: 21, marginTop: 0 }}>配置マトリックス（月間集計）</h3>
           <div style={{ marginTop: 16, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
-            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "16px", textAlign: "center", tableLayout: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "15px", textAlign: "center", tableLayout: "auto" }}>
               <thead><tr><th style={{ position: "sticky", left: 0, top: 0, background: "#f8fafc", zIndex: 30, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 900 }}>スタッフ</th>{ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, zIndex: 20, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 900 }}>{r}</th>)}</tr></thead>
               <tbody>
                 {allStaff.filter(s => activeGeneralStaff.includes(s)).map((staff, sIdx) => {
@@ -1353,7 +1335,7 @@ export default function App(): any {
             <h4 style={{ fontSize: 24, fontWeight: 900, color: "#b45309", marginBottom: 20, borderBottom: "2px solid #fcd34d", paddingBottom: 10 }}>フェーズ2：例外・代打処理</h4>
             
             <RuleCard bg="#fef08a" border="#fde047" color="#a16207" icon="🚨" title="緊急ルール（人数不足時）">
-              <div style={{ marginBottom: 16, padding: "12px", background: "#fef8f8", borderRadius: "8px", border: "1px dashed #fca5a5", color: "#991b1b", fontSize: "16px", fontWeight: "600" }}>💡 <b>「左側（発動条件）」から「右側（アクション）」へ</b> 流れるようにルールを設定します。</div>
+              <div style={{ marginBottom: 16, padding: "12px", background: "#fef8f8", borderRadius: "8px", border: "1px dashed #fca5a5", color: "#991b1b", fontSize: "15px", fontWeight: "600" }}>💡 <b>「左側（発動条件）」から「右側（アクション）」へ</b> 流れるようにルールを設定します。</div>
               {(customRules.emergencies || []).map((em: any, idx: number) => (
                   <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '12px', background: '#fff', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                     <div style={{ flex: '1 1 350px', display: 'flex', gap: '8px', alignItems: 'center', borderRight: '2px dashed #cbd5e1', paddingRight: '16px' }}>
@@ -1738,7 +1720,7 @@ export default function App(): any {
 
       {showRuleModal && (
         <Modal title="📖 勤務割付システムのルール" onClose={() => setShowRuleModal(false)} wide>
-          <div style={{ lineHeight: 1.8, fontSize: "16px", color: "#334155" }}>
+          <div style={{ lineHeight: 1.8, fontSize: "15px", color: "#334155" }}>
             <p>このシステムはランダムではなく、複数のルールを順番に適用して配置を作ります。まず前提条件を固め、そのあと主配置、交換、兼務、救済、仕上げの順で調整していきます。</p>
             
             <h4 style={{ color: "#e11d48", borderBottom: "2px solid #ffe4e6", paddingBottom: 8, marginTop: 24 }}>🛑 1. システムが「絶対に守る」鉄の掟</h4>
