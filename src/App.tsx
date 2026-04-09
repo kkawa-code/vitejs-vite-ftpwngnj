@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 landscape; margin: 3mm; }
+  @page { size: A4 portrait; margin: 4mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -67,54 +67,54 @@ const globalStyle = `
     .screen-weekly-table { display: none !important; }
     .print-weekly-sheet {
       display: block !important;
-      width: 291mm !important;
-      max-width: 291mm !important;
-      min-width: 291mm !important;
-      margin: 0 !important;
+      width: 202mm !important;
+      max-width: 202mm !important;
+      min-width: 202mm !important;
+      margin: 0 auto !important;
       padding: 0 !important;
     }
     .print-sheet-table {
-      width: 291mm !important;
-      max-width: 291mm !important;
-      min-width: 291mm !important;
+      width: 202mm !important;
+      max-width: 202mm !important;
+      min-width: 202mm !important;
       border-collapse: collapse !important;
       table-layout: fixed !important;
       page-break-inside: avoid !important;
     }
     .print-sheet-table th,
     .print-sheet-table td {
-      border: 0.25mm solid #111 !important;
+      border: 0.22mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.6mm 0.8mm !important;
-      font-size: 9.2px !important;
-      line-height: 1.12 !important;
+      padding: 0.35mm 0.5mm !important;
+      font-size: 7px !important;
+      line-height: 1.02 !important;
       vertical-align: top !important;
       word-break: break-word !important;
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table th {
-      font-size: 9.4px !important;
+      font-size: 7.2px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 17mm !important;
+      width: 12mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 9px !important;
+      font-size: 7.1px !important;
       font-weight: 700 !important;
-      line-height: 1.08 !important;
+      line-height: 1.02 !important;
     }
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 8.6px !important;
-      line-height: 1.08 !important;
+      font-size: 6.6px !important;
+      line-height: 1.02 !important;
       white-space: pre-wrap !important;
     }
     .scroll-container,
@@ -375,15 +375,15 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
                 const displayTime = foundEntry ? foundEntry.substring((foundRm+"枠").length).replace(/[()]/g,"") : (metaTime && metaTime !== "__NO_HELP__" ? metaTime.replace(/[()]/g,"") : "");
                 const helpValue = metaTime && metaTime !== "__NO_HELP__" ? metaTime : "";
                 return (
-                  <span style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:4,flexWrap:"wrap"}}>
-                    <span style={{fontSize:11,color:"#6366f1",fontWeight:700,whiteSpace:"nowrap"}}>
-                      {displayRoom && displayTime ? `${displayRoom} ${displayTime} 補充` : "補充"}
+                  <span style={{display:"flex",alignItems:"center",gap:6,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:6,flexWrap:"nowrap",whiteSpace:"nowrap",minWidth:0}}>
+                    <span style={{fontSize:11,color:"#6366f1",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis"}}>
+                      {displayRoom || "補充先"}
                     </span>
-                    <select value={helpValue} onChange={(e:any)=>{ if (e.target.value) onAddHelp(coreName, e.target.value); else if (onClearHelp) onClearHelp(coreName); }} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:13,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 16px 0 2px"}}>
-                      <option value="">なし</option>
+                    <select value={helpValue} onChange={(e:any)=>{ if (e.target.value) onAddHelp(coreName, e.target.value); else if (onClearHelp) onClearHelp(coreName); }} style={{appearance:"none",background:"transparent",border:"none",outline:"none",fontSize:12,fontWeight:700,color:"#6366f1",cursor:"pointer",padding:"0 14px 0 0",minWidth:0}}>
+                      <option value="">補充なし</option>
                       {["(AM)","(PM)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"].map((t:string)=><option key={t} value={t}>{t.replace(/[()]/g,"")}</option>)}
                     </select>
-                    {helpValue && onClearHelp && <button type="button" onClick={(e)=>{e.stopPropagation(); onClearHelp(coreName);}} style={{border:"none",background:"transparent",color:"#6366f1",fontSize:11,fontWeight:800,cursor:"pointer",padding:0}}>解除</button>}
+                    {helpValue && onClearHelp && <button type="button" onClick={(e)=>{e.stopPropagation(); onClearHelp(coreName);}} style={{border:"none",background:"transparent",color:"#6366f1",fontSize:11,fontWeight:800,cursor:"pointer",padding:0,flexShrink:0}}>✕</button>}
                   </span>
                 );
               })()}
@@ -858,7 +858,10 @@ export default function App(): any {
         return;
       }
       const minute = requestedStartMinute(fromTime);
-      if (!roomHasCoverageAfter(cells, room, minute)) {
+      const placeholder = `${room}枠${fromTime}`;
+      if (split(cells[room] || "").includes(placeholder)) {
+        w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}の${fromTime.replace(/[()]/g, '')}補充が埋まっていません` });
+      } else if (!roomHasCoverageAfter(cells, room, minute)) {
         w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}は${fromTime.replace(/[()]/g, '')}以降の担当者がいません` });
       }
     });
@@ -952,8 +955,8 @@ export default function App(): any {
 
   const handleClearGroupDay = (title: string, sections: string[]) => { if (window.confirm(`${cur.label} の「${title}」をクリアしますか？`)) { setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; sections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
   const handleClearGroupWeek = (title: string, sections: string[]) => { if (window.confirm(`表示中の「${title}」を1週間分すべてクリアしますか？`)) { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev }; days.forEach(d => { const nextCells = { ...(prev[d.id] || d.cells) }; sections.forEach(sec => { nextCells[sec] = ""; }); nextState[d.id] = nextCells; }); return nextState; }); } };
-  const handleClearWorkDay = () => { if (window.confirm(`${cur.label} の「モダリティ」と「一般撮影・透視・その他」をクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections]; setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
-  const handleClearWorkWeek = () => { if (window.confirm(`表示中の「モダリティ」と「一般撮影・透視・その他」を1週間分すべてクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections]; setAllDaysWithHistory((prev: any) => { const nextState = { ...prev }; days.forEach(d => { const nextCells = { ...(prev[d.id] || d.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); nextState[d.id] = nextCells; }); return nextState; }); } };
+  const handleClearWorkDay = () => { if (window.confirm(`${cur.label} の「モダリティ」をクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections]; setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
+  const handleClearWorkWeek = () => { if (window.confirm(`表示中の「モダリティ」を1週間分すべてクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections]; setAllDaysWithHistory((prev: any) => { const nextState = { ...prev }; days.forEach(d => { const nextCells = { ...(prev[d.id] || d.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); nextState[d.id] = nextCells; }); return nextState; }); } };
   const handleCopyYesterday = () => { const idx = days.findIndex(d => d.id === cur.id); if (idx <= 0) return; const prevDay = days[idx - 1]; setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...prevDay.cells } })); };
 
   const handleExport = () => { const dataObj = { allDays, monthlyAssign, customRules }; const blob = new Blob([JSON.stringify(dataObj)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `shifto_backup_${targetMonday}.json`; a.click(); URL.revokeObjectURL(url); };
@@ -1088,29 +1091,31 @@ export default function App(): any {
                                 const limit = customRules.alertMaxKenmu || 3;
                                 const isOverLimit = roomLoad > limit;
 
-                                let tagBg = "#f8fafc"; let tagColor = "#1e293b"; let tagBorder = "#cbd5e1"; let tagAccent = "#94a3b8";
-                                if (showKenmuMeta && (roomCount >= 4 || isOverLimit)) { tagBg = "#fee2e2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fdba74"; tagColor = "#7c2d12"; tagBorder = "#fb923c"; tagAccent = "#ea580c"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#fffdfa"; tagColor = "#1f2937"; tagBorder = "#e5e7eb"; tagAccent = "#cbd5e1"; }
+                                let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#475569";
+                                let footerBg = "#f8fafc"; let footerColor = "#64748b"; let footerBorder = "#e2e8f0";
+                                let dangerDot: string | null = null;
+                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#fef2f2"; tagColor = "#991b1b"; tagBorder = "#ef4444"; footerBg = "#fee2e2"; footerColor = "#991b1b"; footerBorder = "#fecaca"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fff4ea"; tagColor = "#8a3b12"; tagBorder = "#efc29a"; footerBg = "#ffeddc"; footerColor = "#9a3412"; footerBorder = "#f6c79c"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#ffffff"; tagColor = "#0f172a"; tagBorder = "#475569"; footerBg = "#f8fafc"; footerColor = "#64748b"; footerBorder = "#e2e8f0"; }
 
-                                if (hasRedWarning) { tagBg = "#fee2e2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; tagAccent = "#ef4444"; }
-                                else if (hasOrangeWarning) { tagBorder = "#ea580c"; tagAccent = "#ea580c"; }
-                                else if (hasYellowWarning && (!showKenmuMeta || roomCount < 3)) { tagBorder = "#ca8a04"; tagAccent = "#ca8a04"; }
+                                if (hasRedWarning) { tagBg = "#fef2f2"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; footerBg = "#fee2e2"; footerColor = "#b91c1c"; footerBorder = "#fecaca"; }
+                                else if (hasOrangeWarning) { dangerDot = "#f59e0b"; }
+                                else if (hasYellowWarning) { dangerDot = "#eab308"; }
 
                                 let inlineStyle: React.CSSProperties = {
                                   background: tagBg,
                                   color: tagColor,
                                   border: `1px solid ${tagBorder}`,
-                                  padding: showKenmuMeta ? "6px 9px 8px" : "6px 10px",
+                                  padding: showKenmuMeta ? "6px 9px 7px" : "6px 10px",
                                   borderRadius: "8px",
                                   display: "flex",
                                   alignItems: "flex-start",
                                   flexDirection: "column",
-                                  gap: "3px",
+                                  gap: "4px",
                                   fontSize: "16px",
-                                  fontWeight: (hasRedWarning || isOverLimit || roomCount >= 3) ? 800 : 700,
+                                  fontWeight: (hasRedWarning || roomCount >= 4) ? 800 : 700,
                                   transition: "all 0.2s ease",
-                                  boxShadow: showKenmuMeta ? `inset 3px 0 0 ${tagAccent}` : "none"
+                                  boxShadow: "none"
                                 };
                                 
                                 if (isHighlighted) {
@@ -1119,7 +1124,6 @@ export default function App(): any {
                                   inlineStyle.opacity = 0.25; inlineStyle.filter = "grayscale(1)";
                                 }
 
-                                const restCount = Math.max(0, otherRooms.length - 2);
                                 const titleText = showKenmuMeta ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
                                 const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>);
@@ -1134,45 +1138,30 @@ export default function App(): any {
                                   >
                                     <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                                       <span data-print-name="1">{coreName}</span>
+                                      {dangerDot && !isHighlighted && <span style={{width:8,height:8,borderRadius:"50%",background:dangerDot,display:"inline-block",flexShrink:0}} />}
                                       {modNode}
                                     </div>
                                     {showKenmuMeta && (
                                       <div data-print-badge="1" style={{
                                         display: "flex",
-                                        flexWrap: "wrap",
-                                        gap: "4px",
-                                        marginTop: "1px"
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        marginTop: "1px",
+                                        padding: roomCount >= 3 ? "2px 6px" : "2px 6px",
+                                        background: isHighlighted ? "rgba(255,255,255,0.16)" : footerBg,
+                                        color: isHighlighted ? "#fff" : footerColor,
+                                        border: isHighlighted ? "1px solid rgba(255,255,255,0.32)" : `1px solid ${footerBorder}`,
+                                        borderRadius: "999px",
+                                        fontSize: roomCount >= 3 ? "10px" : "9px",
+                                        fontWeight: roomCount >= 3 ? 800 : 700,
+                                        lineHeight: 1.15,
+                                        whiteSpace: "nowrap",
+                                        maxWidth: "100%",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis"
                                       }}>
-                                        {otherRooms.slice(0, 2).map((r, idx) => (
-                                          <span key={idx} style={{
-                                            fontSize: roomCount >= 3 ? "10px" : "9px",
-                                            lineHeight: 1.1,
-                                            fontWeight: roomCount >= 3 ? 800 : 700,
-                                            color: isHighlighted ? "#fff" : (roomCount >= 3 ? "#7c2d12" : "#64748b"),
-                                            background: isHighlighted ? "rgba(255,255,255,0.18)" : (roomCount >= 3 ? "rgba(255,247,237,0.8)" : "#f8fafc"),
-                                            border: isHighlighted ? "1px solid rgba(255,255,255,0.35)" : (roomCount >= 3 ? "1px solid #fdba74" : "1px solid #e2e8f0"),
-                                            borderRadius: "999px",
-                                            padding: "2px 6px",
-                                            whiteSpace: "nowrap"
-                                          }}>
-                                            ↔ {roomLinkLabel(r)}
-                                          </span>
-                                        ))}
-                                        {restCount > 0 && (
-                                          <span style={{
-                                            fontSize: "9px",
-                                            lineHeight: 1.1,
-                                            fontWeight: 700,
-                                            color: isHighlighted ? "#fff" : "#64748b",
-                                            background: isHighlighted ? "rgba(255,255,255,0.18)" : "#f8fafc",
-                                            border: isHighlighted ? "1px solid rgba(255,255,255,0.35)" : "1px solid #e2e8f0",
-                                            borderRadius: "999px",
-                                            padding: "2px 6px",
-                                            whiteSpace: "nowrap"
-                                          }}>
-                                            +{restCount}
-                                          </span>
-                                        )}
+                                        <span style={{opacity:0.72, flexShrink:0}}>↔</span>
+                                        <span style={{overflow:"hidden", textOverflow:"ellipsis"}}>{otherRooms.map(roomLinkLabel).join(" ・ ")}</span>
                                       </div>
                                     )}
                                   </div>
@@ -1248,7 +1237,7 @@ export default function App(): any {
                         <button className="btn-hover" onClick={() => handleClearGroupDay(group.title, group.sections)} style={btnStyle("#fff", "#64748b")}>🧹 1日クリア</button>
                         <button className="btn-hover" onClick={() => handleClearGroupWeek(group.title, group.sections)} style={btnStyle("#fff", "#64748b")}>🧹 週間クリア</button>
                       </div>
-                    ) : group.title === "モダリティ" || group.title === "一般撮影・透視・その他" ? (
+                    ) : group.title === "モダリティ" ? (
                       <div style={{display: "flex", gap: 8}}>
                         <button className="btn-hover" onClick={handleClearWorkDay} style={btnStyle("#fff", "#64748b")}>🧹 業務1日クリア</button>
                         <button className="btn-hover" onClick={handleClearWorkWeek} style={btnStyle("#fff", "#64748b")}>🧹 業務週間クリア</button>
