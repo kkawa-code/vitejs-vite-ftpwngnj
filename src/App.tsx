@@ -93,7 +93,7 @@ const globalStyle = `
       background: #fff !important;
       color: #000 !important;
       padding: 0.5mm 0.4mm !important;
-      font-size: 6.9px !important;
+      font-size: 7.3px !important;
       line-height: 1.1 !important;
       vertical-align: middle !important;
       white-space: normal !important;
@@ -105,7 +105,7 @@ const globalStyle = `
       height: auto !important;
     }
     .print-sheet-table th {
-      font-size: 7.4px !important;
+      font-size: 7.8px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
@@ -117,7 +117,7 @@ const globalStyle = `
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 7.1px !important;
+      font-size: 7.5px !important;
       font-weight: 700 !important;
       line-height: 1.05 !important;
       white-space: nowrap !important;
@@ -125,7 +125,7 @@ const globalStyle = `
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 6.8px !important;
+      font-size: 7.15px !important;
       line-height: 1.18 !important;
       white-space: normal !important;
       overflow: visible !important;
@@ -1101,8 +1101,8 @@ export default function App(): any {
                                 let countBg = "#e2e8f0"; let countColor = "#475569";
                                 let dangerDot: string | null = null;
                                 if (showKenmuMeta && roomCount >= 4) { tagBg = "#fff7f7"; tagColor = "#991b1b"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#991b1b"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#991b1b"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fffaf5"; tagColor = "#0f172a"; tagBorder = "#e7c9a3"; metaBg = "#ffedd5"; metaColor = "#9a3412"; metaBorder = "#fdba74"; countBg = "#fed7aa"; countColor = "#9a3412"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#f7fbf7"; tagColor = "#0f172a"; tagBorder = "#9ad0ad"; metaBg = "#eefaf0"; metaColor = "#166534"; metaBorder = "#c7ebcf"; countBg = "#dcfce7"; countColor = "#166534"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fff6ee"; tagColor = "#0f172a"; tagBorder = "#d9b68e"; metaBg = "#ffe3c2"; metaColor = "#9a3412"; metaBorder = "#f5b978"; countBg = "#f7c98f"; countColor = "#9a3412"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#f1fbf3"; tagColor = "#0f172a"; tagBorder = "#86bf96"; metaBg = "#e4f6e8"; metaColor = "#166534"; metaBorder = "#b5dfbf"; countBg = "#c8ebd1"; countColor = "#166534"; }
 
                                 if (hasRedWarning) { tagBg = "#fff7f7"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#b91c1c"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#b91c1c"; }
                                 else if (hasOrangeWarning) { dangerDot = "#f59e0b"; }
