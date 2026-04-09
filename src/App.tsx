@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 3mm; }
+  @page { size: A4 portrait; margin: 2mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -54,7 +54,8 @@ const globalStyle = `
     body {
       background: #fff !important;
       color: #000 !important;
-      font-size: 8.4px !important;
+      font-size: 9px !important;
+      font-family: "Arial Narrow", "Helvetica Neue", Arial, sans-serif !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -70,7 +71,7 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
-      height: 285mm !important;
+      height: 258mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
@@ -88,19 +89,19 @@ const globalStyle = `
       page-break-inside: avoid !important;
     }
     .print-sheet-table thead tr {
-      height: 7.2mm !important;
+      height: 6.6mm !important;
     }
     .print-sheet-table tbody tr {
-      height: 10.8mm !important;
+      height: 9.7mm !important;
     }
     .print-sheet-table th,
     .print-sheet-table td {
       border: 0.18mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.22mm 0.24mm !important;
-      font-size: 8.0px !important;
-      line-height: 1.0 !important;
+      padding: 0.18mm 0.22mm !important;
+      font-size: 8.7px !important;
+      line-height: 1.02 !important;
       vertical-align: middle !important;
       white-space: normal !important;
       overflow: hidden !important;
@@ -108,20 +109,20 @@ const globalStyle = `
       word-break: break-all !important;
     }
     .print-sheet-table th {
-      font-size: 8.4px !important;
+      font-size: 9.1px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 7.8mm !important;
+      width: 6.4mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
-      font-size: 7.6px !important;
+      font-size: 7.9px !important;
     }
     .print-sheet-table .p-day {
-      font-size: 8.2px !important;
+      font-size: 8.8px !important;
       font-weight: 700 !important;
       line-height: 1.0 !important;
       white-space: nowrap !important;
@@ -129,8 +130,8 @@ const globalStyle = `
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 7.8px !important;
-      line-height: 1.06 !important;
+      font-size: 8.4px !important;
+      line-height: 1.08 !important;
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
