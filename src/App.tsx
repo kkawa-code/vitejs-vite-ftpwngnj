@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 4mm; }
+  @page { size: A4 portrait; margin: 2.5mm; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -53,7 +53,7 @@ const globalStyle = `
     body {
       background: #fff !important;
       color: #000 !important;
-      font-size: 7px !important;
+      font-size: 8px !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -86,29 +86,33 @@ const globalStyle = `
       border: 0.18mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.45mm 0.55mm !important;
-      font-size: 6.1px !important;
-      line-height: 1.12 !important;
+      padding: 0.75mm 0.4mm !important;
+      font-size: 6.9px !important;
+      line-height: 1.18 !important;
       vertical-align: top !important;
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
       word-break: keep-all !important;
     }
+
+    .print-sheet-table tr {
+      height: 7.8mm !important;
+    }
     .print-sheet-table th {
-      font-size: 6.3px !important;
+      font-size: 7.0px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 11.5mm !important;
+      width: 8.8mm !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 6.2px !important;
+      font-size: 6.8px !important;
       font-weight: 700 !important;
       line-height: 1.05 !important;
       white-space: nowrap !important;
@@ -116,8 +120,8 @@ const globalStyle = `
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 5.8px !important;
-      line-height: 1.08 !important;
+      font-size: 6.4px !important;
+      line-height: 1.16 !important;
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
@@ -224,6 +228,13 @@ export const DEFAULT_RULES: CustomRules = {
     { target: "パノラマCT", sources: "透視（6号）、2号室" }
   ], 
   alertMaxKenmu: 3, alertEmptyRooms: "CT、MRI、治療、RI、1号室、2号室、3号室、5号室、透視（6号）、透視（11号）、MMG、骨塩、パノラマCT、ポータブル、DSA、検像、受付", smartKenmu: [] 
+};
+
+
+const sanitizeRulesInput = (raw: any): CustomRules => {
+  const next: any = { ...DEFAULT_RULES, ...(raw || {}) };
+  next.smartKenmu = [];
+  return next as CustomRules;
 };
 
 export const KEY_ALL_DAYS = "shifto_alldays_v300"; export const KEY_MONTHLY = "shifto_monthly_v300"; export const KEY_RULES = "shifto_rules_v300";
@@ -738,7 +749,7 @@ export class AutoAssigner {
 export default function App(): any {
   const [activeTab, setActiveTab] = useState<'calendar' | 'stats' | 'rules'>('calendar');
   const [allDays, setAllDays] = useState<Record<string, Record<string, string>>>(() => { try { return JSON.parse(localStorage.getItem(KEY_ALL_DAYS) || "{}"); } catch { return {}; } });
-  const [customRules, setCustomRules] = useState<CustomRules>(() => { try { return { ...DEFAULT_RULES, ...JSON.parse(localStorage.getItem(KEY_RULES) || "{}") }; } catch { return DEFAULT_RULES; } });
+  const [customRules, setCustomRules] = useState<CustomRules>(() => { try { return sanitizeRulesInput(JSON.parse(localStorage.getItem(KEY_RULES) || "{}")); } catch { return sanitizeRulesInput(DEFAULT_RULES); } });
   const [monthlyAssign, setMonthlyAssign] = useState<Record<string, string>>(() => { try { return { ...DEFAULT_MONTHLY_ASSIGN, ...JSON.parse(localStorage.getItem(KEY_MONTHLY) || "{}") }; } catch { return DEFAULT_MONTHLY_ASSIGN; } });
   const [targetMonday, setTargetMonday] = useState(() => { const d = new Date(); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const mon = new Date(d.setDate(diff)); return `${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`; });
   const [sel, setSel] = useState(""); 
@@ -756,7 +767,7 @@ export default function App(): any {
   const [hoveredStaff, setHoveredStaff] = useState<string | null>(null);
 
   useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
-  useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); localStorage.setItem(KEY_RULES, JSON.stringify(customRules)); localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [allDays, customRules, monthlyAssign]);
+  useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); localStorage.setItem(KEY_RULES, JSON.stringify(sanitizeRulesInput(customRules))); localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [allDays, customRules, monthlyAssign]);
 
   const activeGeneralStaff = useMemo(() => parseAndSortStaff(customRules.staffList), [customRules.staffList]);
   const activeReceptionStaff = useMemo(() => parseAndSortStaff(customRules.receptionStaffList), [customRules.receptionStaffList]);
@@ -865,9 +876,13 @@ export default function App(): any {
       }
       const minute = requestedStartMinute(fromTime);
       const placeholder = `${room}枠${fromTime}`;
-      if (split(cells[room] || "").includes(placeholder)) {
+      const members = split(cells[room] || "");
+      const hasPlaceholder = members.includes(placeholder);
+      const coveringMembers = members.filter(m => !m.startsWith(`${room}枠`) && getMemberCoverageRange(m).end > minute);
+      const otherCoveringMembers = coveringMembers.filter(m => extractStaffName(m) !== staff);
+      if (hasPlaceholder) {
         w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}の${fromTime.replace(/[()]/g, '')}補充が埋まっていません` });
-      } else if (!roomHasCoverageAfter(cells, room, minute)) {
+      } else if (otherCoveringMembers.length === 0) {
         w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}は${fromTime.replace(/[()]/g, '')}以降の担当者がいません` });
       }
     });
@@ -965,10 +980,10 @@ export default function App(): any {
   const handleClearWorkWeek = () => { if (window.confirm(`表示中の「モダリティ」を1週間分すべてクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections]; setAllDaysWithHistory((prev: any) => { const nextState = { ...prev }; days.forEach(d => { const nextCells = { ...(prev[d.id] || d.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); nextState[d.id] = nextCells; }); return nextState; }); } };
   const handleCopyYesterday = () => { const idx = days.findIndex(d => d.id === cur.id); if (idx <= 0) return; const prevDay = days[idx - 1]; setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...prevDay.cells } })); };
 
-  const handleExport = () => { const dataObj = { allDays, monthlyAssign, customRules }; const blob = new Blob([JSON.stringify(dataObj)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `shifto_backup_${targetMonday}.json`; a.click(); URL.revokeObjectURL(url); };
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event: any) => { try { const dataObj = JSON.parse(event.target.result); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(dataObj.customRules); alert("データを復元しました！"); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("読み込みに失敗しました。"); } }; reader.readAsText(file); e.target.value = ""; };
-  const handleCopyToClipboard = () => { const dataObj = { allDays, monthlyAssign, customRules }; navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => { alert("データをコピーしました！"); }).catch(() => { alert("コピーに失敗しました。"); }); };
-  const handleTextImport = () => { if(!importText) return; try { const dataObj = JSON.parse(importText); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(dataObj.customRules); alert("テキストからデータを復元しました！"); setImportText(""); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("テキストの読み込みに失敗しました。"); } };
+  const handleExport = () => { const dataObj = { allDays, monthlyAssign, customRules: sanitizeRulesInput(customRules) }; const blob = new Blob([JSON.stringify(dataObj)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `shifto_backup_${targetMonday}.json`; a.click(); URL.revokeObjectURL(url); };
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event: any) => { try { const dataObj = JSON.parse(event.target.result); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(sanitizeRulesInput(dataObj.customRules)); alert("データを復元しました！"); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("読み込みに失敗しました。"); } }; reader.readAsText(file); e.target.value = ""; };
+  const handleCopyToClipboard = () => { const dataObj = { allDays, monthlyAssign, customRules: sanitizeRulesInput(customRules) }; navigator.clipboard.writeText(JSON.stringify(dataObj)).then(() => { alert("データをコピーしました！"); }).catch(() => { alert("コピーに失敗しました。"); }); };
+  const handleTextImport = () => { if(!importText) return; try { const dataObj = JSON.parse(importText); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(sanitizeRulesInput(dataObj.customRules)); alert("テキストからデータを復元しました！"); setImportText(""); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("テキストの読み込みに失敗しました。"); } };
 
   const dailyStaffRooms = useMemo(() => {
     const roomsByDay: Record<string, Record<string, string[]>> = {};
