@@ -71,15 +71,17 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
+      height: 285mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
       padding: 0 !important;
-      overflow: visible !important;
+      overflow: hidden !important;
       page-break-after: avoid !important;
     }
     .print-sheet-table {
       width: 100% !important;
+      height: 100% !important;
       max-width: 100% !important;
       min-width: 0 !important;
       border-collapse: collapse !important;
@@ -132,6 +134,12 @@ const globalStyle = `
       text-overflow: clip !important;
       word-break: keep-all !important;
       overflow-wrap: anywhere !important;
+    }
+    .print-sheet-table thead tr {
+      height: 8.2mm !important;
+    }
+    .print-sheet-table tbody tr {
+      height: 10.85mm !important;
     }
     .scroll-container,
     .print-area {
@@ -1077,13 +1085,13 @@ export default function App(): any {
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0"}}>{section}</td>
                     {days.map((day, dIdx) => {
-                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "#fef3c7"; baseBgStyle.boxShadow = "inset 0 0 0 2px #f59e0b"; }
+                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "#f3f4f6"; baseBgStyle.boxShadow = "inset 0 0 0 2px #cbd5e1"; }
                       
                       return (
                         <td key={day.id + section} style={baseBgStyle}>
                           {!day.isPublicHoliday && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4" }}>
-                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#f3f4f6", border: "1px dashed #cbd5e1", color: "#6b7280", fontSize: 13, fontWeight: 800 }}>空欄</div>}
+                              {currentMems.length === 0 && isRoomEmpty && <div style={{ padding: "6px 10px", borderRadius: 8, background: "#e5e7eb", border: "1px dashed #9ca3af", color: "#4b5563", fontSize: 13, fontWeight: 800 }}>空欄</div>}
                               {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
                                 
