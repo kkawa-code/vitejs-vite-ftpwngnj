@@ -41,7 +41,7 @@ const globalStyle = `
   .close-btn:hover { background: #e2e8f0; }
   .screen-weekly-table { display: block; }
   .print-weekly-sheet { display: none; }
-  @page { size: A4 portrait; margin: 1.2mm; }
+  @page { size: A4 portrait; margin: 0; }
   @media print {
     html, body, #root {
       width: 100% !important;
@@ -54,7 +54,7 @@ const globalStyle = `
     body {
       background: #fff !important;
       color: #000 !important;
-      font-size: 8.2px !important;
+      font-size: 6.6px !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -70,8 +70,9 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
-      height: 294mm !important;
-      max-height: 294mm !important;
+      height: 279mm !important;
+      max-height: 279mm !important;
+      padding: 1.4mm 1.2mm 1.0mm 1.2mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
@@ -79,8 +80,9 @@ const globalStyle = `
     }
     .print-sheet-table {
       width: 100% !important;
-      height: 294mm !important;
-      max-height: 294mm !important;
+      height: 279mm !important;
+      max-height: 279mm !important;
+      padding: 1.4mm 1.2mm 1.0mm 1.2mm !important;
       max-width: 100% !important;
       min-width: 0 !important;
       border-collapse: collapse !important;
@@ -88,19 +90,19 @@ const globalStyle = `
       page-break-inside: avoid !important;
     }
     .print-sheet-table thead tr {
-      height: 8.5mm !important;
+      height: 7.3mm !important;
     }
     .print-sheet-table tbody tr {
-      height: calc((294mm - 8.5mm) / 24) !important;
+      height: calc((276.6mm - 7.3mm) / 25) !important;
     }
     .print-sheet-table th,
     .print-sheet-table td {
       border: 0.18mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 0.45mm 0.35mm !important;
-      font-size: 7.15px !important;
-      line-height: 1.14 !important;
+      padding: 0.18mm 0.22mm !important;
+      font-size: 6.4px !important;
+      line-height: 1.08 !important;
       vertical-align: top !important;
       white-space: normal !important;
       overflow: visible !important;
@@ -109,20 +111,20 @@ const globalStyle = `
       word-break: break-word !important;
     }
     .print-sheet-table th {
-      font-size: 7.2px !important;
+      font-size: 6.6px !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
-      width: 7.2mm !important;
-      font-size: 6.55px !important;
+      width: 5.8mm !important;
+      font-size: 6.0px !important;
       font-weight: 700 !important;
       text-align: center !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
     }
     .print-sheet-table .p-day {
-      font-size: 7px !important;
+      font-size: 6.2px !important;
       font-weight: 700 !important;
       line-height: 1.02 !important;
       white-space: nowrap !important;
@@ -130,8 +132,8 @@ const globalStyle = `
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 6.75px !important;
-      line-height: 1.14 !important;
+      font-size: 6.05px !important;
+      line-height: 1.05 !important;
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
