@@ -372,7 +372,6 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
                 const metaTime = helpMap[coreName] || "";
                 const metaRoom = helpRoomMap[coreName] || "";
                 const displayRoom = foundEntry ? foundRm : (metaTime && metaTime !== "__NO_HELP__" ? metaRoom : "");
-                const displayTime = foundEntry ? foundEntry.substring((foundRm+"枠").length).replace(/[()]/g,"") : (metaTime && metaTime !== "__NO_HELP__" ? metaTime.replace(/[()]/g,"") : "");
                 const helpValue = metaTime && metaTime !== "__NO_HELP__" ? metaTime : "";
                 return (
                   <span style={{display:"flex",alignItems:"center",gap:6,marginLeft:4,borderLeft:"1px solid #c7d2fe",paddingLeft:6,flexWrap:"nowrap",whiteSpace:"nowrap",minWidth:0}}>
@@ -1089,7 +1088,6 @@ export default function App(): any {
                                 const otherRooms = isRoomLikeSection ? sameDayRooms.filter(r => r !== section) : [];
                                 const showKenmuMeta = isRoomLikeSection && roomCount >= 2;
                                 const limit = customRules.alertMaxKenmu || 3;
-                                const isOverLimit = roomLoad > limit;
 
                                 let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#475569";
                                 let footerBg = "#f8fafc"; let footerColor = "#64748b"; let footerBorder = "#e2e8f0";
