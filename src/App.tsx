@@ -71,7 +71,7 @@ const globalStyle = `
     .print-weekly-sheet {
       display: block !important;
       width: 100% !important;
-      height: 282mm !important;
+      height: 279mm !important;
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
@@ -93,8 +93,8 @@ const globalStyle = `
       border: 0.2mm solid #111 !important;
       background: #fff !important;
       color: #000 !important;
-      padding: 1.0mm 0.9mm !important;
-      font-size: 10.8pt !important;
+      padding: 0.72mm 0.75mm !important;
+      font-size: 10.3pt !important;
       line-height: 1.12 !important;
       vertical-align: middle !important;
       white-space: normal !important;
@@ -104,7 +104,7 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table th {
-      font-size: 11pt !important;
+      font-size: 10.7pt !important;
       font-weight: 700 !important;
       text-align: center !important;
     }
@@ -119,7 +119,7 @@ const globalStyle = `
       padding-right: 0.4mm !important;
     }
     .print-sheet-table .p-day {
-      font-size: 10.2pt !important;
+      font-size: 9.9pt !important;
       font-weight: 700 !important;
       line-height: 1.04 !important;
       white-space: nowrap !important;
@@ -127,7 +127,7 @@ const globalStyle = `
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 10.6pt !important;
+      font-size: 10.0pt !important;
       line-height: 1.12 !important;
       white-space: normal !important;
       overflow: visible !important;
@@ -136,10 +136,10 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table thead tr {
-      height: 7.8mm !important;
+      height: 7.1mm !important;
     }
     .print-sheet-table tbody tr {
-      height: 10.15mm !important;
+      height: 9.35mm !important;
     }
     .scroll-container,
     .print-area {
