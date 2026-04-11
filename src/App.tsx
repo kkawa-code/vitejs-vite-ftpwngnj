@@ -1351,7 +1351,7 @@ export default function App(): any {
           </div>
           <div style={{ marginTop: 16, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "15px", textAlign: "center", tableLayout: "auto" }}>
-              <thead><tr><th style={{ position: "sticky", left: 0, background: "#f8fafc", zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 900 }}>スタッフ</th>{ROOM_SECTIONS.map(r => <th key={r} style={{ padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 900 }}>{r}</th>)}</tr></thead>
+              <thead><tr><th style={{ position: "sticky", top: 0, left: 0, background: "#f8fafc", zIndex: 15, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 900 }}>スタッフ</th>{ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 12, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", fontWeight: 900 }}>{r}</th>)}</tr></thead>
               <tbody>
                 {allStaff.filter(s => activeGeneralStaff.includes(s)).map((staff, sIdx) => {
                   const isZebra = sIdx % 2 === 1; const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
