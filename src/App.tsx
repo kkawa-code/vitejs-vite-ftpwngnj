@@ -187,6 +187,8 @@ export const ASSIGNABLE_SECTIONS = SECTIONS.filter(s => !["明け","入り","土
 export const ROOM_SECTIONS = SECTIONS.filter(s => !["明け","入り","土日休日代休","不在","待機","昼当番"].includes(s));
 export const REST_SECTIONS = ["明け","入り","土日休日代休","不在"];
 export const WORK_SECTIONS = SECTIONS.filter(s => !REST_SECTIONS.includes(s));
+export const WEEKLY_DISPLAY_SECTIONS = SECTIONS.filter(s => s !== "透析後胸部");
+WEEKLY_DISPLAY_SECTIONS.splice(WEEKLY_DISPLAY_SECTIONS.indexOf("受付ヘルプ") + 1, 0, "透析後胸部");
 export const ROLE_PLACEHOLDERS = ROOM_SECTIONS.map(s => s + "枠");
 export const GENERAL_ROOMS = ["1号室", "2号室", "3号室", "5号室", "透視（6号）", "透視（11号）", "骨塩", "パノラマCT", "ポータブル", "DSA", "検像"];
 export const EXTENDED_ROOM_SECTIONS = [...ROOM_SECTIONS, "CT(4)", "CT(3)", "MRI(3)", "治療(3)"];
@@ -1130,7 +1132,7 @@ export default function App(): any {
                 </tr>
               </thead>
               <tbody>
-                {SECTIONS.map((section, sIdx) => (
+                {WEEKLY_DISPLAY_SECTIONS.map((section, sIdx) => (
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0", borderBottom: `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`}}>{section}</td>
                     {days.map((day, dIdx) => {
@@ -1278,7 +1280,7 @@ export default function App(): any {
                 </tr>
               </thead>
               <tbody>
-                {SECTIONS.map((section) => {
+                {WEEKLY_DISPLAY_SECTIONS.map((section) => {
                   const rowClass = ["土日休日代休", "待機", "透析後胸部", "3号室"].includes(section)
                     ? "p-row-short"
                     : ["不在", "治療", "昼当番"].includes(section)
