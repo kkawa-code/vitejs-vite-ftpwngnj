@@ -956,6 +956,13 @@ export default function App(): any {
   };
   
   const monthlyMatrixStats = useMemo(() => { const stats: Record<string, Record<string, { total: number, late: number }>> = {}; activeGeneralStaff.forEach(s => { stats[s] = {}; ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); }); Object.entries(allDays).forEach(([dateStr, cells]) => { if (dateStr >= assignmentCycleInfo.startId && dateStr < assignmentCycleInfo.endExclusiveId) { ROOM_SECTIONS.forEach(room => { split(cells[room] || "").forEach(m => { const core = extractStaffName(m); if (stats[core]?.[room] !== undefined) { stats[core][room].total += 1; if (m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")) stats[core][room].late += 1; } }); }); } }); return stats; }, [assignmentCycleInfo, allDays, activeGeneralStaff]);
+  const monthlyAssignmentSummary = useMemo(() => {
+    return MONTHLY_CATEGORIES.map(({ key, label }) => ({
+      key,
+      label,
+      staff: split(monthlyAssign[key] || "").map(extractStaffName),
+    }));
+  }, [monthlyAssign]);
   
   const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); return next; }); };
   const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev, [sel]: { ...(prev[sel] || {}), [k]: v } }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
@@ -1344,11 +1351,26 @@ export default function App(): any {
 
       <div className="no-print" style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
         <div style={{ ...panelStyle(), marginBottom: 24 }}>
-          <h3 style={{ fontWeight: 900, color: "#3b82f6", fontSize: 21, marginTop: 0, marginBottom: 8 }}>配置マトリックス（月間集計）</h3>
+          <h3 style={{ fontWeight: 900, color: "#3b82f6", fontSize: 21, marginTop: 0, marginBottom: 8 }}>月担当一覧・配置マトリックス</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 14 }}>
             <span style={{ fontSize: 15, fontWeight: 800, color: "#1e293b", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 999, padding: "6px 12px" }}>{assignmentCycleInfo.monthLabel}担当分</span>
             <span style={{ fontSize: 14, fontWeight: 700, color: "#475569" }}>集計範囲: {assignmentCycleInfo.rangeLabel}</span>
           </div>
+          <div style={{ background: "#f8fafc", border: "1px solid #dbeafe", borderRadius: 12, padding: 16, marginBottom: 18 }}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: "#1d4ed8", marginBottom: 12 }}>今サイクルの月担当</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+              {monthlyAssignmentSummary.map(({ key, label, staff }) => {
+                const isEmpty = staff.length === 0;
+                return (
+                  <div key={key} style={{ background: isEmpty ? "#f8fafc" : "#ffffff", border: `1px solid ${isEmpty ? "#cbd5e1" : "#bfdbfe"}`, borderRadius: 10, padding: "12px 14px", minHeight: 84, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#475569", marginBottom: 8 }}>{label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: isEmpty ? "#94a3b8" : "#0f172a", lineHeight: 1.6, wordBreak: "break-word" }}>{isEmpty ? "未設定" : join(staff)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 900, color: "#1e293b", marginBottom: 10 }}>詳細件数</div>
           <div style={{ marginTop: 16, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "15px", textAlign: "center", tableLayout: "auto" }}>
               <thead><tr><th style={{ position: "sticky", top: 0, left: 0, background: "#f8fafc", zIndex: 15, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 900 }}>スタッフ</th>{ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 12, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", fontWeight: 900 }}>{r}</th>)}</tr></thead>
