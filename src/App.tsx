@@ -814,6 +814,7 @@ export default function App(): any {
   const [showLogDay, setShowLogDay] = useState<string | null>(null); 
   const [showUnassignedList, setShowUnassignedList] = useState<string | null>(null); 
   const [selectedStaffForStats, setSelectedStaffForStats] = useState<string | null>(null); 
+  const [selectedMatrixCell, setSelectedMatrixCell] = useState<{ staff: string; room: string } | null>(null); 
   const [showRuleModal, setShowRuleModal] = useState(false); 
   const [history, setHistory] = useState<Record<string, Record<string, string>>[]>([]); 
   const fileInputRef = useRef<HTMLInputElement>(null); 
@@ -977,6 +978,35 @@ export default function App(): any {
     受付: { accent: "#d97706", tint: "#fffbeb", border: "#fcd34d", text: "#b45309", chipBg: "#fef3c7", chipBorder: "#fcd34d" },
     受付ヘルプ: { accent: "#7c3aed", tint: "#faf5ff", border: "#d8b4fe", text: "#6d28d9", chipBg: "#f3e8ff", chipBorder: "#d8b4fe" },
   };
+  const monthlyStatsGroupStyles: Record<string, { accent: string; bg: string; border: string; text: string }> = {
+    CT: { accent: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" },
+    MRI: { accent: "#4f46e5", bg: "#eef2ff", border: "#c7d2fe", text: "#4338ca" },
+    治療メイン: { accent: "#db2777", bg: "#fdf2f8", border: "#f9a8d4", text: "#be185d" },
+    RI: { accent: "#059669", bg: "#ecfdf5", border: "#86efac", text: "#047857" },
+    その他: { accent: "#64748b", bg: "#f8fafc", border: "#cbd5e1", text: "#475569" },
+  };
+  const getMonthlyRoleTags = (staff: string) => {
+    const tags: string[] = [];
+    if (split(monthlyAssign.CT || "").map(extractStaffName).includes(staff)) tags.push("CT");
+    if (split(monthlyAssign.MRI || "").map(extractStaffName).includes(staff)) tags.push("MRI");
+    if (split(monthlyAssign.治療 || "").map(extractStaffName).includes(staff)) tags.push("治療メイン");
+    if (split(monthlyAssign.RI || "").map(extractStaffName).includes(staff)) tags.push("RI");
+    return tags;
+  };
+  const getMonthlyPrimaryGroup = (staff: string) => {
+    const tags = getMonthlyRoleTags(staff);
+    return tags[0] || "その他";
+  };
+  const groupedMonthlyStatsRows = useMemo(() => {
+    const orderedGroups = ["CT", "MRI", "治療メイン", "RI", "その他"];
+    let flatIndex = 0;
+    return orderedGroups.map(group => {
+      const rows = activeGeneralStaff
+        .filter(staff => getMonthlyPrimaryGroup(staff) === group)
+        .map(staff => ({ staff, flatIndex: flatIndex++, tags: getMonthlyRoleTags(staff) }));
+      return { key: group, label: group, rows };
+    }).filter(group => group.rows.length > 0);
+  }, [activeGeneralStaff, monthlyAssign]);
   
   const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); return next; }); };
   const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev, [sel]: { ...(prev[sel] || {}), [k]: v } }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
@@ -1445,17 +1475,49 @@ export default function App(): any {
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "15px", textAlign: "center", tableLayout: "auto" }}>
               <thead><tr><th style={{ position: "sticky", top: 0, left: 0, background: "#f8fafc", zIndex: 15, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 900 }}>スタッフ</th>{ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 12, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", fontWeight: 900 }}>{r}</th>)}</tr></thead>
               <tbody>
-                {allStaff.filter(s => activeGeneralStaff.includes(s)).map((staff, sIdx) => {
-                  const isZebra = sIdx % 2 === 1; const rowBg = isZebra ? "#f1f5f9" : "#ffffff";
+                {groupedMonthlyStatsRows.map(group => {
+                  const groupStyle = monthlyStatsGroupStyles[group.key] || monthlyStatsGroupStyles["その他"];
                   return (
-                    <tr key={staff} className="calendar-row">
-                      <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 900, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>{staff}</td>
-                      {ROOM_SECTIONS.map(r => {
-                        const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 }; let bg = rowBg; let color = "#334155";
-                        if (["CT", "MRI"].includes(r)) { if (stat.total > 0) { bg = `rgba(59, 130, 246, ${Math.min(0.1 + stat.total * 0.15, 0.9)})`; if(stat.total >= 3) color = "#fff"; } else if (isMonthlyMainStaff(r, staff, monthlyAssign)) bg = "#fef08a"; }
-                        return ( <td key={r} style={{ padding: 10, background: bg, color: color, fontWeight: stat.total > 0 ? 900 : 500, borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" }}><div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>{stat.total > 0 ? <span style={{fontSize:17}}>{stat.total}</span> : <span style={{ width: "16px" }}></span>}{stat.late > 0 && <span style={{ fontSize: "13px", background: "#fef08a", color: "#b45309", padding: "2px 6px", borderRadius: "6px", border: "1px solid #fde047" }}>遅{stat.late}</span>}</div></td> );
+                    <React.Fragment key={group.key}>
+                      <tr>
+                        <td colSpan={ROOM_SECTIONS.length + 1} style={{ padding: "10px 14px", background: groupStyle.bg, color: groupStyle.text, fontWeight: 900, textAlign: "left", borderTop: `2px solid ${groupStyle.border}`, borderBottom: `2px solid ${groupStyle.border}` }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: 999, background: groupStyle.accent, display: "inline-block" }}></span>
+                            {group.label}
+                          </span>
+                        </td>
+                      </tr>
+                      {group.rows.map(({ staff, flatIndex, tags }) => {
+                        const isZebra = flatIndex % 2 === 1; const rowBg = isZebra ? "#f8fafc" : "#ffffff";
+                        return (
+                          <tr key={staff} className="calendar-row">
+                            <td onClick={() => setSelectedStaffForStats(staff)} style={{ position: "sticky", left: 0, background: rowBg, zIndex: 10, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "1px solid #e2e8f0", fontWeight: 900, textAlign: "left", cursor: "pointer", color: "#2563eb", textDecoration: "underline" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                <span>{staff}</span>
+                                {tags.map(tag => {
+                                  const tagStyle = monthlyStatsGroupStyles[tag] || monthlyStatsGroupStyles["その他"];
+                                  return <span key={tag} style={{ display: "inline-flex", alignItems: "center", height: 22, padding: "0 8px", borderRadius: 999, fontSize: 12, fontWeight: 800, background: tagStyle.bg, color: tagStyle.text, border: `1px solid ${tagStyle.border}`, textDecoration: "none" }}>{tag}</span>;
+                                })}
+                              </div>
+                            </td>
+                            {ROOM_SECTIONS.map(r => {
+                              const stat = monthlyMatrixStats[staff]?.[r] || { total: 0, late: 0 }; let bg = rowBg; let color = "#334155";
+                              if (["CT", "MRI"].includes(r)) { if (stat.total > 0) { bg = `rgba(59, 130, 246, ${Math.min(0.1 + stat.total * 0.15, 0.9)})`; if(stat.total >= 3) color = "#fff"; } else if (isMonthlyMainStaff(r, staff, monthlyAssign)) bg = "#fef08a"; }
+                              return (
+                                <td key={r} style={{ padding: 10, background: bg, color: color, fontWeight: stat.total > 0 ? 900 : 500, borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", verticalAlign: "middle" }}>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                                    {stat.total > 0 ? (
+                                      <button type="button" onClick={() => setSelectedMatrixCell({ staff, room: r })} style={{ border: "none", background: "transparent", padding: 0, margin: 0, fontSize: 17, fontWeight: 900, color: "inherit", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "2px" }}>{stat.total}</button>
+                                    ) : <span style={{ width: "16px" }}></span>}
+                                    {stat.late > 0 && <span style={{ fontSize: "13px", background: "#fef08a", color: "#b45309", padding: "2px 6px", borderRadius: "6px", border: "1px solid #fde047" }}>遅{stat.late}</span>}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
                       })}
-                    </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -1883,6 +1945,33 @@ export default function App(): any {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        </Modal>
+      )}
+
+      {selectedMatrixCell && (
+        <Modal title={`📅 ${selectedMatrixCell.staff} さんの ${selectedMatrixCell.room} 日付一覧`} onClose={() => setSelectedMatrixCell(null)}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 18 }}>
+            <thead><tr style={{ borderBottom: "2px solid #e2e8f0" }}><th style={{ padding: "12px 10px", textAlign: "left" }}>日付</th><th style={{ padding: "12px 10px", textAlign: "left" }}>担当</th></tr></thead>
+            <tbody>
+              {Object.entries(allDays)
+                .filter(([dateStr]) => dateStr >= assignmentCycleInfo.startId && dateStr < assignmentCycleInfo.endExclusiveId)
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([dateStr, cells]) => {
+                  const members = split(cells[selectedMatrixCell.room] || "");
+                  const hit = members.find(m => extractStaffName(m) === selectedMatrixCell.staff);
+                  if (!hit) return null;
+                  const dObj = new Date(dateStr); const YOUBI = ["日", "月", "火", "水", "木", "金", "土"];
+                  const label = `${dObj.getMonth() + 1}/${dObj.getDate()}(${YOUBI[dObj.getDay()]})`;
+                  const timeStr = hit.substring(selectedMatrixCell.staff.length) || "終日";
+                  return (
+                    <tr key={dateStr} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "12px 10px", fontWeight: 600 }}>{label}</td>
+                      <td style={{ padding: "12px 10px", color: "#0f766e", fontWeight: 700 }}>{selectedMatrixCell.room}{timeStr === "終日" ? "" : timeStr}</td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </Modal>
