@@ -843,6 +843,8 @@ export default function App(): any {
   const [importText, setImportText] = useState(""); 
   const [nationalHolidays, setNationalHolidays] = useState<Record<string, string>>(FALLBACK_HOLIDAYS);
   const [highlightedStaff, setHighlightedStaff] = useState<string | null>(null); 
+  const [weeklySwapMode, setWeeklySwapMode] = useState(false);
+  const [weeklySwapPending, setWeeklySwapPending] = useState<{ dayId: string; section: string; member: string; index: number; coreName: string } | null>(null);
   const [hoveredStaff, setHoveredStaff] = useState<string | null>(null);
 
   useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
@@ -1191,6 +1193,52 @@ export default function App(): any {
   const handleClearWorkDay = () => { if (window.confirm(`${cur.label} の「モダリティ・一般撮影」をクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections]; setAllDaysWithHistory((prev: any) => { const nextCells = { ...(prev[cur.id] || cur.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); return { ...prev, [cur.id]: nextCells }; }); } };
   const handleClearWorkWeek = () => { if (window.confirm(`表示中の「モダリティ・一般撮影」を1週間分すべてクリアしますか？`)) { const workSections = [...RENDER_GROUPS[1].sections, ...RENDER_GROUPS[2].sections]; setAllDaysWithHistory((prev: any) => { const nextState = { ...prev }; days.forEach(d => { const nextCells = { ...(prev[d.id] || d.cells) }; workSections.forEach(sec => { nextCells[sec] = ""; }); nextState[d.id] = nextCells; }); return nextState; }); } };
   const handleCopyYesterday = () => { const idx = days.findIndex(d => d.id === cur.id); if (idx <= 0) return; const prevDay = days[idx - 1]; setAllDaysWithHistory((prev: any) => ({ ...prev, [cur.id]: { ...prevDay.cells } })); };
+  const handleWeeklyChipClick = (dayId: string, section: string, member: string, index: number, coreName: string) => {
+    if (!weeklySwapMode) {
+      setHighlightedStaff(prev => prev === coreName ? null : coreName);
+      return;
+    }
+    if (!weeklySwapPending) {
+      setWeeklySwapPending({ dayId, section, member, index, coreName });
+      return;
+    }
+    if (weeklySwapPending.dayId !== dayId) {
+      setWeeklySwapPending({ dayId, section, member, index, coreName });
+      return;
+    }
+    if (weeklySwapPending.section === section && weeklySwapPending.index === index && weeklySwapPending.member === member) {
+      setWeeklySwapPending(null);
+      return;
+    }
+    setAllDaysWithHistory((prev: any) => {
+      const dayCells = { ...(prev[dayId] || {}) };
+      const fromMembers = split(dayCells[weeklySwapPending.section] || '');
+      const toMembers = split(dayCells[section] || '');
+      const fromIdx = weeklySwapPending.index < fromMembers.length && fromMembers[weeklySwapPending.index] === weeklySwapPending.member
+        ? weeklySwapPending.index
+        : fromMembers.findIndex((x: string) => x === weeklySwapPending.member);
+      const toIdx = index < toMembers.length && toMembers[index] === member
+        ? index
+        : toMembers.findIndex((x: string) => x === member);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      if (weeklySwapPending.section === section) {
+        const nextMembers = [...fromMembers];
+        [nextMembers[fromIdx], nextMembers[toIdx]] = [nextMembers[toIdx], nextMembers[fromIdx]];
+        dayCells[section] = join(nextMembers);
+      } else {
+        const nextFrom = [...fromMembers];
+        const nextTo = [...toMembers];
+        const fromMember = nextFrom[fromIdx];
+        const toMember = nextTo[toIdx];
+        nextFrom[fromIdx] = toMember;
+        nextTo[toIdx] = fromMember;
+        dayCells[weeklySwapPending.section] = join(nextFrom);
+        dayCells[section] = join(nextTo);
+      }
+      return { ...prev, [dayId]: dayCells };
+    });
+    setWeeklySwapPending(null);
+  };
 
   const handleExport = () => { const dataObj = { allDays, monthlyAssign, customRules: sanitizeRulesInput(customRules) }; const blob = new Blob([JSON.stringify(dataObj)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `shifto_backup_${targetMonday}.json`; a.click(); URL.revokeObjectURL(url); };
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (event: any) => { try { const dataObj = JSON.parse(event.target.result); if (dataObj.allDays && dataObj.monthlyAssign && dataObj.customRules) { setAllDaysWithHistory(dataObj.allDays); setMonthlyAssign(dataObj.monthlyAssign); setCustomRules(sanitizeRulesInput(dataObj.customRules)); alert("データを復元しました！"); } else { alert("正しいデータ形式ではありません。"); } } catch (err) { alert("読み込みに失敗しました。"); } }; reader.readAsText(file); e.target.value = ""; };
@@ -1240,6 +1288,7 @@ export default function App(): any {
           <WeekCalendarPicker targetMonday={targetMonday} onChange={setTargetMonday} nationalHolidays={nationalHolidays} customHolidays={customHolidays} />
           <button className="btn-hover" onClick={() => setTargetMonday((prev:any) => { const d=new Date(prev); d.setDate(d.getDate()+7); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })} style={btnStyle("#f1f5f9", "#475569")}>来週 ▶</button>
           {activeTab === 'calendar' && <button className="btn-hover" onClick={() => window.print()} style={btnStyle("#2563eb", "#fff")}>🖨️ 週間配置を印刷</button>}
+          {activeTab === 'calendar' && <button className="btn-hover" onClick={() => { setWeeklySwapMode(prev => { const next = !prev; if (!next) setWeeklySwapPending(null); return next; }); setHighlightedStaff(null); }} style={btnStyle(weeklySwapMode ? "#0f766e" : "#f8fafc", weeklySwapMode ? "#fff" : "#475569")}>↔ 交換モード{weeklySwapMode ? ' ON' : ''}</button>}
         </div>
       </div>
 
@@ -1251,6 +1300,7 @@ export default function App(): any {
 
       <div style={{ display: activeTab === 'calendar' ? 'block' : 'none' }}>
         <div className="print-area" style={{ ...panelStyle(), marginBottom: 32, padding: "16px" }}>
+          {weeklySwapMode && (<div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid #99f6e4", background: weeklySwapPending ? "#ecfeff" : "#f0fdfa", color: "#0f766e", fontWeight: 700, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}><span>↔ 交換モード中</span><span style={{ opacity: 0.82 }}>{weeklySwapPending ? `${weeklySwapPending.dayId} の ${weeklySwapPending.section} / ${weeklySwapPending.coreName} を選択中。次に同じ日の相手をクリックすると交換。` : "同じ日の名前を2つ選ぶと交換します。もう一度トグルを押すと終了します。"}</span>{weeklySwapPending && <button type="button" className="btn-hover" onClick={() => setWeeklySwapPending(null)} style={{ ...btnStyle("#ffffff", "#0f766e", 13), border: "1px solid #99f6e4", padding: "6px 10px" }}>選択解除</button>}</div>)}
           <div className="screen-weekly-table">
           <div className="scroll-container">
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
@@ -1303,6 +1353,7 @@ export default function App(): any {
                                 const targetStaff = highlightedStaff || hoveredStaff;
                                 const isHighlighted = targetStaff === coreName;
                                 const isDimmed = targetStaff !== null && targetStaff !== coreName;
+                                const isSwapSelected = weeklySwapMode && weeklySwapPending?.dayId === day.id && weeklySwapPending?.section === section && weeklySwapPending?.index === mIdx && weeklySwapPending?.member === m;
                                 
                                 const sameDayRooms = dailyStaffRooms[day.id]?.[coreName] || [];
                                 const roomCount = sameDayRooms.length;
@@ -1339,9 +1390,11 @@ export default function App(): any {
                                   alignSelf: "flex-start"
                                 };
                                 
-                                if (isHighlighted) {
+                                if (isSwapSelected) {
+                                  inlineStyle.background = "#0f766e"; inlineStyle.color = "#fff"; inlineStyle.borderColor = "#0f766e"; inlineStyle.boxShadow = "0 0 0 2px rgba(15,118,110,0.18), 0 6px 16px rgba(15,118,110,0.24)"; inlineStyle.transform = "scale(1.04)"; inlineStyle.zIndex = 12; inlineStyle.position = "relative";
+                                } else if (isHighlighted) {
                                   inlineStyle.background = "#2563eb"; inlineStyle.color = "#fff"; inlineStyle.borderColor = "#1d4ed8"; inlineStyle.boxShadow = "0 4px 12px rgba(37,99,235,0.4)"; inlineStyle.transform = "scale(1.05)"; inlineStyle.zIndex = 10; inlineStyle.position = "relative";
-                                } else if (isDimmed) {
+                                } else if (isDimmed && !weeklySwapMode) {
                                   inlineStyle.opacity = 0.25; inlineStyle.filter = "grayscale(1)";
                                 }
 
@@ -1352,7 +1405,7 @@ export default function App(): any {
                                 return (
                                   <div key={mIdx} className="btn-hover" data-print-chip="1" 
                                     title={titleText}
-                                    onClick={(e) => { e.stopPropagation(); setHighlightedStaff(prev => prev === coreName ? null : coreName); }}
+                                    onClick={(e) => { e.stopPropagation(); handleWeeklyChipClick(day.id, section, m, mIdx, coreName); }}
                                     onMouseEnter={() => setHoveredStaff(coreName)}
                                     onMouseLeave={() => setHoveredStaff(null)}
                                     style={inlineStyle}
