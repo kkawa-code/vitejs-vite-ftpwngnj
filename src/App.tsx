@@ -964,6 +964,25 @@ export default function App(): any {
     if (from) return from;
     return tag.replace(/[()]/g, "").replace(/〜$/, "");
   };
+  const minuteToShortageLabel = (minute: number) => `${Math.floor(minute / 60)}:${pad(minute % 60)}`;
+  const getRoomFirstShortageMinute = (dayId: string, cells: Record<string, string>, room: string) => {
+    const members = split(cells[room] || '').filter(m => !m.startsWith(`${room}枠`));
+    if (members.length === 0) return null;
+    const candidateMinutes = new Set<number>([11 * 60 + 30, 13 * 60]);
+    members.forEach(member => {
+      const range = getMemberCoverageRange(member);
+      if (range.start > 0) candidateMinutes.add(range.start);
+      if (range.end < 24 * 60) candidateMinutes.add(range.end);
+    });
+    const sortedMinutes = Array.from(candidateMinutes).sort((a, b) => a - b);
+    for (const minute of sortedMinutes) {
+      const requiredCount = getRoomRequiredCoverageAt(dayId, room, minute);
+      if (requiredCount <= 0) continue;
+      const coveringCount = roomCoverageCountAt(cells, room, minute);
+      if (coveringCount < requiredCount) return minute;
+    }
+    return null;
+  };
 
   const getDayWarnings = (dayId: string): WarningInfo[] => { 
     const w: WarningInfo[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {}; 
@@ -996,12 +1015,25 @@ export default function App(): any {
         w.push({ level: 'orange', title: '補充不足', staff, room, fromTime: formatShortageFromTime(fromTime), msg: `${room}は${fromTime.replace(/[()]/g, '')}以降 ${coveringCount}/${requiredCount}名で不足しています` });
       }
     });
-    const hasPortableHelpShortage = w.some(x => x.room === 'ポータブル' && x.title === '補充不足');
-    const portableRequired = getRoomRequiredCoverageAt(dayId, 'ポータブル', 11 * 60 + 30);
-    const portableCoverage = roomCoverageCountAt(cells, 'ポータブル', 11 * 60 + 30);
-    if (!hasPortableHelpShortage && split(cells["ポータブル"] || "").length > 0 && portableRequired > 0 && portableCoverage < portableRequired) {
-      w.push({ level: 'orange', title: '午後不足', room: 'ポータブル', fromTime: '11:30', msg: portableCoverage === 0 ? 'ポータブルは11:30以降の担当者がいません' : `ポータブルは11:30以降 ${portableCoverage}/${portableRequired}名で不足しています` });
-    }
+    targetEmptyRooms.forEach(room => {
+      const hasRoomShortage = w.some(x => x.room === room && (x.title === '補充不足' || x.title === '午後不足'));
+      if (hasRoomShortage) return;
+      if (split(cells[room] || '').length === 0) return;
+      const shortageMinute = getRoomFirstShortageMinute(dayId, cells, room);
+      if (shortageMinute == null) return;
+      const requiredCount = getRoomRequiredCoverageAt(dayId, room, shortageMinute);
+      const coveringCount = roomCoverageCountAt(cells, room, shortageMinute);
+      const shortageLabel = minuteToShortageLabel(shortageMinute);
+      w.push({
+        level: 'orange',
+        title: '午後不足',
+        room,
+        fromTime: shortageLabel,
+        msg: coveringCount === 0
+          ? `${room}は${shortageLabel}以降の担当者がいません`
+          : `${room}は${shortageLabel}以降 ${coveringCount}/${requiredCount}名で不足しています`
+      });
+    });
     const uTarget = customRules.capacity?.受付 ?? 2; 
     if (split(cells["受付"]).reduce((sum: number, m: string) => sum + getStaffAmount(m), 0) < uTarget && split(cells["受付ヘルプ"]).length === 0) { w.push({ level: 'yellow', title: '受付不足', room: '受付', msg: `受付が${uTarget}名未満ですが、受付ヘルプがいません` }); } 
     const curIdx = days.findIndex(d => d.id === dayId); 
