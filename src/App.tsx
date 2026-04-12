@@ -910,8 +910,31 @@ export default function App(): any {
     if (from) return { start: hhmmToMinutes(from), end: 24 * 60 };
     return { start: 0, end: 24 * 60 };
   };
-  const roomHasCoverageAfter = (cells: Record<string, string>, room: string, minute: number) => {
-    return split(cells[room] || "").some(m => getMemberCoverageRange(m).end > minute);
+  const roomCoverageCountAt = (cells: Record<string, string>, room: string, minute: number) => {
+    return split(cells[room] || "").filter(m => {
+      if (m.startsWith(`${room}枠`)) return false;
+      const range = getMemberCoverageRange(m);
+      return range.start <= minute && range.end > minute;
+    }).length;
+  };
+  const getRoomRequiredCoverageAt = (dayId: string, room: string, minute: number) => {
+    const base = customRules.capacity?.[room] ?? 1;
+    const day = days.find(d => d.id === dayId);
+    const dayChar = day?.label.match(/\((.*?)\)/)?.[1];
+    if (!dayChar) return base;
+    const closed = (customRules.closedRooms || []).filter((r: any) => r.room === room && r.day === dayChar);
+    let amClosed = false;
+    let pmClosed = false;
+    let allClosed = false;
+    closed.forEach((r: any) => {
+      if (r.time === "全日") allClosed = true;
+      else if (r.time === "(AM)") amClosed = true;
+      else if (r.time === "(PM)") pmClosed = true;
+    });
+    if (allClosed) return 0;
+    if (minute >= 12 * 60 && pmClosed) return 0;
+    if (minute < 12 * 60 && amClosed) return 0;
+    return base;
   };
   const requestedStartMinute = (tag: string) => {
     if (!tag) return 0;
@@ -930,9 +953,6 @@ export default function App(): any {
     Object.entries(staffMap).forEach(([staff, rms]) => { const limit = customRules.alertMaxKenmu || 3; const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:"); }).length; if(dayCount > limit) w.push({ level: 'orange', title: '兼務超過', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); }); 
     const targetEmptyRooms = split(customRules.alertEmptyRooms || "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"); 
     targetEmptyRooms.forEach(room => { if (split(cells[room]).length === 0) w.push({ level: 'yellow', title: '空室', room, msg: `「${room}」の担当者がいません` }); }); 
-    if (split(cells["ポータブル"] || "").length > 0 && !roomHasCoverageAfter(cells, "ポータブル", 11 * 60 + 30)) {
-      w.push({ level: 'orange', title: '午後不足', room: 'ポータブル', msg: 'ポータブルは11:30以降の担当者がいません' });
-    }
     const helpMap = parseLooseJsonMap(cells["__absenceHelp"]);
     const helpRoomMap = parseLooseJsonMap(cells["__absenceHelpRooms"]);
     Object.entries(helpMap).forEach(([staff, fromTime]) => {
@@ -946,14 +966,22 @@ export default function App(): any {
       const placeholder = `${room}枠${fromTime}`;
       const members = split(cells[room] || "");
       const hasPlaceholder = members.includes(placeholder);
-      const coveringMembers = members.filter(m => !m.startsWith(`${room}枠`) && getMemberCoverageRange(m).end > minute);
-      const otherCoveringMembers = coveringMembers.filter(m => extractStaffName(m) !== staff);
+      const requiredCount = getRoomRequiredCoverageAt(dayId, room, minute);
+      const coveringCount = roomCoverageCountAt(cells, room, minute);
       if (hasPlaceholder) {
         w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}の${fromTime.replace(/[()]/g, '')}補充が埋まっていません` });
-      } else if (otherCoveringMembers.length === 0) {
+      } else if (requiredCount > 0 && coveringCount === 0) {
         w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}は${fromTime.replace(/[()]/g, '')}以降の担当者がいません` });
+      } else if (requiredCount > 0 && coveringCount < requiredCount) {
+        w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}は${fromTime.replace(/[()]/g, '')}以降 ${coveringCount}/${requiredCount}名で不足しています` });
       }
     });
+    const hasPortableHelpShortage = w.some(x => x.room === 'ポータブル' && x.title === '補充不足');
+    const portableRequired = getRoomRequiredCoverageAt(dayId, 'ポータブル', 11 * 60 + 30);
+    const portableCoverage = roomCoverageCountAt(cells, 'ポータブル', 11 * 60 + 30);
+    if (!hasPortableHelpShortage && split(cells["ポータブル"] || "").length > 0 && portableRequired > 0 && portableCoverage < portableRequired) {
+      w.push({ level: 'orange', title: '午後不足', room: 'ポータブル', msg: portableCoverage === 0 ? 'ポータブルは11:30以降の担当者がいません' : `ポータブルは11:30以降 ${portableCoverage}/${portableRequired}名で不足しています` });
+    }
     const uTarget = customRules.capacity?.受付 ?? 2; 
     if (split(cells["受付"]).reduce((sum: number, m: string) => sum + getStaffAmount(m), 0) < uTarget && split(cells["受付ヘルプ"]).length === 0) { w.push({ level: 'yellow', title: '受付不足', room: '受付', msg: `受付が${uTarget}名未満ですが、受付ヘルプがいません` }); } 
     const curIdx = days.findIndex(d => d.id === dayId); 
@@ -1188,7 +1216,7 @@ export default function App(): any {
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0", borderBottom: `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`}}>{section}</td>
                     {days.map((day, dIdx) => {
-                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const hasPmGap = section === 'ポータブル' && warnings.some(w => w.room === section && w.title === '午後不足'); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(180deg, #e8ebf0 0%, #dde2e8 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b2bac4"; } else if (hasPmGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(to right, rgba(255,255,255,1) 0 56%, #dde2e8 56% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b8c0c9"; } baseBgStyle.borderBottom = `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`;
+                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const hasPmGap = section === 'ポータブル' && warnings.some(w => w.room === section && (w.title === '午後不足' || (w.title === '補充不足' && w.msg.includes('11:30以降')))); let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(180deg, #e8ebf0 0%, #dde2e8 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b2bac4"; } else if (hasPmGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(to right, rgba(255,255,255,1) 0 56%, #dde2e8 56% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b8c0c9"; } baseBgStyle.borderBottom = `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`;
                       
                       return (
                         <td key={day.id + section} style={baseBgStyle}>
