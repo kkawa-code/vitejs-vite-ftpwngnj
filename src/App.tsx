@@ -11,9 +11,9 @@ const globalStyle = `
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
   details>summary:hover { color: #0d9488; }
-  .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; }
-  .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; box-shadow: 0 2px 4px -1px rgba(0,0,0,0.05); }
-  .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); padding-top: 16px; margin-top: -16px; box-shadow: 0 4px 6px -4px rgba(0,0,0,0.1); }
+  .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; }
+  .sticky-table-header th { position: sticky; top: 0; z-index: 20; background: #f8fafc; border-bottom: 1px solid #cbd5e1; box-shadow: 0 2px 5px -2px rgba(15,23,42,0.16); }
+  .sticky-header-panel { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(4px); padding-top: 16px; margin-top: -16px; box-shadow: 0 4px 8px -6px rgba(15,23,42,0.18); border-bottom: 1px solid rgba(203,213,225,0.9); }
   .calendar-row { transition: background-color 0.2s; cursor: pointer; }
   .calendar-row:hover { background-color: #f1f5f9 !important; }
   .btn-hover { transition: all 0.2s; cursor: pointer; }
@@ -27,8 +27,8 @@ const globalStyle = `
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
   .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 10px 16px; font-size: 16px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: 0.2s; }
   .rule-add:hover { background: #e0e7ff; border-color: #4f46e5; }
-  .rule-label { font-size: 15px; font-weight: 700; color: #64748b; flex-shrink: 0; }
-  .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 17px; font-weight: 800; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
+  .rule-label { font-size: 15px; font-weight: 700; color: #475569; flex-shrink: 0; }
+  .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 17px; font-weight: 800; color: #475569; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
   .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; line-height: 1.5; }
@@ -350,8 +350,8 @@ export function isAllDayAbsenceEntry(entry: string) {
 
 // ===================== 🌟 UI Components =====================
 export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
-export const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px", boxShadow: "0 2px 8px -2px rgba(0,0,0,0.03)", width: "100%", boxSizing: "border-box" });
-export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#f8fafc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e0f2fe" : "#f0f9ff"); return { border: "1px solid #e2e8f0", padding: "10px 12px", background: bg, fontWeight: isHeader ? 800 : 700, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 16 : 15, color: isHoliday && isHeader ? "#ef4444" : "inherit", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
+export const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "20px", boxShadow: "0 4px 14px -10px rgba(15,23,42,0.16)", width: "100%", boxSizing: "border-box" });
+export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 800 : 700, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 16 : 15, color: isHoliday && isHeader ? "#dc2626" : "#1e293b", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
 
 export const Modal = ({ title, onClose, wide, children }: any) => ( <div className="modal-overlay" onClick={onClose}><div className={`modal-content modal-animate ${wide ? 'modal-wide' : ''}`} onClick={e => e.stopPropagation()}><div className="modal-header"><h3 className="modal-title">{title}</h3><button onClick={onClose} className="close-btn">✖</button></div>{children}<div style={{ textAlign: "center", marginTop: 32 }}><button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "16px" }}>閉じる</button></div></div></div> );
 export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any) => ( <div style={{ background: bg, padding: 24, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}><h5 style={{ margin: "0 0 12px 0", color, fontSize: 18, fontWeight: 800 }}>{icon} {title}</h5>{desc && <p style={{ fontSize: 15, color: "#166534", marginTop: 0, marginBottom: 16 }}>{desc}</p>}{children}</div> );
@@ -478,7 +478,7 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
             {FUZAI_TIMES.map(t => <option key={t} value={t}>{FUZAI_LABELS[t]}</option>)}
           </select>
         )}
-        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 15, color: "#64748b", flex: 1, minWidth: 100, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "8px 24px 8px 12px" }}>
+        <select onChange={(e: any) => handleAdd(e.target.value)} value="" style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", outline: "none", fontSize: 15, color: "#475569", flex: 1, minWidth: 100, cursor: "pointer", fontWeight: 600, borderRadius: 8, padding: "8px 24px 8px 12px" }}>
           <option value="">＋{isFuzai ? "不在者を選択" : isHelp ? "ヘルプを追加" : "追加"}</option>
           <optgroup label="スタッフ">{activeStaff.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>
           {customOptions.length > 0 && <optgroup label="担当枠（未定）">{customOptions.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</optgroup>}
@@ -1029,23 +1029,23 @@ export default function App(): any {
     }));
   }, [monthlyAssign]);
   const monthlyAssignmentCardStyles: Record<string, { accent: string; tint: string; border: string; text: string; chipBg: string; chipBorder: string; }> = {
-    CT: { accent: "#2563eb", tint: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8", chipBg: "#dbeafe", chipBorder: "#93c5fd" },
-    MRI: { accent: "#4f46e5", tint: "#eef2ff", border: "#c7d2fe", text: "#4338ca", chipBg: "#e0e7ff", chipBorder: "#a5b4fc" },
-    治療: { accent: "#db2777", tint: "#fdf2f8", border: "#f9a8d4", text: "#be185d", chipBg: "#fce7f3", chipBorder: "#f9a8d4" },
-    治療サブ優先: { accent: "#ea580c", tint: "#fff7ed", border: "#fdba74", text: "#c2410c", chipBg: "#ffedd5", chipBorder: "#fdba74" },
-    治療サブ: { accent: "#f59e0b", tint: "#fffbeb", border: "#fcd34d", text: "#b45309", chipBg: "#fef3c7", chipBorder: "#fcd34d" },
-    RI: { accent: "#059669", tint: "#ecfdf5", border: "#86efac", text: "#047857", chipBg: "#dcfce7", chipBorder: "#86efac" },
-    RIサブ: { accent: "#10b981", tint: "#f0fdf4", border: "#86efac", text: "#15803d", chipBg: "#dcfce7", chipBorder: "#86efac" },
-    MMG: { accent: "#ec4899", tint: "#fdf2f8", border: "#f9a8d4", text: "#be185d", chipBg: "#fce7f3", chipBorder: "#f9a8d4" },
-    受付: { accent: "#d97706", tint: "#fffbeb", border: "#fcd34d", text: "#b45309", chipBg: "#fef3c7", chipBorder: "#fcd34d" },
-    受付ヘルプ: { accent: "#7c3aed", tint: "#faf5ff", border: "#d8b4fe", text: "#6d28d9", chipBg: "#f3e8ff", chipBorder: "#d8b4fe" },
+    CT: { accent: "#2563eb", tint: "#f8fbff", border: "#cbdaf7", text: "#1d4ed8", chipBg: "#ffffff", chipBorder: "#cbdaf7" },
+    MRI: { accent: "#4f46e5", tint: "#fafbff", border: "#d4d8f6", text: "#4338ca", chipBg: "#ffffff", chipBorder: "#d4d8f6" },
+    治療: { accent: "#db2777", tint: "#fffafb", border: "#f2d3df", text: "#be185d", chipBg: "#ffffff", chipBorder: "#f2d3df" },
+    治療サブ優先: { accent: "#ea580c", tint: "#fffaf6", border: "#f2d4bf", text: "#c2410c", chipBg: "#ffffff", chipBorder: "#f2d4bf" },
+    治療サブ: { accent: "#d97706", tint: "#fffdf8", border: "#ead9b5", text: "#b45309", chipBg: "#ffffff", chipBorder: "#ead9b5" },
+    RI: { accent: "#059669", tint: "#f7fcfa", border: "#c9e9dc", text: "#047857", chipBg: "#ffffff", chipBorder: "#c9e9dc" },
+    RIサブ: { accent: "#10b981", tint: "#f8fcfa", border: "#cfe8dc", text: "#15803d", chipBg: "#ffffff", chipBorder: "#cfe8dc" },
+    MMG: { accent: "#ec4899", tint: "#fffafb", border: "#f1d2df", text: "#be185d", chipBg: "#ffffff", chipBorder: "#f1d2df" },
+    受付: { accent: "#b45309", tint: "#fffdf8", border: "#ead9b5", text: "#92400e", chipBg: "#ffffff", chipBorder: "#ead9b5" },
+    受付ヘルプ: { accent: "#7c3aed", tint: "#fbfaff", border: "#ddd4f7", text: "#6d28d9", chipBg: "#ffffff", chipBorder: "#ddd4f7" },
   };
   const monthlyStatsGroupStyles: Record<string, { accent: string; bg: string; border: string; text: string }> = {
-    CT: { accent: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" },
-    MRI: { accent: "#4f46e5", bg: "#eef2ff", border: "#c7d2fe", text: "#4338ca" },
-    治療メイン: { accent: "#db2777", bg: "#fdf2f8", border: "#f9a8d4", text: "#be185d" },
-    RI: { accent: "#059669", bg: "#ecfdf5", border: "#86efac", text: "#047857" },
-    その他: { accent: "#64748b", bg: "#f8fafc", border: "#cbd5e1", text: "#475569" },
+    CT: { accent: "#2563eb", bg: "#f8fbff", border: "#cbdaf7", text: "#1d4ed8" },
+    MRI: { accent: "#4f46e5", bg: "#fafbff", border: "#d4d8f6", text: "#4338ca" },
+    治療メイン: { accent: "#db2777", bg: "#fffafb", border: "#f2d3df", text: "#be185d" },
+    RI: { accent: "#059669", bg: "#f7fcfa", border: "#c9e9dc", text: "#047857" },
+    その他: { accent: "#64748b", bg: "#fbfcfd", border: "#cbd5e1", text: "#334155" },
   };
   const getMonthlyRoleTags = (staff: string) => {
     const tags: string[] = [];
@@ -1247,8 +1247,8 @@ export default function App(): any {
                         <td key={day.id + section} style={baseBgStyle}>
                           {!day.isPublicHoliday && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4", alignItems: "flex-start" }}>
-                              {currentMems.length === 0 && isRoomEmpty && <div aria-hidden style={{ width: "100%", minHeight: 28, borderRadius: 10, border: "1px dashed #8f98a3", background: "linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.10) 100%)", position: "relative" }}><span style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 26, height: 4, borderRadius: 999, background: "#8f98a3", opacity: 0.78 }} /></div>}
-                              {hasPartialGap && currentMems.length > 0 && <div style={{ padding: "4px 9px", borderRadius: 999, background: "#eef1f4", border: "1px solid #aeb7c2", color: "#374151", fontSize: 12, fontWeight: 900, lineHeight: 1, letterSpacing: "0.01em" }}>{shortageFrom ? `${shortageFrom}〜不足` : '途中不足'}</div>}
+                              {currentMems.length === 0 && isRoomEmpty && <div aria-hidden style={{ width: "100%", minHeight: 28, borderRadius: 10, border: "1px dashed #7b8794", background: "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.14) 100%)", position: "relative" }}><span style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 26, height: 4, borderRadius: 999, background: "#64748b", opacity: 0.86 }} /></div>}
+                              {hasPartialGap && currentMems.length > 0 && <div style={{ padding: "4px 9px", borderRadius: 999, background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", fontSize: 12, fontWeight: 900, lineHeight: 1, letterSpacing: "0.01em" }}>{shortageFrom ? `${shortageFrom}〜不足` : '途中不足'}</div>}
                               {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
                                 
@@ -1457,23 +1457,23 @@ export default function App(): any {
       </div>
 
       <div className="no-print" style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
-        <div style={{ ...panelStyle(), marginBottom: 24, background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)", border: "1px solid #dbeafe", boxShadow: "0 10px 24px -18px rgba(37,99,235,0.35)" }}>
-          <h3 style={{ fontWeight: 900, color: "#2563eb", fontSize: 21, marginTop: 0, marginBottom: 8, letterSpacing: "0.01em" }}>月担当一覧・配置マトリックス</h3>
+        <div style={{ ...panelStyle(), marginBottom: 24, background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #cbd5e1", boxShadow: "0 12px 24px -20px rgba(15,23,42,0.22)" }}>
+          <h3 style={{ fontWeight: 900, color: "#0f172a", fontSize: 21, marginTop: 0, marginBottom: 8, letterSpacing: "0.01em" }}>月担当一覧・配置マトリックス</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "stretch", marginBottom: 18 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%)", border: "1px solid #bfdbfe", borderRadius: 14, padding: "12px 14px", minWidth: 240 }}>
-              <span style={{ fontSize: 12, fontWeight: 900, color: "#1d4ed8", letterSpacing: "0.08em" }}>ASSIGNMENT CYCLE</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: "12px 14px", minWidth: 240 }}>
+              <span style={{ fontSize: 12, fontWeight: 900, color: "#334155", letterSpacing: "0.08em" }}>ASSIGNMENT CYCLE</span>
               <span style={{ fontSize: 17, fontWeight: 900, color: "#0f172a" }}>{assignmentCycleInfo.monthLabel}担当分</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>集計範囲: {assignmentCycleInfo.rangeLabel}</span>
             </div>
-            <div style={{ display: "flex", flex: 1, minWidth: 220, alignItems: "center", background: "#ffffff", border: "1px solid #dbeafe", borderRadius: 14, padding: "12px 16px", color: "#475569", fontSize: 14, fontWeight: 700, lineHeight: 1.6 }}>
+            <div style={{ display: "flex", flex: 1, minWidth: 220, alignItems: "center", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 14, padding: "12px 16px", color: "#475569", fontSize: 14, fontWeight: 700, lineHeight: 1.6 }}>
               まず月担当を上で確認し、その下で偏りや遅番回数を確認できる並びにしています。
             </div>
           </div>
-          <div style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #dbeafe", borderRadius: 16, padding: 18, marginBottom: 18 }}>
+          <div style={{ background: "linear-gradient(180deg, #ffffff 0%, #fafbfc 100%)", border: "1px solid #cbd5e1", borderRadius: 16, padding: 18, marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#1d4ed8" }}>今サイクルの月担当</div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 999, padding: "6px 10px" }}>
-                役割ごとに色を少し分けて表示
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>今サイクルの月担当</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#475569", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 999, padding: "6px 10px" }}>
+                役割色は控えめに表示
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
@@ -1532,7 +1532,7 @@ export default function App(): any {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
             <div style={{ fontSize: 17, fontWeight: 900, color: "#1e293b" }}>詳細件数</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>CT・MRI は月担当の偏りが見やすいよう色を少し強めています</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>CT・MRI は偏り確認のため少しだけ強めに表示しています</div>
           </div>
           <div style={{ marginTop: 16, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 14, background: "#ffffff", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)" }}>
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "15px", textAlign: "center", tableLayout: "auto" }}>
@@ -1970,13 +1970,13 @@ export default function App(): any {
         <Modal title={`👀 ${selectedErrorDay} の確認事項`} onClose={() => setSelectedErrorDay(null)}>
           <ul style={{ listStyle: "none", padding: 0 }}>
             {getDayWarnings(selectedErrorDay).map((w, i) => {
-              let badgeColor = "#475569"; let badgeBg = "#f8fafc"; let icon = "⚠️"; let borderColor = "#cbd5e1"; let cardBg = "#f8fafc"; let accentColor = "#94a3b8";
-              if (w.level === 'red') { badgeColor = "#b91c1c"; badgeBg = "#fee2e2"; icon = "🔴"; borderColor = "#fecaca"; cardBg = "#fff7f7"; accentColor = "#ef4444"; }
-              else if (w.level === 'orange') { badgeColor = "#c2410c"; badgeBg = "#ffedd5"; icon = "🟠"; borderColor = "#fed7aa"; cardBg = "#fff8f1"; accentColor = "#fb923c"; }
-              else if (w.level === 'yellow') { badgeColor = "#a16207"; badgeBg = "#fef3c7"; icon = "🟡"; borderColor = "#fcd34d"; cardBg = "#fffdf3"; accentColor = "#fbbf24"; }
+              let badgeColor = "#475569"; let badgeBg = "#ffffff"; let icon = "⚠️"; let borderColor = "#cbd5e1"; let cardBg = "#ffffff"; let accentColor = "#94a3b8";
+              if (w.level === 'red') { badgeColor = "#991b1b"; badgeBg = "#fff5f5"; icon = "🔴"; borderColor = "#fca5a5"; cardBg = "#fffdfd"; accentColor = "#dc2626"; }
+              else if (w.level === 'orange') { badgeColor = "#9a3412"; badgeBg = "#fff7ed"; icon = "🟠"; borderColor = "#fdba74"; cardBg = "#fffdfa"; accentColor = "#ea580c"; }
+              else if (w.level === 'yellow') { badgeColor = "#854d0e"; badgeBg = "#fffbea"; icon = "🟡"; borderColor = "#facc15"; cardBg = "#fffefd"; accentColor = "#ca8a04"; }
               
               return (
-                <li key={i} style={{ display: "flex", gap: "12px", padding: "16px 20px", marginBottom: "12px", background: cardBg, border: `1px solid ${borderColor}`, borderLeft: `6px solid ${accentColor}`, borderRadius: "12px", fontSize: 16, fontWeight: 700, color: "#334155", lineHeight: 1.6, alignItems: "center", boxShadow: "0 6px 14px -14px rgba(15,23,42,0.35)" }}>
+                <li key={i} style={{ display: "flex", gap: "12px", padding: "16px 20px", marginBottom: "12px", background: cardBg, border: `1px solid ${borderColor}`, borderLeft: `6px solid ${accentColor}`, borderRadius: "12px", fontSize: 16, fontWeight: 700, color: "#1e293b", lineHeight: 1.6, alignItems: "center", boxShadow: "0 6px 16px -14px rgba(15,23,42,0.22)" }}>
                   <span style={{ display: "inline-block", background: badgeBg, color: badgeColor, padding: "5px 10px", borderRadius: "999px", fontSize: "14px", fontWeight: 800, whiteSpace: "nowrap", border: `1px solid ${borderColor}` }}>{icon} {w.title}</span>
                   <span>{w.msg}</span>
                 </li>
