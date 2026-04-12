@@ -172,13 +172,12 @@ export type RejectReason = { hard: boolean; msg: string };
 
 export interface CustomRules {
   staffList: string; receptionStaffList: string; femaleStaffList: string; supportStaffList: string; supportTargetRooms: string; 
-  supportTargetRoomsLowImpact: string; supportTargetRoomsHighImpact: string; customHolidays: string; capacity: Record<string, number>; 
-  dailyCapacities: any[]; dailyAdditions: any[]; priorityRooms: string[]; fullDayOnlyRooms: string; noConsecutiveRooms: string; 
-  consecutiveAlertRooms: string; noLateShiftStaff: string; noLateShiftRooms: string; lateShiftLowPriorityStaff: string;
+  customHolidays: string; capacity: Record<string, number>; dailyAdditions: any[]; priorityRooms: string[]; 
+  fullDayOnlyRooms: string; noConsecutiveRooms: string; noLateShiftStaff: string; noLateShiftRooms: string; lateShiftLowPriorityStaff: string;
   closedRooms: any[]; ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; 
   swapRules: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[]; lunchBaseCount: number; lunchSpecialDays: any[]; 
   lunchConditional: any[]; lunchRoleRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[];
-  alertMaxKenmu: number; alertEmptyRooms: string; smartKenmu: any[];
+  alertMaxKenmu: number; alertEmptyRooms: string;
 }
 export type AutoAssignContext = { allStaff: string[]; activeGeneralStaff: string[]; activeReceptionStaff: string[]; monthlyAssign: Record<string, string>; customRules: CustomRules; };
 
@@ -207,10 +206,10 @@ export const RENDER_GROUPS: RenderGroup[] = [
 export const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日" };
 
 export const DEFAULT_RULES: CustomRules = { 
-  staffList: "", receptionStaffList: "", femaleStaffList: "", supportStaffList: "浅野", supportTargetRooms: "2号室、3号室", supportTargetRoomsLowImpact: "3号室,パノラマCT", supportTargetRoomsHighImpact: "CT,MRI,治療,RI,ポータブル,2号室,1号室,5号室,透視（6号）,透視（11号）,骨塩,検像", customHolidays: "", 
+  staffList: "", receptionStaffList: "", femaleStaffList: "", supportStaffList: "浅野", supportTargetRooms: "2号室、3号室", customHolidays: "", 
   capacity: { "CT": 4, "MRI": 3, "治療": 3, "RI": 1, "MMG": 1, "透視（6号）": 1, "透視（11号）": 1, "骨塩": 1, "1号室": 1, "5号室": 1, "パノラマCT": 2 }, 
-  dailyCapacities: [], dailyAdditions: [], priorityRooms: ["治療","受付","MMG","RI","MRI","CT","透視（6号）","透視（11号）","骨塩","1号室","5号室","2号室","ポータブル","DSA","検像","パノラマCT","3号室","受付ヘルプ","透析後胸部"], 
-  fullDayOnlyRooms: "DSA、CT、MRI", noConsecutiveRooms: "ポータブル", consecutiveAlertRooms: "ポータブル, 透視（6号）", 
+  dailyAdditions: [], priorityRooms: ["治療","受付","MMG","RI","MRI","CT","透視（6号）","透視（11号）","骨塩","1号室","5号室","2号室","ポータブル","DSA","検像","パノラマCT","3号室","受付ヘルプ","透析後胸部"], 
+  fullDayOnlyRooms: "DSA、CT、MRI", noConsecutiveRooms: "ポータブル", 
   noLateShiftStaff: "浅野、木内康、髙橋、川崎、松平、阿部", noLateShiftRooms: "透視（11号）", lateShiftLowPriorityStaff: "木内康、石田、澤邊、依田", 
   closedRooms: [{day:"月",room:"3号室",time:"(PM)"},{day:"火",room:"3号室",time:"(PM)"},{day:"水",room:"3号室",time:"(PM)"},{day:"木",room:"3号室",time:"(PM)"},{day:"金",room:"3号室",time:"(PM)"}], 
   ngPairs: [{s1:"本郷",s2:"寺本",level:"hard"},{s1:"髙橋",s2:"寺本",level:"soft"}], 
@@ -254,14 +253,20 @@ export const DEFAULT_RULES: CustomRules = {
     { target: "DSA", sources: "5号室、CT(4)、2号室" },
     { target: "パノラマCT", sources: "透視（6号）、2号室" }
   ], 
-  alertMaxKenmu: 3, alertEmptyRooms: "CT、MRI、治療、RI、1号室、2号室、3号室、5号室、透視（6号）、透視（11号）、MMG、骨塩、パノラマCT、ポータブル、DSA、検像、受付", smartKenmu: [] 
+  alertMaxKenmu: 3, alertEmptyRooms: "CT、MRI、治療、RI、1号室、2号室、3号室、5号室、透視（6号）、透視（11号）、MMG、骨塩、パノラマCT、ポータブル、DSA、検像、受付" 
 };
 
 
 const sanitizeRulesInput = (raw: any): CustomRules => {
-  const next: any = { ...DEFAULT_RULES, ...(raw || {}) };
-  next.smartKenmu = [];
-  return next as CustomRules;
+  const {
+    smartKenmu: _smartKenmu,
+    consecutiveAlertRooms: _consecutiveAlertRooms,
+    dailyCapacities: _dailyCapacities,
+    supportTargetRoomsLowImpact: _supportTargetRoomsLowImpact,
+    supportTargetRoomsHighImpact: _supportTargetRoomsHighImpact,
+    ...rest
+  } = raw || {};
+  return { ...DEFAULT_RULES, ...rest } as CustomRules;
 };
 
 export const KEY_ALL_DAYS = "shifto_alldays_v300"; export const KEY_MONTHLY = "shifto_monthly_v300"; export const KEY_RULES = "shifto_rules_v300";
