@@ -167,7 +167,7 @@ const globalStyle = `
 // ===================== 🌟 Types & Constants =====================
 export type RenderGroup = { title: string; color: string; sections: string[] };
 export type DayData = { id: string; label: string; isPublicHoliday: boolean; holidayName: string; cells: Record<string, string>; logInfo?: string[] };
-export type WarningInfo = { level: 'red' | 'orange' | 'yellow'; title: string; msg: string; staff?: string; room?: string; };
+export type WarningInfo = { level: 'red' | 'orange' | 'yellow'; title: string; msg: string; staff?: string; room?: string; fromTime?: string; };
 export type RejectReason = { hard: boolean; msg: string };
 
 export interface CustomRules {
@@ -947,6 +947,14 @@ export default function App(): any {
     if (from) return hhmmToMinutes(from);
     return 0;
   };
+  const formatShortageFromTime = (tag: string) => {
+    if (!tag) return "";
+    if (tag === "(PM)") return "13:00";
+    if (tag === "(AM)") return "AM";
+    const from = tag.match(/\((\d+:\d+)〜\)/)?.[1];
+    if (from) return from;
+    return tag.replace(/[()]/g, "").replace(/〜$/, "");
+  };
 
   const getDayWarnings = (dayId: string): WarningInfo[] => { 
     const w: WarningInfo[] = []; const cells = allDays[dayId] || {}; const staffMap: Record<string, string[]> = {}; 
@@ -962,7 +970,7 @@ export default function App(): any {
       if (!fromTime || fromTime === "__NO_HELP__") return;
       const room = helpRoomMap[staff];
       if (!room) {
-        w.push({ level: 'orange', title: '補充不足', staff, msg: `${staff}さんの${fromTime.replace(/[()]/g, '')}以降の補充先が見つかっていません` });
+        w.push({ level: 'orange', title: '補充不足', staff, fromTime: formatShortageFromTime(fromTime), msg: `${staff}さんの${fromTime.replace(/[()]/g, '')}以降の補充先が見つかっていません` });
         return;
       }
       const minute = requestedStartMinute(fromTime);
@@ -972,18 +980,18 @@ export default function App(): any {
       const requiredCount = getRoomRequiredCoverageAt(dayId, room, minute);
       const coveringCount = roomCoverageCountAt(cells, room, minute);
       if (hasPlaceholder) {
-        w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}の${fromTime.replace(/[()]/g, '')}補充が埋まっていません` });
+        w.push({ level: 'orange', title: '補充不足', staff, room, fromTime: formatShortageFromTime(fromTime), msg: `${room}の${fromTime.replace(/[()]/g, '')}補充が埋まっていません` });
       } else if (requiredCount > 0 && coveringCount === 0) {
-        w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}は${fromTime.replace(/[()]/g, '')}以降の担当者がいません` });
+        w.push({ level: 'orange', title: '補充不足', staff, room, fromTime: formatShortageFromTime(fromTime), msg: `${room}は${fromTime.replace(/[()]/g, '')}以降の担当者がいません` });
       } else if (requiredCount > 0 && coveringCount < requiredCount) {
-        w.push({ level: 'orange', title: '補充不足', staff, room, msg: `${room}は${fromTime.replace(/[()]/g, '')}以降 ${coveringCount}/${requiredCount}名で不足しています` });
+        w.push({ level: 'orange', title: '補充不足', staff, room, fromTime: formatShortageFromTime(fromTime), msg: `${room}は${fromTime.replace(/[()]/g, '')}以降 ${coveringCount}/${requiredCount}名で不足しています` });
       }
     });
     const hasPortableHelpShortage = w.some(x => x.room === 'ポータブル' && x.title === '補充不足');
     const portableRequired = getRoomRequiredCoverageAt(dayId, 'ポータブル', 11 * 60 + 30);
     const portableCoverage = roomCoverageCountAt(cells, 'ポータブル', 11 * 60 + 30);
     if (!hasPortableHelpShortage && split(cells["ポータブル"] || "").length > 0 && portableRequired > 0 && portableCoverage < portableRequired) {
-      w.push({ level: 'orange', title: '午後不足', room: 'ポータブル', msg: portableCoverage === 0 ? 'ポータブルは11:30以降の担当者がいません' : `ポータブルは11:30以降 ${portableCoverage}/${portableRequired}名で不足しています` });
+      w.push({ level: 'orange', title: '午後不足', room: 'ポータブル', fromTime: '11:30', msg: portableCoverage === 0 ? 'ポータブルは11:30以降の担当者がいません' : `ポータブルは11:30以降 ${portableCoverage}/${portableRequired}名で不足しています` });
     }
     const uTarget = customRules.capacity?.受付 ?? 2; 
     if (split(cells["受付"]).reduce((sum: number, m: string) => sum + getStaffAmount(m), 0) < uTarget && split(cells["受付ヘルプ"]).length === 0) { w.push({ level: 'yellow', title: '受付不足', room: '受付', msg: `受付が${uTarget}名未満ですが、受付ヘルプがいません` }); } 
@@ -1220,7 +1228,7 @@ export default function App(): any {
                   <tr key={section}>
                     <td style={{...cellStyle(true, false, false, true, sIdx % 2 === 1), borderRight: "1px solid #e2e8f0", borderBottom: `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`}}>{section}</td>
                     {days.map((day, dIdx) => {
-                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const roomShortageWarning = warnings.find(w => w.room === section && (w.title === '午後不足' || w.title === '補充不足')); const shortageFrom = roomShortageWarning?.msg.match(/(\d{1,2}:\d{2})以降/)?.[1] || (roomShortageWarning?.title === '午後不足' ? 'PM' : ''); const hasPartialGap = !!roomShortageWarning && currentMems.length > 0; let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(180deg, #e8ebf0 0%, #dde2e8 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b2bac4"; } else if (hasPartialGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(90deg, rgba(255,255,255,1) 0 48%, #e4e8ee 48% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #aeb7c2"; } baseBgStyle.borderBottom = `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`;
+                      const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const roomShortageWarning = warnings.find(w => w.room === section && (w.title === '午後不足' || w.title === '補充不足')); const shortageFrom = roomShortageWarning?.fromTime || (roomShortageWarning?.title === '午後不足' ? 'PM' : ''); const hasPartialGap = !!roomShortageWarning && currentMems.length > 0; let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(180deg, #e8ebf0 0%, #dde2e8 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b2bac4"; } else if (hasPartialGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(90deg, rgba(255,255,255,1) 0 48%, #e4e8ee 48% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #aeb7c2"; } baseBgStyle.borderBottom = `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`;
                       
                       return (
                         <td key={day.id + section} style={baseBgStyle}>
