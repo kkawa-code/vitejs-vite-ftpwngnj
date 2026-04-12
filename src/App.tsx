@@ -965,6 +965,18 @@ export default function App(): any {
       staff: split(monthlyAssign[key] || "").map(extractStaffName),
     }));
   }, [monthlyAssign]);
+  const monthlyAssignmentCardStyles: Record<string, { accent: string; tint: string; border: string; text: string; chipBg: string; chipBorder: string; }> = {
+    CT: { accent: "#2563eb", tint: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8", chipBg: "#dbeafe", chipBorder: "#93c5fd" },
+    MRI: { accent: "#4f46e5", tint: "#eef2ff", border: "#c7d2fe", text: "#4338ca", chipBg: "#e0e7ff", chipBorder: "#a5b4fc" },
+    治療: { accent: "#db2777", tint: "#fdf2f8", border: "#f9a8d4", text: "#be185d", chipBg: "#fce7f3", chipBorder: "#f9a8d4" },
+    治療サブ優先: { accent: "#ea580c", tint: "#fff7ed", border: "#fdba74", text: "#c2410c", chipBg: "#ffedd5", chipBorder: "#fdba74" },
+    治療サブ: { accent: "#f59e0b", tint: "#fffbeb", border: "#fcd34d", text: "#b45309", chipBg: "#fef3c7", chipBorder: "#fcd34d" },
+    RI: { accent: "#059669", tint: "#ecfdf5", border: "#86efac", text: "#047857", chipBg: "#dcfce7", chipBorder: "#86efac" },
+    RIサブ: { accent: "#10b981", tint: "#f0fdf4", border: "#86efac", text: "#15803d", chipBg: "#dcfce7", chipBorder: "#86efac" },
+    MMG: { accent: "#ec4899", tint: "#fdf2f8", border: "#f9a8d4", text: "#be185d", chipBg: "#fce7f3", chipBorder: "#f9a8d4" },
+    受付: { accent: "#d97706", tint: "#fffbeb", border: "#fcd34d", text: "#b45309", chipBg: "#fef3c7", chipBorder: "#fcd34d" },
+    受付ヘルプ: { accent: "#7c3aed", tint: "#faf5ff", border: "#d8b4fe", text: "#6d28d9", chipBg: "#f3e8ff", chipBorder: "#d8b4fe" },
+  };
   
   const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); return next; }); };
   const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { const nextState = { ...prev, [sel]: { ...(prev[sel] || {}), [k]: v } }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
@@ -1352,28 +1364,84 @@ export default function App(): any {
       </div>
 
       <div className="no-print" style={{ display: activeTab === 'stats' ? 'block' : 'none' }}>
-        <div style={{ ...panelStyle(), marginBottom: 24 }}>
-          <h3 style={{ fontWeight: 900, color: "#3b82f6", fontSize: 21, marginTop: 0, marginBottom: 8 }}>月担当一覧・配置マトリックス</h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 14 }}>
-            <span style={{ fontSize: 15, fontWeight: 800, color: "#1e293b", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 999, padding: "6px 12px" }}>{assignmentCycleInfo.monthLabel}担当分</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#475569" }}>集計範囲: {assignmentCycleInfo.rangeLabel}</span>
+        <div style={{ ...panelStyle(), marginBottom: 24, background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)", border: "1px solid #dbeafe", boxShadow: "0 10px 24px -18px rgba(37,99,235,0.35)" }}>
+          <h3 style={{ fontWeight: 900, color: "#2563eb", fontSize: 21, marginTop: 0, marginBottom: 8, letterSpacing: "0.01em" }}>月担当一覧・配置マトリックス</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "stretch", marginBottom: 18 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%)", border: "1px solid #bfdbfe", borderRadius: 14, padding: "12px 14px", minWidth: 240 }}>
+              <span style={{ fontSize: 12, fontWeight: 900, color: "#1d4ed8", letterSpacing: "0.08em" }}>ASSIGNMENT CYCLE</span>
+              <span style={{ fontSize: 17, fontWeight: 900, color: "#0f172a" }}>{assignmentCycleInfo.monthLabel}担当分</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>集計範囲: {assignmentCycleInfo.rangeLabel}</span>
+            </div>
+            <div style={{ display: "flex", flex: 1, minWidth: 220, alignItems: "center", background: "#ffffff", border: "1px solid #dbeafe", borderRadius: 14, padding: "12px 16px", color: "#475569", fontSize: 14, fontWeight: 700, lineHeight: 1.6 }}>
+              まず月担当を上で確認し、その下で偏りや遅番回数を確認できる並びにしています。
+            </div>
           </div>
-          <div style={{ background: "#f8fafc", border: "1px solid #dbeafe", borderRadius: 12, padding: 16, marginBottom: 18 }}>
-            <div style={{ fontSize: 17, fontWeight: 900, color: "#1d4ed8", marginBottom: 12 }}>今サイクルの月担当</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+          <div style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #dbeafe", borderRadius: 16, padding: 18, marginBottom: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#1d4ed8" }}>今サイクルの月担当</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 999, padding: "6px 10px" }}>
+                役割ごとに色を少し分けて表示
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
               {monthlyAssignmentSummary.map(({ key, label, staff }) => {
                 const isEmpty = staff.length === 0;
+                const palette = monthlyAssignmentCardStyles[key] || { accent: "#64748b", tint: "#f8fafc", border: "#cbd5e1", text: "#475569", chipBg: "#f1f5f9", chipBorder: "#cbd5e1" };
                 return (
-                  <div key={key} style={{ background: isEmpty ? "#f8fafc" : "#ffffff", border: `1px solid ${isEmpty ? "#cbd5e1" : "#bfdbfe"}`, borderRadius: 10, padding: "12px 14px", minHeight: 84, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#475569", marginBottom: 8 }}>{label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: isEmpty ? "#94a3b8" : "#0f172a", lineHeight: 1.6, wordBreak: "break-word" }}>{isEmpty ? "未設定" : join(staff)}</div>
+                  <div
+                    key={key}
+                    style={{
+                      background: isEmpty ? "#f8fafc" : `linear-gradient(180deg, ${palette.tint} 0%, #ffffff 100%)`,
+                      border: `1px solid ${isEmpty ? "#cbd5e1" : palette.border}`,
+                      borderTop: `4px solid ${isEmpty ? "#cbd5e1" : palette.accent}`,
+                      borderRadius: 14,
+                      padding: "14px 15px",
+                      minHeight: 108,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      boxShadow: isEmpty ? "none" : "0 10px 20px -18px rgba(15,23,42,0.4)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: isEmpty ? "#64748b" : palette.text }}>{label}</div>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: isEmpty ? "#64748b" : palette.text, background: isEmpty ? "#e2e8f0" : "rgba(255,255,255,0.82)", border: `1px solid ${isEmpty ? "#cbd5e1" : palette.border}`, borderRadius: 999, padding: "4px 8px", whiteSpace: "nowrap" }}>
+                        {isEmpty ? "未設定" : `${staff.length}名`}
+                      </span>
+                    </div>
+                    {isEmpty ? (
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#94a3b8", lineHeight: 1.6, border: "1px dashed #cbd5e1", borderRadius: 10, padding: "10px 12px", background: "rgba(255,255,255,0.65)" }}>未設定</div>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {staff.map((name) => (
+                          <span
+                            key={`${key}-${name}`}
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 800,
+                              color: palette.text,
+                              background: palette.chipBg,
+                              border: `1px solid ${palette.chipBorder}`,
+                              borderRadius: 999,
+                              padding: "6px 10px",
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
-          <div style={{ fontSize: 17, fontWeight: 900, color: "#1e293b", marginBottom: 10 }}>詳細件数</div>
-          <div style={{ marginTop: 16, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: "#1e293b" }}>詳細件数</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>CT・MRI は月担当の偏りが見やすいよう色を少し強めています</div>
+          </div>
+          <div style={{ marginTop: 16, overflowX: "auto", maxHeight: "70vh", border: "2px solid #cbd5e1", borderRadius: 14, background: "#ffffff", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)" }}>
             <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "15px", textAlign: "center", tableLayout: "auto" }}>
               <thead><tr><th style={{ position: "sticky", top: 0, left: 0, background: "#f8fafc", zIndex: 15, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", color: "#1e293b", fontWeight: 900 }}>スタッフ</th>{ROOM_SECTIONS.map(r => <th key={r} style={{ position: "sticky", top: 0, background: "#f8fafc", zIndex: 12, padding: 12, borderRight: "2px solid #cbd5e1", borderBottom: "2px solid #cbd5e1", fontWeight: 900 }}>{r}</th>)}</tr></thead>
               <tbody>
