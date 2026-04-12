@@ -932,8 +932,30 @@ export default function App(): any {
       return range.start <= minute && range.end > minute;
     }).length;
   };
+  const getTriggeredCapacityForWarning = (dayId: string, room: string) => {
+    let cap = customRules.capacity?.[room] ?? 1;
+    const cells = allDays[dayId] || {};
+    const blockMap = new Map<string, string>();
+    activeGeneralStaff.forEach(s => blockMap.set(s, 'NONE'));
+    ["明け", "入り", "土日休日代休"].forEach(sec => {
+      split(cells[sec] || "").forEach(m => blockMap.set(extractStaffName(m), 'ALL'));
+    });
+    split(cells["不在"] || "").forEach(m => {
+      const core = extractStaffName(m);
+      if (m.includes("(AM)") || m.match(/\(〜\d/)) blockMap.set(core, 'AM');
+      else if (m.includes("(PM)") || m.match(/\(\d.*〜\)/)) blockMap.set(core, 'PM');
+      else blockMap.set(core, 'ALL');
+    });
+    const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
+    (customRules.emergencies || []).forEach((em: any) => {
+      if (em.type === "change_capacity" && em.section === room && tempAvailCount <= Number(em.threshold)) {
+        cap = Number(em.newCapacity);
+      }
+    });
+    return cap;
+  };
   const getRoomRequiredCoverageAt = (dayId: string, room: string, minute: number) => {
-    const base = customRules.capacity?.[room] ?? 1;
+    const base = getTriggeredCapacityForWarning(dayId, room);
     const day = days.find(d => d.id === dayId);
     const dayChar = day?.label.match(/\((.*?)\)/)?.[1];
     if (!dayChar) return base;
@@ -947,7 +969,6 @@ export default function App(): any {
       else if (r.time === "(PM)") pmClosed = true;
     });
     if (allClosed) return 0;
-    // PM系の判定は12:00ではなく13:00から切り替える
     if (minute >= 13 * 60 && pmClosed) return 0;
     if (minute < 13 * 60 && amClosed) return 0;
     return base;
