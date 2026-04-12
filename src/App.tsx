@@ -534,6 +534,10 @@ export class AutoAssigner {
     if (block === 'PM') return "(AM)";
     return "";
   }
+  private getMemberTimeTag(entry: string): string {
+    const core = extractStaffName(entry);
+    return entry.substring(core.length);
+  }
   private getPortableTag(staff: string): string {
     return this.getPreferredWorkTag(staff);
   }
@@ -704,12 +708,16 @@ export class AutoAssigner {
           if (!tTK) { this.log(`↪️ [交換スキップ] ${r.targetRoom}: ${sR} に戻せる ${r.triggerRoom} 担当がいない`); continue; }
           const targetMembers = split(this.dayCells[r.targetRoom]);
           if (this.hasNGPair(sCo, targetMembers.map(extractStaffName), false)) { this.log(`↪️ [交換スキップ] ${r.targetRoom}: ${sCo} は NG ペア`); continue; }
-          this.dayCells[r.triggerRoom] = join(tM.map(m => m === tTK ? m.replace(extractStaffName(tTK), sCo) : m));
-          this.dayCells[sR] = join(sM.map(m => m === sm ? m.replace(sCo, extractStaffName(tTK)) : m));
+          const sourceTag = this.getMemberTimeTag(sm);
+          const triggerTag = this.getMemberTimeTag(tTK);
+          const movedToTrigger = `${sCo}${sourceTag}`;
+          const movedToSource = `${extractStaffName(tTK)}${triggerTag}`;
+          this.dayCells[r.triggerRoom] = join(tM.map(m => m === tTK ? movedToTrigger : m));
+          this.dayCells[sR] = join(sM.map(m => m === sm ? movedToSource : m));
           if (!targetMembers.some(m => extractStaffName(m) === sCo)) {
-            this.dayCells[r.targetRoom] = join([...targetMembers, sm]);
-            this.addUsage(sCo, getStaffAmount(sm));
-            this.updateBlockMapAfterKenmu(sCo, sm);
+            this.dayCells[r.targetRoom] = join([...targetMembers, movedToTrigger]);
+            this.addUsage(sCo, getStaffAmount(movedToTrigger));
+            this.updateBlockMapAfterKenmu(sCo, movedToTrigger);
           }
           this.log(`🔄 [交換成立] ${r.triggerRoom}の${extractStaffName(tTK)}と ${sR}の${sCo}を交換し、${sCo} を ${r.targetRoom} に配置`);
           swapped = true;
@@ -749,7 +757,7 @@ export class AutoAssigner {
 
     (this.ctx.customRules.emergencies || []).forEach((em: any) => {
       if (em.type !== "empty_room_swap") return; const wR = em.section; const sRL = split(em.sourceRooms || em.sourceRoom || ""); if (!wR || !sRL.length || this.skipSections.includes(wR) || wR === "透析後胸部") return; const wC = this.dynamicCapacity[wR] ?? 1; if (split(this.dayCells[wR]).reduce((s, m) => s + getStaffAmount(m), 0) >= wC) return;
-      let sw = false; for (const sF of sRL) { if (sw || sF === "透析後胸部") break; const sM = split(this.dayCells[sF]); if (!sM.length) continue; const ngI = sM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && (this.isForbidden(c, wR) || !this.canAddKenmu(c, wR, true)); }); if (!ngI.length) continue; for (const src of ROOM_SECTIONS.filter(r => r !== wR && r !== sF && !this.skipSections.includes(r) && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r))) { if (sw) break; const rM = split(this.dayCells[src]); const currentTargetMembers = split(this.dayCells[wR]); const oC = rM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && !this.isForbidden(c, wR) && !this.isForbidden(c, sF) && !this.isHalfDayBlocked(c, wR).hard && !this.hasNGPair(c, currentTargetMembers.map(extractStaffName), false) && (wR === "MMG" ? this.isMmgCapable(c) : true) && this.canAddKenmu(c, wR, true) && !m.includes("17:") && !m.includes("19:") && !this.isTimeTagBlockedByFullDayRule(wR, m); }); for (const om of oC) { const oc = extractStaffName(om); const km = ngI.find(m => { const c = extractStaffName(m); return !this.isForbidden(c, src) && !this.isHalfDayBlocked(c, src).hard && !this.hasNGPair(c, rM.map(extractStaffName), false) && this.canAddKenmu(c, src, true); }); if (!km) continue; const kc = extractStaffName(km); const movedToSource = km.replace(kc, oc); if (this.isTimeTagBlockedByFullDayRule(wR, movedToSource)) continue; this.dayCells[sF] = join(sM.map(m => m === km ? movedToSource : m)); this.dayCells[src] = join(rM.map(m => m === om ? m.replace(oc, kc) : m)); if (!currentTargetMembers.some(m => extractStaffName(m) === oc)) { this.dayCells[wR] = join([...currentTargetMembers, movedToSource]); this.addUsage(oc, getStaffAmount(movedToSource)); this.updateBlockMapAfterKenmu(oc, movedToSource); this.log(`🧩 [緊急交換] ${src} の ${oc} を ${sF} 経由で ${wR} に補充`); } sw = true; break; } } }
+      let sw = false; for (const sF of sRL) { if (sw || sF === "透析後胸部") break; const sM = split(this.dayCells[sF]); if (!sM.length) continue; const ngI = sM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && (this.isForbidden(c, wR) || !this.canAddKenmu(c, wR, true)); }); if (!ngI.length) continue; for (const src of ROOM_SECTIONS.filter(r => r !== wR && r !== sF && !this.skipSections.includes(r) && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r))) { if (sw) break; const rM = split(this.dayCells[src]); const currentTargetMembers = split(this.dayCells[wR]); const oC = rM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && !this.isForbidden(c, wR) && !this.isForbidden(c, sF) && !this.isHalfDayBlocked(c, wR).hard && !this.hasNGPair(c, currentTargetMembers.map(extractStaffName), false) && (wR === "MMG" ? this.isMmgCapable(c) : true) && this.canAddKenmu(c, wR, true) && !m.includes("17:") && !m.includes("19:") && !this.isTimeTagBlockedByFullDayRule(wR, m); }); for (const om of oC) { const oc = extractStaffName(om); const km = ngI.find(m => { const c = extractStaffName(m); return !this.isForbidden(c, src) && !this.isHalfDayBlocked(c, src).hard && !this.hasNGPair(c, rM.map(extractStaffName), false) && this.canAddKenmu(c, src, true); }); if (!km) continue; const kc = extractStaffName(km); const sourceTag = this.getMemberTimeTag(om); const swappedTag = this.getMemberTimeTag(km); const movedToSwapSource = `${oc}${sourceTag}`; const movedToSrc = `${kc}${swappedTag}`; if (this.isTimeTagBlockedByFullDayRule(wR, movedToSwapSource)) continue; this.dayCells[sF] = join(sM.map(m => m === km ? movedToSwapSource : m)); this.dayCells[src] = join(rM.map(m => m === om ? movedToSrc : m)); if (!currentTargetMembers.some(m => extractStaffName(m) === oc)) { this.dayCells[wR] = join([...currentTargetMembers, movedToSwapSource]); this.addUsage(oc, getStaffAmount(movedToSwapSource)); this.updateBlockMapAfterKenmu(oc, movedToSwapSource); this.log(`🧩 [緊急交換] ${src} の ${oc} を ${sF} 経由で ${wR} に補充`); } sw = true; break; } } }
     });
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
