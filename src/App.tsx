@@ -344,6 +344,9 @@ export function getStaffAmount(name: string) {
   if (ROLE_PLACEHOLDERS.includes(extractStaffName(name))) return 0;
   return (name.includes("(AM)") || name.includes("(PM)") || name.match(/\(〜/) || name.match(/〜\)/)) ? 0.5 : 1;
 }
+export function isAllDayAbsenceEntry(entry: string) {
+  return !!entry && !entry.includes("(AM)") && !entry.includes("(PM)") && !entry.includes("〜");
+}
 
 // ===================== 🌟 UI Components =====================
 export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
@@ -578,7 +581,7 @@ export class AutoAssigner {
   execute(): DayData {
     this.logPhase("フェーズ1：前提処理"); this.initCounts();
     if (this.prevDay?.cells["入り"]) { const iriMems = split(this.prevDay.cells["入り"]).map(extractStaffName); this.dayCells["明け"] = join(Array.from(new Set([...split(this.dayCells["明け"]), ...iriMems]))); if (iriMems.length > 0) this.log(`[前日処理] 昨日の「入り」を「明け」に配置`); }
-    if (this.day.isPublicHoliday) { this.log(`🎌 祝日のためスキップ`); return { ...this.day, cells: Object.fromEntries(SECTIONS.map(s => [s, ""])), logInfo: this.logInfo }; }
+    if (this.day.isPublicHoliday) { this.log(`🎌 祝日のためスキップ`); return { ...this.day, cells: this.dayCells, logInfo: this.logInfo }; }
     const dayChar = this.day.label.match(/\((.*?)\)/)?.[1]; if (dayChar) { (this.ctx.customRules.closedRooms || []).forEach((r: any) => { if (r.day === dayChar) this.log(`🛑 曜日ルールで ${r.room} の ${r.time} 閉室`); }); }
     if (!this.isSmartFix) { ROOM_SECTIONS.forEach(sec => { this.dayCells[sec] = join(split(this.dayCells[sec]).filter(m => ROLE_PLACEHOLDERS.includes(extractStaffName(m)))); }); this.dayCells["昼当番"] = ""; this.dayCells["受付ヘルプ"] = ""; this.dayCells["待機"] = ""; }
     this.buildBlockMap();
@@ -745,7 +748,7 @@ export class AutoAssigner {
 
     (this.ctx.customRules.emergencies || []).forEach((em: any) => {
       if (em.type !== "empty_room_swap") return; const wR = em.section; const sRL = split(em.sourceRooms || em.sourceRoom || ""); if (!wR || !sRL.length || this.skipSections.includes(wR) || wR === "透析後胸部") return; const wC = this.dynamicCapacity[wR] ?? 1; if (split(this.dayCells[wR]).reduce((s, m) => s + getStaffAmount(m), 0) >= wC) return;
-      let sw = false; for (const sF of sRL) { if (sw || sF === "透析後胸部") break; const sM = split(this.dayCells[sF]); if (!sM.length) continue; const ngI = sM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && (this.isForbidden(c, wR) || !this.canAddKenmu(c, wR, true)); }); if (!ngI.length) continue; for (const src of ROOM_SECTIONS.filter(r => r !== wR && r !== sF && !this.skipSections.includes(r) && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r))) { if (sw) break; const rM = split(this.dayCells[src]); const oC = rM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && !this.isForbidden(c, wR) && !this.isForbidden(c, sF) && !this.isHalfDayBlocked(c, wR).hard && this.canAddKenmu(c, wR, true) && !m.includes("17:") && !m.includes("19:") && !this.isTimeTagBlockedByFullDayRule(wR, m); }); for (const om of oC) { const oc = extractStaffName(om); const km = ngI.find(m => { const c = extractStaffName(m); return !this.isForbidden(c, src) && !this.isHalfDayBlocked(c, src).hard && !this.hasNGPair(c, rM.map(extractStaffName), false) && this.canAddKenmu(c, src, true); }); if (!km) continue; const kc = extractStaffName(km); this.dayCells[sF] = join(sM.map(m => m === km ? m.replace(kc, oc) : m)); this.dayCells[src] = join(rM.map(m => m === om ? m.replace(oc, kc) : m)); sw = true; break; } } }
+      let sw = false; for (const sF of sRL) { if (sw || sF === "透析後胸部") break; const sM = split(this.dayCells[sF]); if (!sM.length) continue; const ngI = sM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && (this.isForbidden(c, wR) || !this.canAddKenmu(c, wR, true)); }); if (!ngI.length) continue; for (const src of ROOM_SECTIONS.filter(r => r !== wR && r !== sF && !this.skipSections.includes(r) && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r))) { if (sw) break; const rM = split(this.dayCells[src]); const currentTargetMembers = split(this.dayCells[wR]); const oC = rM.filter(m => { const c = extractStaffName(m); return !ROLE_PLACEHOLDERS.includes(c) && !this.isForbidden(c, wR) && !this.isForbidden(c, sF) && !this.isHalfDayBlocked(c, wR).hard && !this.hasNGPair(c, currentTargetMembers.map(extractStaffName), false) && (wR === "MMG" ? this.isMmgCapable(c) : true) && this.canAddKenmu(c, wR, true) && !m.includes("17:") && !m.includes("19:") && !this.isTimeTagBlockedByFullDayRule(wR, m); }); for (const om of oC) { const oc = extractStaffName(om); const km = ngI.find(m => { const c = extractStaffName(m); return !this.isForbidden(c, src) && !this.isHalfDayBlocked(c, src).hard && !this.hasNGPair(c, rM.map(extractStaffName), false) && this.canAddKenmu(c, src, true); }); if (!km) continue; const kc = extractStaffName(km); const movedToSource = km.replace(kc, oc); if (this.isTimeTagBlockedByFullDayRule(wR, movedToSource)) continue; this.dayCells[sF] = join(sM.map(m => m === km ? movedToSource : m)); this.dayCells[src] = join(rM.map(m => m === om ? m.replace(oc, kc) : m)); if (!currentTargetMembers.some(m => extractStaffName(m) === oc)) { this.dayCells[wR] = join([...currentTargetMembers, movedToSource]); this.addUsage(oc, getStaffAmount(movedToSource)); this.updateBlockMapAfterKenmu(oc, movedToSource); this.log(`🧩 [緊急交換] ${src} の ${oc} を ${sF} 経由で ${wR} に補充`); } sw = true; break; } } }
     });
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
@@ -862,7 +865,7 @@ export default function App(): any {
     const allDayOffSet = new Set([...split(cells["明け"]||""),...split(cells["入り"]||""),...split(cells["土日休日代休"]||"")].map(extractStaffName));
     const workingStaff = allStaff.filter(s => { 
       if (allDayOffSet.has(s)) return false;
-      const isFullAbsent = absentMems.some(m => extractStaffName(m) === s && !m.includes("(AM)") && !m.includes("(PM)")); 
+      const isFullAbsent = absentMems.some(m => extractStaffName(m) === s && isAllDayAbsenceEntry(m)); 
       return !isFullAbsent; 
     }); 
     
@@ -1096,11 +1099,12 @@ export default function App(): any {
   const handleAutoAssign = (isSmart: boolean, isWeekly: boolean) => {
     setAllDaysWithHistory((prev: any) => {
       const nextAll = { ...prev }; const newLogs = { ...assignLogs }; const ctx = { allStaff, activeGeneralStaff, activeReceptionStaff, monthlyAssign, customRules }; const targetDays = isWeekly ? days : [cur];
+      const buildStoredDay = (dateStr: string, fallbackCells?: Record<string, string>) => ({ id: dateStr, label: dateStr, isPublicHoliday: !!nationalHolidays[dateStr] || customHolidays.includes(dateStr), holidayName: nationalHolidays[dateStr] || "休診日", cells: nextAll[dateStr] || fallbackCells || Object.fromEntries(SECTIONS.map(s => [s, ""])) });
       targetDays.forEach(day => {
-        const idx = days.findIndex(d => d.id === day.id); let prevDayObj: any = null; const dObj = new Date(day.id);
-        if (dObj.getDay() !== 1) { const prevDate = new Date(dObj); prevDate.setDate(prevDate.getDate() - 1); const prevDateStr = `${prevDate.getFullYear()}-${pad(prevDate.getMonth() + 1)}-${pad(prevDate.getDate())}`; if (nextAll[prevDateStr]) prevDayObj = { id: prevDateStr, cells: nextAll[prevDateStr] }; else if (idx > 0) prevDayObj = { id: days[idx-1].id, cells: nextAll[days[idx-1].id] || days[idx-1].cells }; }
-        const cycleInfo = getAssignmentCycleInfo(day.id); const pastDaysInMonthArray = Object.entries(nextAll).filter(([dateStr]) => dateStr >= cycleInfo.startId && dateStr < day.id).map(([dateStr, cells]) => ({ id: dateStr, cells } as any));
-        const pastDaysInWeekArray = days.slice(0, idx).map(d => ({ ...d, cells: nextAll[d.id] || d.cells }));
+        const idx = days.findIndex(d => d.id === day.id); let prevDayObj: DayData | null = null; const dObj = new Date(day.id);
+        if (dObj.getDay() !== 1) { const prevDate = new Date(dObj); prevDate.setDate(prevDate.getDate() - 1); const prevDateStr = `${prevDate.getFullYear()}-${pad(prevDate.getMonth() + 1)}-${pad(prevDate.getDate())}`; if (nextAll[prevDateStr]) prevDayObj = buildStoredDay(prevDateStr); else if (idx > 0) prevDayObj = buildStoredDay(days[idx-1].id, days[idx-1].cells); }
+        const cycleInfo = getAssignmentCycleInfo(day.id); const pastDaysInMonthArray = Object.entries(nextAll).filter(([dateStr]) => dateStr >= cycleInfo.startId && dateStr < day.id).map(([dateStr, cells]) => buildStoredDay(dateStr, cells as Record<string, string>));
+        const pastDaysInWeekArray = days.slice(0, idx).map(d => buildStoredDay(d.id, d.cells));
         const originalCells = nextAll[day.id] || day.cells;
         const worker = new AutoAssigner({ ...day, cells: originalCells }, prevDayObj, pastDaysInMonthArray, pastDaysInWeekArray, ctx, isSmart);
         const res = worker.execute();
