@@ -1287,12 +1287,17 @@ export default function App(): any {
                       const currentMems = split(allDays[day.id]?.[section]); const prevMems = dIdx > 0 ? split(allDays[days[dIdx-1].id]?.[section]).map(extractStaffName) : []; const isAlertRoom = split(customRules.noConsecutiveRooms).includes(section); const warnings = getDayWarnings(day.id); const isRoomEmpty = currentMems.length === 0 && warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '空室'); const roomShortageWarning = warnings.find(w => w.room === section && (w.title === '午後不足' || w.title === '補充不足')); const shortageFrom = roomShortageWarning?.fromTime || (roomShortageWarning?.title === '午後不足' ? 'PM' : ''); const hasPartialGap = !!roomShortageWarning && currentMems.length > 0; let baseBgStyle = cellStyle(false, day.isPublicHoliday, day.id === sel, false, sIdx % 2 === 1); if (isRoomEmpty && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(180deg, #e8ebf0 0%, #dde2e8 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #b2bac4"; } else if (hasPartialGap && !day.isPublicHoliday) { baseBgStyle.background = "linear-gradient(90deg, rgba(255,255,255,1) 0 48%, #e4e8ee 48% 100%)"; baseBgStyle.boxShadow = "inset 0 0 0 1px #aeb7c2"; } baseBgStyle.borderBottom = `2px solid ${ROOM_SECTIONS.includes(section) ? "#cbd5e1" : "#dbe4ee"}`;
                       
                       return (
-                        <td key={day.id + section} style={baseBgStyle}>
+                        <td key={day.id + section} style={{ ...baseBgStyle, position: hasPartialGap ? "relative" : baseBgStyle.position }}>
                           {!day.isPublicHoliday && (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4", alignItems: "flex-start" }}>
-                              {currentMems.length === 0 && isRoomEmpty && <div aria-hidden style={{ width: "100%", minHeight: 28, borderRadius: 10, border: "1px dashed #7b8794", background: "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.14) 100%)", position: "relative" }}><span style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 26, height: 4, borderRadius: 999, background: "#64748b", opacity: 0.86 }} /></div>}
-                              {hasPartialGap && currentMems.length > 0 && <div style={{ padding: "4px 9px", borderRadius: 999, background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", fontSize: 12, fontWeight: 900, lineHeight: 1, letterSpacing: "0.01em" }}>{shortageFrom ? `${shortageFrom}〜不足` : '途中不足'}</div>}
-                              {currentMems.map((m, mIdx) => {
+                            <>
+                              {hasPartialGap && currentMems.length > 0 && (
+                                <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2, padding: "4px 9px", borderRadius: 999, background: "#fff7ed", border: "1px solid #fb923c", color: "#9a3412", fontSize: 12, fontWeight: 900, lineHeight: 1, letterSpacing: "0.01em", boxShadow: "0 1px 2px rgba(15,23,42,0.08)" }}>
+                                  {shortageFrom ? `${shortageFrom}〜不足` : '途中不足'}
+                                </div>
+                              )}
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", lineHeight: "1.4", alignItems: "flex-start", paddingRight: hasPartialGap ? 92 : 0 }}>
+                                {currentMems.length === 0 && isRoomEmpty && <div aria-hidden style={{ width: "100%", minHeight: 28, borderRadius: 10, border: "1px dashed #7b8794", background: "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.14) 100%)", position: "relative" }}><span style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 26, height: 4, borderRadius: 999, background: "#64748b", opacity: 0.86 }} /></div>}
+                                {currentMems.map((m, mIdx) => {
                                 const coreName = extractStaffName(m); const mod = m.substring(coreName.length); const isConsecutive = isAlertRoom && prevMems.includes(coreName); const hasRedWarning = isConsecutive || warnings.some(w => w.level === 'red' && w.staff === coreName && w.room === section); const hasOrangeWarning = warnings.some(w => w.level === 'orange' && w.staff === coreName); const hasYellowWarning = warnings.some(w => w.level === 'yellow' && w.room === section && w.title === '回避特例');
                                 
                                 const targetStaff = highlightedStaff || hoveredStaff;
@@ -1404,7 +1409,8 @@ export default function App(): any {
                                   </div>
                                 );
                               })}
-                            </div>
+                              </div>
+                            </>
                           )}
                         </td>
                       );
