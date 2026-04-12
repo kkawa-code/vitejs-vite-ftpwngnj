@@ -914,7 +914,8 @@ export default function App(): any {
   
   const hhmmToMinutes = (s: string) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
   const getMemberCoverageRange = (member: string) => {
-    if (member.includes("(AM)")) return { start: 0, end: 12 * 60 };
+    // AM勤務は「昼まで」ではなく「PM不在」として扱い、13:00までは在室扱いにする
+    if (member.includes("(AM)")) return { start: 0, end: 13 * 60 };
     if (member.includes("(PM)")) return { start: 13 * 60, end: 24 * 60 };
     const until = member.match(/\(〜(\d+:\d+)\)/)?.[1];
     if (until) return { start: 0, end: hhmmToMinutes(until) };
@@ -944,8 +945,9 @@ export default function App(): any {
       else if (r.time === "(PM)") pmClosed = true;
     });
     if (allClosed) return 0;
-    if (minute >= 12 * 60 && pmClosed) return 0;
-    if (minute < 12 * 60 && amClosed) return 0;
+    // PM系の判定は12:00ではなく13:00から切り替える
+    if (minute >= 13 * 60 && pmClosed) return 0;
+    if (minute < 13 * 60 && amClosed) return 0;
     return base;
   };
   const requestedStartMinute = (tag: string) => {
