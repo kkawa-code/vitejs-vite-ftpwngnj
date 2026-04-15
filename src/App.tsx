@@ -248,7 +248,7 @@ export const DEFAULT_RULES: CustomRules = {
     { targetRoom: "2号室", sourceRooms: "3号室、CT(4)" },
     { targetRoom: "5号室", sourceRooms: "3号室、CT(4)、2号室" }
   ], 
-  lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" }], 
+  lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)", fromSecondUseInWeek: true }], 
   lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" }], 
   lunchPrioritySections: "RI、1号室、2号室、3号室、5号室", lunchLastResortSections: "治療", 
@@ -761,7 +761,30 @@ export class AutoAssigner {
     });
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
-      let current = split(this.dayCells[rule.section]); if (current.length > 0 && !current.some(m => m.includes("17:") || m.includes("18:"))) { const currentCore = current.map(extractStaffName); const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : []; const excludeStaff = Array.from(new Set([...split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName), ...split(this.ctx.customRules.noLateShiftRooms || "").flatMap(r => split(this.dayCells[r] || "").map(extractStaffName))])); const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n) && this.blockMap.get(n) !== 'ALL' && this.blockMap.get(n) !== 'PM'); candidates.sort((a, b) => { let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100; const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b); if (idxA !== -1) sA += 100000 + ((lowPriorityStaff.length - idxA) * 10000); if (idxB !== -1) sB += 100000 + ((lowPriorityStaff.length - idxB) * 10000); if (sA !== sB) return sA - sB; return a.localeCompare(b, 'ja'); }); let picked = candidates.find(n => !prevLateStaff.includes(n)); if (!picked && candidates.length > 0) picked = candidates[0]; if (picked) { current.push(`${picked}${rule.lateTime}`); this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM'); this.dayCells[rule.section] = join(current); } }
+      let current = split(this.dayCells[rule.section]);
+      if (current.length > 0 && !current.some(m => m.includes("17:") || m.includes("18:"))) {
+        const usedCountThisWeek = this.pastDaysInWeek.filter((pd: DayData) =>
+          split(pd.cells[rule.section] || "").some((m: string) =>
+            !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:")
+          )
+        ).length;
+        if (rule.fromSecondUseInWeek && usedCountThisWeek === 0) {
+          this.log(`🕒 [遅番保留] ${rule.section} は今週初回のため遅番を付与しない`);
+          return;
+        }
+        const currentCore = current.map(extractStaffName);
+        const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
+        const excludeStaff = Array.from(new Set([...split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName), ...split(this.ctx.customRules.noLateShiftRooms || "").flatMap(r => split(this.dayCells[r] || "").map(extractStaffName))]));
+        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n) && this.blockMap.get(n) !== 'ALL' && this.blockMap.get(n) !== 'PM');
+        candidates.sort((a, b) => { let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100; const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b); if (idxA !== -1) sA += 100000 + ((lowPriorityStaff.length - idxA) * 10000); if (idxB !== -1) sB += 100000 + ((lowPriorityStaff.length - idxB) * 10000); if (sA !== sB) return sA - sB; return a.localeCompare(b, 'ja'); });
+        let picked = candidates.find(n => !prevLateStaff.includes(n));
+        if (!picked && candidates.length > 0) picked = candidates[0];
+        if (picked) {
+          current.push(`${picked}${rule.lateTime}`);
+          this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM');
+          this.dayCells[rule.section] = join(current);
+        }
+      }
     });
 
     const pM = split(this.dayCells["ポータブル"]); const r2M = split(this.dayCells["2号室"]); const r2C = r2M.map(extractStaffName); const r2A = r2M.reduce((s, m) => s + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
@@ -1979,10 +2002,14 @@ export default function App(): any {
                     <span className="rule-label" style={{color:"#6d28d9"}}>の担当を追加する（日勤は</span>
                     <select value={rule.dayEndTime} onChange={(e: any) => updateRule("lateShifts", idx, "dayEndTime", e.target.value)} className="rule-sel" style={{borderColor:"#ddd6fe", minWidth: "160px", flex: "1 1 auto"}}><option value="">終了時間</option>{TIME_OPTIONS.filter(t => t.includes("(〜")).map(t => <option key={t} value={t}>{t.replace(/[()]/g, '')}</option>)}</select>
                     <span className="rule-label" style={{color:"#6d28d9"}}>とする）</span>
+                    <label style={{display:"inline-flex", alignItems:"center", gap:6, fontSize:14, fontWeight:700, color:"#6d28d9", marginLeft:4}}>
+                      <input type="checkbox" checked={!!rule.fromSecondUseInWeek} onChange={(e:any)=>updateRule("lateShifts", idx, "fromSecondUseInWeek", e.target.checked)} />
+                      週2回目以降
+                    </label>
                     <DelBtn onClick={()=>removeRule("lateShifts", idx)} />
                   </div>
               ))}
-              <button className="rule-add" style={{color:"#6d28d9", borderColor:"#c4b5fd"}} onClick={() => addRule("lateShifts", { section: "", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)" })}>＋ 遅番ルールを追加</button>
+              <button className="rule-add" style={{color:"#6d28d9", borderColor:"#c4b5fd"}} onClick={() => addRule("lateShifts", { section: "", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)", fromSecondUseInWeek: false })}>＋ 遅番ルールを追加</button>
             </RuleCard>
 
             <RuleCard bg="#fff1f2" border="#fecaca" color="#be185d" icon="⚠️" title="兼務上限のストッパー設定">
@@ -2259,5 +2286,6 @@ const formatPrintMember = (m: string) => m
   .replace("(16:00〜)", " 16:00〜")
   .replace("(12:15〜13:00)", " 12:15〜13:00")
   .trim();
+
 
 
