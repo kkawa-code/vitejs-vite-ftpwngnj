@@ -174,6 +174,7 @@ export interface CustomRules {
   staffList: string; receptionStaffList: string; femaleStaffList: string; supportStaffList: string; supportTargetRooms: string; 
   customHolidays: string; capacity: Record<string, number>; dailyAdditions: any[]; priorityRooms: string[]; 
   fullDayOnlyRooms: string; noConsecutiveRooms: string; noLateShiftStaff: string; noLateShiftRooms: string; lateShiftLowPriorityStaff: string;
+  fluoroAuxConflictRooms: string;
   closedRooms: any[]; ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; 
   swapRules: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[]; lunchBaseCount: number; lunchSpecialDays: any[]; 
   lunchConditional: any[]; lunchRoleRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[];
@@ -214,7 +215,7 @@ export const DEFAULT_RULES: CustomRules = {
   capacity: { "CT": 4, "MRI": 3, "治療": 3, "RI": 1, "MMG": 1, "透視（6号）": 1, "透視（11号）": 1, "骨塩": 1, "1号室": 1, "5号室": 1, "パノラマCT": 2 }, 
   dailyAdditions: [], priorityRooms: ["治療","受付","MMG","RI","MRI","CT","透視（6号）","透視（11号）","骨塩","1号室","5号室","2号室","ポータブル","DSA","検像","パノラマCT","3号室","受付ヘルプ","透析後胸部"], 
   fullDayOnlyRooms: "DSA、CT、MRI", noConsecutiveRooms: "ポータブル", 
-  noLateShiftStaff: "浅野、木内康、髙橋、川崎、松平、阿部", noLateShiftRooms: "透視（11号）", lateShiftLowPriorityStaff: "木内康、石田、澤邊、依田", 
+  noLateShiftStaff: "浅野、木内康、髙橋、川崎、松平、阿部", noLateShiftRooms: "透視（11号）", lateShiftLowPriorityStaff: "木内康、石田、澤邊、依田", fluoroAuxConflictRooms: "透視（6号）、透視（11号）", 
   closedRooms: [{day:"月",room:"3号室",time:"(PM)"},{day:"火",room:"3号室",time:"(PM)"},{day:"水",room:"3号室",time:"(PM)"},{day:"木",room:"3号室",time:"(PM)"},{day:"金",room:"3号室",time:"(PM)"}], 
   ngPairs: [{s1:"本郷",s2:"寺本",level:"hard"},{s1:"髙橋",s2:"寺本",level:"soft"}], 
   fixed: [{staff:"川崎",section:"治療"},{staff:"阿部",section:"治療"},{staff:"髙橋",section:"MRI"},{staff:"松平",section:"CT"},{staff:"豊田",section:"CT"}], 
@@ -284,28 +285,31 @@ export const join = (a: string[]) => a.filter(Boolean).join("、");
 export const extractStaffName = (f: string) => f.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
 export const parseRoomCond = (str: string) => { const m = str.match(/^(.*?)\((\d+)\)$/); return m ? { r: m[1], min: Number(m[2]) } : { r: str, min: 0 }; };
 
-export const FLUORO_CONFLICT_SECTIONS = ["透視（6号）", "透視（11号）"];
+export const DEFAULT_FLUORO_AUX_CONFLICT_ROOMS = "透視（6号）、透視（11号）";
 export const AUX_FOLLOWUP_SECTIONS = ["待機", "透析後胸部"];
-export const hasFluoroAuxConflict = (dayCells: Record<string, string> | undefined, staff: string, targetSection: string) => {
+export const getFluoroAuxConflictSections = (rooms?: string) => split(rooms || DEFAULT_FLUORO_AUX_CONFLICT_ROOMS);
+export const hasFluoroAuxConflict = (dayCells: Record<string, string> | undefined, staff: string, targetSection: string, conflictRooms?: string) => {
   if (!dayCells) return false;
   const core = extractStaffName(staff);
+  const fluoroConflictSections = getFluoroAuxConflictSections(conflictRooms);
   if (AUX_FOLLOWUP_SECTIONS.includes(targetSection)) {
-    return FLUORO_CONFLICT_SECTIONS.some(sec => split(dayCells[sec] || "").some(m => extractStaffName(m) === core));
+    return fluoroConflictSections.some(sec => split(dayCells[sec] || "").some(m => extractStaffName(m) === core));
   }
-  if (FLUORO_CONFLICT_SECTIONS.includes(targetSection)) {
+  if (fluoroConflictSections.includes(targetSection)) {
     return AUX_FOLLOWUP_SECTIONS.some(sec => split(dayCells[sec] || "").some(m => extractStaffName(m) === core));
   }
   return false;
 };
 
-export const applyFluoroAuxConflictRule = (cells: Record<string, string>, changedSection: string) => {
-  if (![...FLUORO_CONFLICT_SECTIONS, ...AUX_FOLLOWUP_SECTIONS].includes(changedSection)) return cells;
+export const applyFluoroAuxConflictRule = (cells: Record<string, string>, changedSection: string, conflictRooms?: string) => {
+  const fluoroConflictSections = getFluoroAuxConflictSections(conflictRooms);
+  if (![...fluoroConflictSections, ...AUX_FOLLOWUP_SECTIONS].includes(changedSection)) return cells;
   const next = { ...cells };
   const changedMembers = split(next[changedSection] || "").map(extractStaffName);
   if (changedMembers.length === 0) return next;
   const oppositeSections = AUX_FOLLOWUP_SECTIONS.includes(changedSection)
-    ? FLUORO_CONFLICT_SECTIONS
-    : FLUORO_CONFLICT_SECTIONS.includes(changedSection)
+    ? fluoroConflictSections
+    : fluoroConflictSections.includes(changedSection)
       ? AUX_FOLLOWUP_SECTIONS
       : [];
   oppositeSections.forEach(sec => {
@@ -443,9 +447,9 @@ export const WeekCalendarPicker = ({ targetMonday, onChange, nationalHolidays, c
   );
 };
 
-export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [], onAddHelp, onClearHelp, dayCells }: any) => {
+export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = false, customOptions = [], onAddHelp, onClearHelp, dayCells, fluoroAuxConflictRooms }: any) => {
   const members = split(value); const isTaiki = section === "待機"; const isFuzai = section === "不在"; const isHelp = section === "受付ヘルプ";
-  const selectableStaff = activeStaff.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s) && !hasFluoroAuxConflict(dayCells, s, section));
+  const selectableStaff = activeStaff.filter((s: string) => !members.some((m: string) => extractStaffName(m) === s) && !hasFluoroAuxConflict(dayCells, s, section, fluoroAuxConflictRooms));
   const [pendingFuzai, setPendingFuzai] = React.useState("");
   const FUZAI_TIMES = ["","(AM)","(PM)","(〜8:30)","(〜9:00)","(〜9:30)","(〜10:00)","(〜10:30)","(〜11:00)","(〜11:30)","(〜12:00)","(〜12:30)","(〜13:00)","(〜13:30)","(〜14:00)","(〜14:30)","(〜15:00)","(〜15:30)","(〜16:00)","(〜16:30)","(〜17:00)","(8:30〜)","(9:00〜)","(9:30〜)","(10:00〜)","(10:30〜)","(11:00〜)","(11:30〜)","(12:00〜)","(12:30〜)","(13:00〜)","(13:30〜)","(14:00〜)","(14:30〜)","(15:00〜)","(15:30〜)","(16:00〜)","(16:30〜)","(17:00〜)"];
   const FUZAI_LABELS: Record<string,string> = {"":"全休","(AM)":"AM休","(PM)":"PM休","(〜8:30)":"〜8:30","(〜9:00)":"〜9:00","(〜9:30)":"〜9:30","(〜10:00)":"〜10:00","(〜10:30)":"〜10:30","(〜11:00)":"〜11:00","(〜11:30)":"〜11:30","(〜12:00)":"〜12:00","(〜12:30)":"〜12:30","(〜13:00)":"〜13:00","(〜13:30)":"〜13:30","(〜14:00)":"〜14:00","(〜14:30)":"〜14:30","(〜15:00)":"〜15:00","(〜15:30)":"〜15:30","(〜16:00)":"〜16:00","(〜16:30)":"〜16:30","(〜17:00)":"〜17:00","(8:30〜)":"8:30〜","(9:00〜)":"9:00〜","(9:30〜)":"9:30〜","(10:00〜)":"10:00〜","(10:30〜)":"10:30〜","(11:00〜)":"11:00〜","(11:30〜)":"11:30〜","(12:00〜)":"12:00〜","(12:30〜)":"12:30〜","(13:00〜)":"13:00〜","(13:30〜)":"13:30〜","(14:00〜)":"14:00〜","(14:30〜)":"14:30〜","(15:00〜)":"15:00〜","(15:30〜)":"15:30〜","(16:00〜)":"16:00〜","(16:30〜)":"16:30〜","(17:00〜)":"17:00〜"};
@@ -1046,13 +1050,14 @@ export default function App(): any {
     return tag.replace(/[()]/g, "").replace(/〜$/, "");
   };
   const minuteToShortageLabel = (minute: number) => `${Math.floor(minute / 60)}:${pad(minute % 60)}`;
+  const ROOM_DAY_START_MINUTE = 8 * 60 + 30;
   const getRoomFirstShortageMinute = (dayId: string, cells: Record<string, string>, room: string) => {
     const members = split(cells[room] || '').filter(m => !m.startsWith(`${room}枠`));
     if (members.length === 0) return null;
-    const candidateMinutes = new Set<number>([11 * 60 + 30, 13 * 60]);
+    const candidateMinutes = new Set<number>([ROOM_DAY_START_MINUTE, 11 * 60 + 30, 13 * 60]);
     members.forEach(member => {
       const range = getMemberCoverageRange(member);
-      if (range.start > 0) candidateMinutes.add(range.start);
+      if (range.start > ROOM_DAY_START_MINUTE) candidateMinutes.add(range.start);
       if (range.end < 24 * 60) candidateMinutes.add(range.end);
     });
     const sortedMinutes = Array.from(candidateMinutes).sort((a, b) => a - b);
@@ -1070,7 +1075,7 @@ export default function App(): any {
     ROOM_SECTIONS.forEach(room => { split(cells[room]).forEach(m => { const core = extractStaffName(m); if(!staffMap[core]) staffMap[core]=[]; if(!staffMap[core].includes(room)) staffMap[core].push(room); }) }); 
     const softNgPairs = (customRules.ngPairs || []).filter((p: any) => p.level === "soft"); 
     softNgPairs.forEach((ng: any) => { const s1 = extractStaffName(ng.s1); const s2 = extractStaffName(ng.s2); ROOM_SECTIONS.forEach(room => { const mems = split(cells[room]).map(extractStaffName); if (mems.includes(s1) && mems.includes(s2)) w.push({ level: 'yellow', title: '回避特例', room, msg: `なるべくNGペア（${s1} と ${s2}）が「${room}」で同室です` }); }); }); 
-    AUX_FOLLOWUP_SECTIONS.forEach(auxRoom => { split(cells[auxRoom] || "").map(extractStaffName).forEach(staff => { const conflictRoom = FLUORO_CONFLICT_SECTIONS.find(fRoom => split(cells[fRoom] || "").map(extractStaffName).includes(staff)); if (conflictRoom) w.push({ level: 'yellow', title: '併用注意', staff, room: auxRoom, msg: `${staff}さんが「${auxRoom}」と「${conflictRoom}」を兼ねています` }); }); }); 
+    const fluoroConflictSections = getFluoroAuxConflictSections(customRules.fluoroAuxConflictRooms); AUX_FOLLOWUP_SECTIONS.forEach(auxRoom => { split(cells[auxRoom] || "").map(extractStaffName).forEach(staff => { const conflictRoom = fluoroConflictSections.find(fRoom => split(cells[fRoom] || "").map(extractStaffName).includes(staff)); if (conflictRoom) w.push({ level: 'yellow', title: '併用注意', staff, room: auxRoom, msg: `${staff}さんが「${auxRoom}」と「${conflictRoom}」を兼ねています` }); }); }); 
     Object.entries(staffMap).forEach(([staff, rms]) => { const limit = customRules.alertMaxKenmu || 3; const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:"); }).length; if(dayCount > limit) w.push({ level: 'orange', title: '兼務超過', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); }); 
     const targetEmptyRooms = split(customRules.alertEmptyRooms || "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"); 
     targetEmptyRooms.forEach(room => { if (split(cells[room]).length === 0) w.push({ level: 'yellow', title: '空室', room, msg: `「${room}」の担当者がいません` }); }); 
@@ -1106,14 +1111,15 @@ export default function App(): any {
       const requiredCount = getRoomRequiredCoverageAt(dayId, room, shortageMinute);
       const coveringCount = roomCoverageCountAt(cells, room, shortageMinute);
       const shortageLabel = minuteToShortageLabel(shortageMinute);
+      const isInitialShortage = shortageMinute <= ROOM_DAY_START_MINUTE;
       w.push({
         level: 'orange',
-        title: '午後不足',
+        title: isInitialShortage ? '人数不足' : '午後不足',
         room,
-        fromTime: shortageLabel,
+        fromTime: isInitialShortage ? undefined : shortageLabel,
         msg: coveringCount === 0
-          ? `${room}は${shortageLabel}以降の担当者がいません`
-          : `${room}は${shortageLabel}以降 ${coveringCount}/${requiredCount}名で不足しています`
+          ? (isInitialShortage ? `「${room}」の担当者がいません` : `${room}は${shortageLabel}以降の担当者がいません`)
+          : (isInitialShortage ? `${room}は終日 ${coveringCount}/${requiredCount}名で不足しています` : `${room}は${shortageLabel}以降 ${coveringCount}/${requiredCount}名で不足しています`)
       });
     });
     const uTarget = customRules.capacity?.受付 ?? 2; 
@@ -1194,7 +1200,7 @@ export default function App(): any {
   }, [activeGeneralStaff, monthlyAssign]);
   
   const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); return next; }); };
-  const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { let nextDayCells = { ...(prev[sel] || {}), [k]: v }; nextDayCells = applyFluoroAuxConflictRule(nextDayCells, k); const nextState = { ...prev, [sel]: nextDayCells }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
+  const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { let nextDayCells = { ...(prev[sel] || {}), [k]: v }; nextDayCells = applyFluoroAuxConflictRule(nextDayCells, k, customRules.fluoroAuxConflictRooms); const nextState = { ...prev, [sel]: nextDayCells }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
 
   const clearAbsenceHelp = (staffName: string) => {
     setAllDaysWithHistory((prev: any) => {
@@ -1313,7 +1319,7 @@ export default function App(): any {
         dayCells[weeklySwapPending.section] = join(nextFrom);
         dayCells[section] = join(nextTo);
       }
-      const normalizedDayCells = applyFluoroAuxConflictRule(applyFluoroAuxConflictRule(dayCells, weeklySwapPending.section), section);
+      const normalizedDayCells = applyFluoroAuxConflictRule(applyFluoroAuxConflictRule(dayCells, weeklySwapPending.section, customRules.fluoroAuxConflictRooms), section, customRules.fluoroAuxConflictRooms);
       return { ...prev, [dayId]: normalizedDayCells };
     });
     setWeeklySwapPending(null);
@@ -1629,7 +1635,7 @@ export default function App(): any {
                     ) : null}
                  </div>
                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? addAbsenceHelp : undefined} onClearHelp={s === "不在" ? clearAbsenceHelp : undefined} dayCells={allDays[sel] || {}} />)}
+                   {group.sections.map((s: string) => <SectionEditor key={s} section={s} value={allDays[sel]?.[s] || ""} activeStaff={allStaff} onChange={(v: string) => updateDay(s, v)} noTime={REST_SECTIONS.includes(s) || s === "昼当番"} customOptions={ROLE_PLACEHOLDERS.filter(p => p.startsWith(s))} onAddHelp={s === "不在" ? addAbsenceHelp : undefined} onClearHelp={s === "不在" ? clearAbsenceHelp : undefined} dayCells={allDays[sel] || {}} fluoroAuxConflictRooms={customRules.fluoroAuxConflictRooms} />)}
                  </div>
                </div>
              ))}
@@ -1825,6 +1831,7 @@ export default function App(): any {
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 260 }}><label style={{ fontSize: 17, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>【終日専任】半休・AM/PM不可の部屋</label><MultiPicker selected={customRules.fullDayOnlyRooms ?? ""} onChange={(v: string) => setCustomRules({...customRules, fullDayOnlyRooms: v})} options={ROOM_SECTIONS} /></div>
                 <div style={{ flex: 1, minWidth: 260 }}><label style={{ fontSize: 17, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>【連日を強く回避・週1回優先】連日はなるべく避け、今週2回目以降もできれば避けたい部屋（不足時は許容）</label><MultiPicker selected={customRules.noConsecutiveRooms ?? ""} onChange={(v: string) => setCustomRules({...customRules, noConsecutiveRooms: v})} options={ROOM_SECTIONS} /></div>
+                <div style={{ flex: 1, minWidth: 260 }}><label style={{ fontSize: 17, fontWeight: 800, color: "#475569", display: "block", marginBottom: 8 }}>【待機・透析後胸部】重ねない部屋</label><MultiPicker selected={customRules.fluoroAuxConflictRooms ?? ""} onChange={(v: string) => setCustomRules({...customRules, fluoroAuxConflictRooms: v})} options={ROOM_SECTIONS.filter(s => !AUX_FOLLOWUP_SECTIONS.includes(s))} /></div>
               </div>
             </RuleCard>
 
