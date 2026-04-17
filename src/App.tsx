@@ -534,7 +534,7 @@ export class AutoAssigner {
   dynamicCapacity: Record<string, number> = {}; assignCounts: Record<string, number> = {}; maxAssigns: Record<string, number> = {};
   counts: Record<string, number> = {}; roomCounts: Record<string, Record<string, number>> = {};
   initialAvailAll: string[] = []; initialAvailGeneral: string[] = []; initialAvailSupport: string[] = []; initialAvailReception: string[] = [];
-  logInfo: string[] = []; staffAssignments: {staff: string, section: string}[] = [];
+  logInfo: string[] = []; staffAssignments: {staff: string, section: string}[] = []; lateShiftAssigned: Set<string> = new Set();
   
   constructor(day: DayData, prevDay: DayData | null, pastDaysInMonth: DayData[], pastDaysInWeek: DayData[], ctx: AutoAssignContext, isSmartFix: boolean = false) {
     this.day = { ...day }; this.prevDay = prevDay; this.pastDaysInMonth = pastDaysInMonth; this.pastDaysInWeek = pastDaysInWeek; this.ctx = ctx; this.dayCells = { ...day.cells }; this.dynamicCapacity = { ...(ctx.customRules.capacity || {}) }; this.isSmartFix = isSmartFix;
@@ -820,6 +820,9 @@ export class AutoAssigner {
           current.push(`${picked}${rule.lateTime}`);
           this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM');
           this.dayCells[rule.section] = join(current);
+          this.lateShiftAssigned.add(picked);
+          this.assignCounts[picked] = 1;
+          this.log(`🌙 [遅番確定] ${picked} を ${rule.section} の遅番に配置`);
         }
       }
     });
@@ -836,7 +839,7 @@ export class AutoAssigner {
     const dKT = ROOM_SECTIONS.filter(r => !["CT", "MRI", "治療", "RI", "待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r)).sort((a, b) => { let iA = pL.indexOf(a); if (iA === -1) iA = 999; let iB = pL.indexOf(b); if (iB === -1) iB = 999; return iB - iA; });
     const rP = [...ROOM_SECTIONS].sort((a, b) => { let iA = pL.indexOf(a); if (iA === -1) iA = 999; let iB = pL.indexOf(b); if (iB === -1) iB = 999; return iB - iA; });
     
-    let uG2 = this.initialAvailGeneral.filter(s => !this.isUsed(s) && this.blockMap.get(s) !== 'ALL');
+    let uG2 = this.initialAvailGeneral.filter(s => !this.isUsed(s) && this.blockMap.get(s) !== 'ALL' && !this.lateShiftAssigned.has(s));
     uG2.forEach(st => {
       const b = this.blockMap.get(st); if (b === 'ALL') return; let t = this.getPreferredWorkTag(st); let asg = false;
       if (!this.isUnassignedForRelief(st, t)) return;
@@ -2328,5 +2331,6 @@ const formatPrintMember = (m: string) => m
   .replace("(16:00〜)", " 16:00〜")
   .replace("(12:15〜13:00)", " 12:15〜13:00")
   .trim();
+
 
 
