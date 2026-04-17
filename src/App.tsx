@@ -578,6 +578,47 @@ export class AutoAssigner {
   private getPortableTag(staff: string): string {
     return this.getPreferredWorkTag(staff);
   }
+  private isLateShiftEntry(entry: string): boolean {
+    return entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:");
+  }
+  private getLateShiftDayAssignments(staff: string, excludeSection: string): { section: string; entry: string }[] {
+    return ROOM_SECTIONS
+      .filter(sec => sec !== excludeSection)
+      .flatMap(sec => split(this.dayCells[sec] || "").filter(m => extractStaffName(m) === staff && !this.isLateShiftEntry(m)).map(entry => ({ section: sec, entry })));
+  }
+  private getLateShiftCandidateMeta(staff: string, ruleSection: string, dayEndTime: string) {
+    const daytimeAssignments = this.getLateShiftDayAssignments(staff, ruleSection);
+    if (daytimeAssignments.length === 0) {
+      return { ok: true, priority: 1, trimTarget: null as { section: string; entry: string } | null };
+    }
+    if (daytimeAssignments.length !== 1) {
+      return { ok: false, priority: 9, trimTarget: null as { section: string; entry: string } | null };
+    }
+    const trimTarget = daytimeAssignments[0];
+    const tag = this.getMemberTimeTag(trimTarget.entry);
+    if (this.isTimeTagBlockedByFullDayRule(trimTarget.section, dayEndTime || tag || "")) {
+      return { ok: false, priority: 9, trimTarget: null as { section: string; entry: string } | null };
+    }
+    if (!dayEndTime) {
+      return { ok: tag === "", priority: tag === "" ? 0 : 9, trimTarget: tag === "" ? trimTarget : null as { section: string; entry: string } | null };
+    }
+    if (tag === "") {
+      return { ok: true, priority: 0, trimTarget };
+    }
+    if (tag === dayEndTime) {
+      return { ok: true, priority: 0, trimTarget: null as { section: string; entry: string } | null };
+    }
+    return { ok: false, priority: 9, trimTarget: null as { section: string; entry: string } | null };
+  }
+  private applyLateShiftDayEndTime(staff: string, ruleSection: string, dayEndTime: string) {
+    if (!dayEndTime) return;
+    const meta = this.getLateShiftCandidateMeta(staff, ruleSection, dayEndTime);
+    if (!meta.ok || !meta.trimTarget) return;
+    const { section, entry } = meta.trimTarget;
+    const updated = split(this.dayCells[section] || "").map(m => m === entry ? `${staff}${dayEndTime}` : m);
+    this.dayCells[section] = join(updated);
+    this.blockMap.set(staff, 'PM');
+  }
   private isMetadataKey(sec: string) { return sec.startsWith("__"); }
   private hhmmToMinutes(s: string) { const [h, m] = s.split(":").map(Number); return h * 60 + m; }
   private isLunchAvailable(staff: string): boolean {
@@ -799,30 +840,59 @@ export class AutoAssigner {
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
       let current = split(this.dayCells[rule.section]);
-      if (current.length > 0 && !current.some(m => m.includes("17:") || m.includes("18:"))) {
+      if (current.length > 0 && !current.some(m => this.isLateShiftEntry(m))) {
         const usedCountThisWeek = this.pastDaysInWeek.filter((pd: DayData) =>
-          split(pd.cells[rule.section] || "").some((m: string) =>
-            !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:")
-          )
+          split(pd.cells[rule.section] || "").some((m: string) => !this.isLateShiftEntry(m))
         ).length;
         if (rule.fromSecondUseInWeek && usedCountThisWeek === 0) {
           this.log(`🕒 [遅番保留] ${rule.section} は今週初回のため遅番を付与しない`);
           return;
         }
         const currentCore = current.map(extractStaffName);
-        const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
-        const excludeStaff = Array.from(new Set([...split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName), ...split(this.ctx.customRules.noLateShiftRooms || "").flatMap(r => split(this.dayCells[r] || "").map(extractStaffName))]));
-        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n) && this.blockMap.get(n) !== 'ALL' && this.blockMap.get(n) !== 'PM' && !(this.blockMap.get(n) === 'AM' && this.getAssignedUsage(n) > 0));
-        candidates.sort((a, b) => { let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100; const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b); if (idxA !== -1) sA += 100000 + ((lowPriorityStaff.length - idxA) * 10000); if (idxB !== -1) sB += 100000 + ((lowPriorityStaff.length - idxB) * 10000); if (sA !== sB) return sA - sB; return a.localeCompare(b, 'ja'); });
-        let picked = candidates.find(n => !prevLateStaff.includes(n));
+        const dayEndTime = rule.dayEndTime || "";
+        const prevLateStaff = this.prevDay
+          ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => this.isLateShiftEntry(m)).map(extractStaffName)
+          : [];
+        const excludeStaff = Array.from(new Set([
+          ...split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName),
+          ...split(this.ctx.customRules.noLateShiftRooms || "").flatMap(r => split(this.dayCells[r] || "").map(extractStaffName))
+        ]));
+        const candidates = this.initialAvailGeneral
+          .map(name => ({
+            name,
+            meta: this.getLateShiftCandidateMeta(name, rule.section, dayEndTime)
+          }))
+          .filter(({ name, meta }) =>
+            meta.ok &&
+            !currentCore.includes(name) &&
+            !this.isForbidden(name, rule.section) &&
+            !excludeStaff.includes(name) &&
+            this.blockMap.get(name) !== 'ALL' &&
+            this.blockMap.get(name) !== 'PM' &&
+            !(this.blockMap.get(name) === 'AM' && this.getAssignedUsage(name) > 0)
+          );
+        candidates.sort((a, b) => {
+          if (a.meta.priority !== b.meta.priority) return a.meta.priority - b.meta.priority;
+          let sA = this.getPastLateShiftCount(a.name) * 100;
+          let sB = this.getPastLateShiftCount(b.name) * 100;
+          const idxA = lowPriorityStaff.indexOf(a.name);
+          const idxB = lowPriorityStaff.indexOf(b.name);
+          if (idxA !== -1) sA += 100000 + ((lowPriorityStaff.length - idxA) * 10000);
+          if (idxB !== -1) sB += 100000 + ((lowPriorityStaff.length - idxB) * 10000);
+          if (sA !== sB) return sA - sB;
+          return a.name.localeCompare(b.name, 'ja');
+        });
+        let picked = candidates.find(({ name }) => !prevLateStaff.includes(name));
         if (!picked && candidates.length > 0) picked = candidates[0];
         if (picked) {
-          current.push(`${picked}${rule.lateTime}`);
-          this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM');
+          this.applyLateShiftDayEndTime(picked.name, rule.section, dayEndTime);
+          current = split(this.dayCells[rule.section]);
+          current.push(`${picked.name}${rule.lateTime}`);
+          this.blockMap.set(picked.name, this.blockMap.get(picked.name) === 'AM' ? 'ALL' : 'PM');
           this.dayCells[rule.section] = join(current);
-          this.lateShiftAssigned.add(picked);
-          this.assignCounts[picked] = 1;
-          this.log(`🌙 [遅番確定] ${picked} を ${rule.section} の遅番に配置`);
+          this.lateShiftAssigned.add(picked.name);
+          this.assignCounts[picked.name] = 1;
+          this.log(`🌙 [遅番確定] ${picked.name} を ${rule.section} の遅番に配置`);
         }
       }
     });
