@@ -216,7 +216,7 @@ export const DEFAULT_RULES: CustomRules = {
   dailyAdditions: [], priorityRooms: ["治療","受付","MMG","RI","MRI","CT","透視（6号）","透視（11号）","骨塩","1号室","5号室","2号室","ポータブル","DSA","検像","パノラマCT","3号室","受付ヘルプ","透析後胸部"], 
   fullDayOnlyRooms: "DSA、CT、MRI", noConsecutiveRooms: "ポータブル", 
   noLateShiftStaff: "浅野、木内康、髙橋、川崎、松平、阿部", noLateShiftRooms: "透視（11号）", lateShiftLowPriorityStaff: "木内康、石田、澤邊、依田", fluoroAuxConflictRooms: "透視（6号）、透視（11号）", 
-  closedRooms: [{day:"月",room:"3号室",time:"(PM)"},{day:"火",room:"3号室",time:"(PM)"},{day:"水",room:"3号室",time:"(PM)"},{day:"木",room:"3号室",time:"(PM)"},{day:"金",room:"3号室",time:"(PM)"}], 
+  closedRooms: [{day:"月",room:"3号室",time:"全日"},{day:"火",room:"3号室",time:"全日"},{day:"水",room:"3号室",time:"全日"},{day:"木",room:"3号室",time:"全日"},{day:"金",room:"3号室",time:"全日"}], 
   ngPairs: [{s1:"本郷",s2:"寺本",level:"hard"},{s1:"髙橋",s2:"寺本",level:"soft"}], 
   fixed: [{staff:"川崎",section:"治療"},{staff:"阿部",section:"治療"},{staff:"髙橋",section:"MRI"},{staff:"松平",section:"CT"},{staff:"豊田",section:"CT"}], 
   forbidden: [
@@ -271,7 +271,9 @@ const sanitizeRulesInput = (raw: any): CustomRules => {
     supportTargetRoomsHighImpact: _supportTargetRoomsHighImpact,
     ...rest
   } = raw || {};
-  return { ...DEFAULT_RULES, ...rest } as CustomRules;
+  const merged = { ...DEFAULT_RULES, ...rest } as CustomRules;
+  merged.closedRooms = (merged.closedRooms || []).map((r: any) => (r?.room === "3号室" ? { ...r, time: "全日" } : r));
+  return merged;
 };
 
 export const KEY_ALL_DAYS = "shifto_alldays_v300"; export const KEY_MONTHLY = "shifto_monthly_v300"; export const KEY_RULES = "shifto_rules_v300";
@@ -674,15 +676,34 @@ export class AutoAssigner {
     const eff = this.getEffectiveTarget(targetRoom, baseCap);
     if (eff.allClosed) return;
 
-    const sourceRoomsFromRules = (this.ctx.customRules.rescueRules || [])
-      .filter((r: any) => r.targetRoom === targetRoom)
-      .flatMap((r: any) => split(r.sourceRooms || "").map((src: string) => parseRoomCond(src).r));
-    const sourceRooms = Array.from(new Set([...supportRooms, ...sourceRoomsFromRules.filter((r: string) => supportRooms.includes(r))]))
-      .filter((r: string) => r && r !== targetRoom);
+    const sourceRooms = Array.from(new Set(supportRooms)).filter((r: string) => r && r !== targetRoom);
     if (!sourceRooms.length) return;
 
     const hasSupportRemaining = (members: string[]) => members.some(m => supportStaff.includes(extractStaffName(m)));
     let targetMembers = split(this.dayCells[targetRoom] || "");
+
+    // targetRoom が空いている場合は、支援部屋（例: 2号室=浅野＋誰か）から相方を「移動」して空室を先に埋める。
+    if (targetMembers.length === 0) {
+      for (const sourceRoom of sourceRooms) {
+        if (this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
+        const sourceMembers = split(this.dayCells[sourceRoom] || "");
+        if (!hasSupportRemaining(sourceMembers)) continue;
+        const movable = sourceMembers.find(entry => {
+          const core = extractStaffName(entry);
+          if (supportStaff.includes(core) || ROLE_PLACEHOLDERS.includes(core) || entry.includes("17:") || entry.includes("19:")) return false;
+          if (this.isForbidden(core, targetRoom) || this.isHalfDayBlocked(core, targetRoom).hard) return false;
+          if (this.isTimeTagBlockedByFullDayRule(targetRoom, entry)) return false;
+          return sourceMembers.filter(m => m !== entry).some(m => supportStaff.includes(extractStaffName(m)));
+        });
+        if (movable) {
+          this.dayCells[sourceRoom] = join(sourceMembers.filter(m => m !== movable));
+          this.dayCells[targetRoom] = movable;
+          this.log(`🧩 [サポート部屋振替] ${sourceRoom} は支援スタッフのみで維持し、${extractStaffName(movable)} を ${targetRoom} に移動`);
+          this.refreshAssignmentState();
+          return;
+        }
+      }
+    }
 
     // 既に支援対象部屋の担当者を targetRoom に兼務追加してしまっている場合は、支援対象部屋側から外して「浅野だけ」に戻す。
     for (const sourceRoom of sourceRooms) {
@@ -917,7 +938,7 @@ export class AutoAssigner {
     this.logPhase("フェーズ1：前提処理"); this.initCounts();
     if (this.prevDay?.cells["入り"]) { const iriMems = split(this.prevDay.cells["入り"]).map(extractStaffName); this.dayCells["明け"] = join(Array.from(new Set([...split(this.dayCells["明け"]), ...iriMems]))); if (iriMems.length > 0) this.log(`[前日処理] 昨日の「入り」を「明け」に配置`); }
     if (this.day.isPublicHoliday) { this.log(`🎌 祝日のためスキップ`); return { ...this.day, cells: this.dayCells, logInfo: this.logInfo }; }
-    const dayChar = this.day.label.match(/\((.*?)\)/)?.[1]; if (dayChar) { (this.ctx.customRules.closedRooms || []).forEach((r: any) => { if (r.day === dayChar) this.log(`🛑 曜日ルールで ${r.room} の ${r.time} 閉室`); }); }
+    const dayChar = this.day.label.match(/\((.*?)\)/)?.[1];
     if (!this.isSmartFix) { ROOM_SECTIONS.forEach(sec => { if (sec === "透析後胸部") return; this.dayCells[sec] = join(split(this.dayCells[sec]).filter(m => ROLE_PLACEHOLDERS.includes(extractStaffName(m)))); }); this.dayCells["昼当番"] = ""; this.dayCells["受付ヘルプ"] = ""; }
     this.buildBlockMap();
     if (this.isSmartFix) { WORK_SECTIONS.forEach(sec => { let cur = split(this.dayCells[sec]); let nx = cur.filter(m => { const core = extractStaffName(m); const b = this.blockMap.get(core); if (ROLE_PLACEHOLDERS.includes(core)) return true; if (b === 'ALL') return false; const tt = this.timeTagMap.get(core); if (tt && m.includes(tt)) return true; if (b === 'AM' && (!m.includes('(') || m.includes('(AM)'))) return false; if (b === 'PM' && (!m.includes('(') || m.includes('(PM)'))) return false; if (b === 'PM' && tt && m.includes('(AM)')) return false; return true; }); if (cur.length !== nx.length) { this.dayCells[sec] = join(nx); } }); }
@@ -1289,20 +1310,6 @@ export default function App(): any {
         } 
       });
     });
-
-    const day = days.find(d => d.id === dayId);
-    const dayChar = day?.label.match(/\((.*?)\)/)?.[1];
-    if (dayChar) {
-      (customRules.closedRooms || []).forEach((r: any) => {
-        if (r.room !== "3号室" || r.day !== dayChar) return;
-        split(cells[r.room] || "").forEach(m => {
-          const c = extractStaffName(m);
-          if (!staffTime[c]) return;
-          if (r.time === "(PM)" && m.includes("(AM)")) staffTime[c].pm = true;
-          if (r.time === "(AM)" && m.includes("(PM)")) staffTime[c].am = true;
-        });
-      });
-    }
 
     
     const unassigned: string[] = [];
