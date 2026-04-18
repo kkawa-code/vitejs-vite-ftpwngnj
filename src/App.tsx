@@ -955,6 +955,76 @@ export class AutoAssigner {
     });
   }
   updateBlockMapAfterKenmu(core: string, pushStr: string) { const cur = this.blockMap.get(core); let nx: string; if (pushStr.includes("(AM)")) nx = (cur === 'PM' || cur === 'ALL') ? 'ALL' : 'AM'; else if (pushStr.includes("(PM)")) nx = (cur === 'AM' || cur === 'ALL') ? 'ALL' : 'PM'; else nx = 'ALL'; this.blockMap.set(core, nx); }
+  private repairMmgElevenConflict(conflictStaff: string): boolean {
+    const staffCore = extractStaffName(conflictStaff);
+    if (!staffCore) return false;
+    const mmgMembers = split(this.dayCells["MMG"] || "");
+    const elevenMembers = split(this.dayCells["透視（11号）"] || "");
+    const staffInMmg = mmgMembers.some(m => extractStaffName(m) === staffCore);
+    const staffInEleven = elevenMembers.some(m => extractStaffName(m) === staffCore);
+    if (!staffInMmg && !staffInEleven) return false;
+    const auxCores = new Set<string>();
+    AUX_FOLLOWUP_SECTIONS.forEach(sec => split(this.dayCells[sec] || "").forEach(m => auxCores.add(extractStaffName(m))));
+    const femaleList = split(this.ctx.customRules.femaleStaffList || "").map(extractStaffName);
+    const isCandidateMmgOk = (core: string) => !auxCores.has(core) && core !== staffCore && !this.isForbidden(core, "MMG") && (femaleList.includes(core) || this.isMmgCapable(core));
+    const sourceRooms = ["MMG", "1号室", "2号室", "5号室", "骨塩", "検像", "パノラマCT", "ポータブル", "CT", "RI", "治療", "透視（6号）"].filter(r => !this.skipSections.includes(r) && !this.shouldSkipAutoAssignRoom(r));
+    for (const sourceRoom of sourceRooms) {
+      const sourceMembers = split(this.dayCells[sourceRoom] || "");
+      const candidates = sourceMembers
+        .filter(m => !m.includes("17:") && !m.includes("19:"))
+        .filter(m => isCandidateMmgOk(extractStaffName(m)))
+        .sort((a, b) => {
+          const aCore = extractStaffName(a);
+          const bCore = extractStaffName(b);
+          const aFull = a.includes("(") ? 1 : 0;
+          const bFull = b.includes("(") ? 1 : 0;
+          return aFull - bFull || this.getTodayRoomLoad(aCore) - this.getTodayRoomLoad(bCore) || this.getPastRoomCount(aCore, "MMG") - this.getPastRoomCount(bCore, "MMG");
+        });
+      for (const candidateEntry of candidates) {
+        const candidateCore = extractStaffName(candidateEntry);
+        const candidateTag = this.getMemberTimeTag(candidateEntry);
+        if (this.isTimeTagBlockedByFullDayRule("MMG", candidateTag) || this.isTimeTagBlockedByFullDayRule("透視（11号）", candidateTag)) continue;
+        const sourcePeers = sourceMembers.filter(m => m !== candidateEntry).map(extractStaffName);
+        const replacementForSource = `${staffCore}${candidateTag}`;
+        const canMoveStaffToSource = sourceRoom === "MMG" || (!this.isForbidden(staffCore, sourceRoom) && !this.isHalfDayBlocked(staffCore, sourceRoom).hard && !this.hasNGPair(staffCore, sourcePeers, false) && !this.isTimeTagBlockedByFullDayRule(sourceRoom, replacementForSource));
+        if (!canMoveStaffToSource) continue;
+        if (sourceRoom !== "MMG") {
+          this.dayCells[sourceRoom] = join(sourceMembers.map(m => m === candidateEntry ? replacementForSource : m));
+        }
+        const nextMmg = mmgMembers.filter(m => extractStaffName(m) !== staffCore && extractStaffName(m) !== candidateCore);
+        const nextEleven = elevenMembers.filter(m => extractStaffName(m) !== staffCore && extractStaffName(m) !== candidateCore);
+        this.dayCells["MMG"] = join([...nextMmg, `${candidateCore}${candidateTag}`]);
+        this.dayCells["透視（11号）"] = join([...nextEleven, `${candidateCore}${candidateTag}`]);
+        this.assignCounts[staffCore] = this.getAssignedUsage(staffCore);
+        this.assignCounts[candidateCore] = this.getAssignedUsage(candidateCore);
+        this.log(`🔁 [MMG・11号調整] 待機/透析後胸部と重なる ${staffCore} の代わりに ${candidateCore} を MMG・透視（11号）へ移しました`);
+        return true;
+      }
+    }
+    return false;
+  }
+  private fillEmptyFluoroConflictRoom(room: string, auxCores: Set<string>): boolean {
+    if (split(this.dayCells[room] || "").length > 0) return true;
+    const femaleList = split(this.ctx.customRules.femaleStaffList || "").map(extractStaffName);
+    const sourceRooms = ["MMG", "1号室", "2号室", "5号室", "骨塩", "検像", "パノラマCT", "ポータブル", "CT", "RI", "治療"];
+    for (const sourceRoom of sourceRooms) {
+      if (this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
+      const sourceMembers = split(this.dayCells[sourceRoom] || "");
+      for (const entry of sourceMembers) {
+        const core = extractStaffName(entry);
+        if (!core || auxCores.has(core) || ROLE_PLACEHOLDERS.includes(core) || entry.includes("17:") || entry.includes("19:")) continue;
+        if (this.isForbidden(core, room) || this.isHalfDayBlocked(core, room).hard || this.isTimeTagBlockedByFullDayRule(room, entry)) continue;
+        if (room === "透視（11号）" && sourceRoom === "MMG" && !femaleList.includes(core) && !this.isMmgCapable(core)) continue;
+        if (this.hasNGPair(core, [], false)) continue;
+        this.dayCells[room] = entry;
+        this.addUsage(core, getStaffAmount(entry));
+        this.updateBlockMapAfterKenmu(core, entry);
+        this.log(`🧩 [透視補充] ${room} が空いたため ${sourceRoom} の ${core} を補充しました`);
+        return true;
+      }
+    }
+    return false;
+  }
   private enforceFluoroAuxConflictRule(): void {
     const conflictRooms = getFluoroAuxConflictSections(this.ctx.customRules.fluoroAuxConflictRooms);
     const auxCores = new Set<string>();
@@ -966,12 +1036,20 @@ export class AutoAssigner {
     });
     if (auxCores.size === 0) return;
     conflictRooms.forEach(room => {
-      const before = split(this.dayCells[room] || "");
+      let before = split(this.dayCells[room] || "");
+      const conflicted = before.filter(m => auxCores.has(extractStaffName(m))).map(extractStaffName);
+      if (room === "透視（11号）" && conflicted.length > 0 && before.length === conflicted.length) {
+        conflicted.some(staff => this.repairMmgElevenConflict(staff));
+        before = split(this.dayCells[room] || "");
+      }
       const after = before.filter(m => !auxCores.has(extractStaffName(m)));
       if (after.length !== before.length) {
         const removed = before.filter(m => auxCores.has(extractStaffName(m))).map(extractStaffName);
         this.dayCells[room] = join(after);
         this.log(`🚫 [待機・透析後胸部優先] ${room} から ${join(Array.from(new Set(removed)))} を外しました`);
+      }
+      if (split(this.dayCells[room] || "").length === 0) {
+        this.fillEmptyFluoroConflictRoom(room, auxCores);
       }
     });
   }
