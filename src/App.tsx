@@ -634,6 +634,13 @@ export class AutoAssigner {
     if (!isPartial) return { hard: false, monthlyHalfException: false };
     return { hard: true, monthlyHalfException: false };
   }
+  private hasPmAbsence(staff: string): boolean {
+    const entry = split(this.dayCells["不在"] || "").find(m => extractStaffName(m) === extractStaffName(staff));
+    if (!entry) return false;
+    if (entry.includes("(PM)")) return true;
+    const from = entry.match(/\((\d+:\d+)〜\)/)?.[1];
+    return !!from && this.hhmmToMinutes(from) < (17 * 60);
+  }
   private getPastWeekRoomCount(s: string, r: string): number { return this.pastDaysInWeek.filter(pd => split(pd.cells[r] || "").map(extractStaffName).includes(s)).length; }
   private getPastMonthRoomCount(s: string, r: string): number { return this.pastDaysInMonth.filter(pd => split(pd.cells[r] || "").map(extractStaffName).includes(s)).length; }
   private shouldAvoidConsecutive(s: string, r: string): boolean { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!this.prevDay || !noC.includes(r)) return false; return split(this.prevDay.cells[r] || "").map(extractStaffName).includes(s); }
@@ -764,6 +771,31 @@ export class AutoAssigner {
       }
     });
     this.refreshAssignmentState();
+  }
+
+  private trimOverloadedSupportPartners() {
+    const supportStaff = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
+    const supportRooms = split(this.ctx.customRules.supportTargetRooms || "");
+    if (!supportStaff.length || !supportRooms.length) return;
+    let changed = false;
+    supportRooms.forEach(room => {
+      if (this.skipSections.includes(room) || this.shouldSkipAutoAssignRoom(room)) return;
+      const members = split(this.dayCells[room] || "");
+      if (!members.some(m => supportStaff.includes(extractStaffName(m)))) return;
+      const next = members.filter(entry => {
+        const core = extractStaffName(entry);
+        if (supportStaff.includes(core) || ROLE_PLACEHOLDERS.includes(core)) return true;
+        const hasOtherRoom = ROOM_SECTIONS.some(r => r !== room && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r) && split(this.dayCells[r] || "").some(m => extractStaffName(m) === core));
+        if (hasOtherRoom && this.getTodayRoomLoad(core) >= 3) {
+          this.log(`↪️ [サポート最終整理] ${core} は3件兼務を避けるため ${room} から外し、支援スタッフを残しました`);
+          changed = true;
+          return false;
+        }
+        return true;
+      });
+      if (next.length !== members.length && next.some(m => supportStaff.includes(extractStaffName(m)))) this.dayCells[room] = join(next);
+    });
+    if (changed) this.refreshAssignmentState();
   }
 
   private getNoConsecutiveSourceRooms(room: string): string[] {
@@ -923,7 +955,31 @@ export class AutoAssigner {
     });
   }
   updateBlockMapAfterKenmu(core: string, pushStr: string) { const cur = this.blockMap.get(core); let nx: string; if (pushStr.includes("(AM)")) nx = (cur === 'PM' || cur === 'ALL') ? 'ALL' : 'AM'; else if (pushStr.includes("(PM)")) nx = (cur === 'AM' || cur === 'ALL') ? 'ALL' : 'PM'; else nx = 'ALL'; this.blockMap.set(core, nx); }
-  canAddKenmu(st: string, tgt: string, bypass: boolean = false): boolean { if (hasFluoroAuxConflict(this.dayCells, st, tgt, this.ctx.customRules.fluoroAuxConflictRooms)) return false; const limit = this.ctx.customRules.alertMaxKenmu || 3; const cLoad = this.getTodayRoomLoad(st); if (!split(this.dayCells[tgt] || "").map(extractStaffName).includes(st) && cLoad >= limit) return false; const exPairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive); for (const p of exPairs) { const inS1 = split(this.dayCells[p.s1] || "").map(extractStaffName).includes(st); const inS2 = split(this.dayCells[p.s2] || "").map(extractStaffName).includes(st); if (inS1 || inS2) { if (tgt !== p.s1 && tgt !== p.s2) return false; } if (tgt === p.s1 || tgt === p.s2) { if (!bypass) { const curR = ROOM_SECTIONS.filter(r => split(this.dayCells[r] || "").map(extractStaffName).includes(st) && !["待機", "昼当番", "受付", "受付ヘルプ"].includes(r)); const hasOut = curR.some(r => r !== p.s1 && r !== p.s2); if (hasOut) return false; } } } return true; }
+  canAddKenmu(st: string, tgt: string, bypass: boolean = false): boolean {
+    const core = extractStaffName(st);
+    if (hasFluoroAuxConflict(this.dayCells, core, tgt, this.ctx.customRules.fluoroAuxConflictRooms)) return false;
+    const limit = this.ctx.customRules.alertMaxKenmu || 3;
+    const normalCap = Math.max(2, limit - 1);
+    const alreadyInTarget = split(this.dayCells[tgt] || "").map(extractStaffName).includes(core);
+    const cLoad = this.getTodayRoomLoad(core);
+    if (!alreadyInTarget && cLoad >= limit) return false;
+    // 3件兼務は通常の基本兼務・救済では作らない。必要な場合は最終救済側でだけ許容する。
+    if (!alreadyInTarget && cLoad >= normalCap) return false;
+    const exPairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive);
+    for (const p of exPairs) {
+      const inS1 = split(this.dayCells[p.s1] || "").map(extractStaffName).includes(core);
+      const inS2 = split(this.dayCells[p.s2] || "").map(extractStaffName).includes(core);
+      if (inS1 || inS2) { if (tgt !== p.s1 && tgt !== p.s2) return false; }
+      if (tgt === p.s1 || tgt === p.s2) {
+        if (!bypass) {
+          const curR = ROOM_SECTIONS.filter(r => split(this.dayCells[r] || "").map(extractStaffName).includes(core) && !["待機", "昼当番", "受付", "受付ヘルプ"].includes(r));
+          const hasOut = curR.some(r => r !== p.s1 && r !== p.s2);
+          if (hasOut) return false;
+        }
+      }
+    }
+    return true;
+  }
   private isLinkedTargetRoom(room: string): boolean { return (this.ctx.customRules.linkedRooms || []).some((rule: any) => rule.target === room); }
   isMmgCapable(st: string): boolean { return split(this.ctx.monthlyAssign.MMG || "").map(extractStaffName).includes(extractStaffName(st)); }
   getEffectiveTarget(room: string, baseCap: number) { const dayChar = this.day.label.match(/\((.*?)\)/)?.[1]; if (!dayChar) return { cap: baseCap, amClosed: false, pmClosed: false, allClosed: false }; const closed = (this.ctx.customRules.closedRooms || []).filter((r: any) => r.room === room && r.day === dayChar); let amClosed = false; let pmClosed = false; let allClosed = false; closed.forEach((r: any) => { if (r.time === "全日") allClosed = true; else if (r.time === "(AM)") amClosed = true; else if (r.time === "(PM)") pmClosed = true; }); if (amClosed && pmClosed) allClosed = true; if (allClosed) return { cap: 0, amClosed: true, pmClosed: true, allClosed: true }; if (amClosed || pmClosed) return { cap: baseCap / 2, amClosed, pmClosed, allClosed: false }; return { cap: baseCap, amClosed: false, pmClosed: false, allClosed: false }; }
@@ -1167,6 +1223,9 @@ export class AutoAssigner {
     });
 
     this.releaseSupportPartnersForEmptyRooms();
+    this.trimOverloadedSupportPartners();
+    this.placeSupportStaffAsLastResort();
+    this.releaseSupportPartnersForEmptyRooms();
 
     (this.ctx.customRules.emergencies || []).forEach((em: any) => {
       if (em.type !== "empty_room_swap") return; const wR = em.section; const sRL = split(em.sourceRooms || em.sourceRoom || ""); if (!wR || !sRL.length || this.skipSections.includes(wR) || wR === "透析後胸部") return; const wC = this.dynamicCapacity[wR] ?? 1; if (split(this.dayCells[wR]).reduce((s, m) => s + getStaffAmount(m), 0) >= wC) return;
@@ -1191,16 +1250,17 @@ export class AutoAssigner {
         const currentCore = current.map(extractStaffName);
         const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
         const excludeStaff = Array.from(new Set([...split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName), ...split(this.ctx.customRules.noLateShiftRooms || "").flatMap(r => split(this.dayCells[r] || "").map(extractStaffName))]));
-        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n) && this.blockMap.get(n) !== 'ALL' && this.blockMap.get(n) !== 'PM' && !(this.blockMap.get(n) === 'AM' && this.getAssignedUsage(n) > 0));
+        const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n) && !this.hasPmAbsence(n) && this.getTodayRoomLoad(n) > 0);
         candidates.sort((a, b) => { let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100; const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b); if (idxA !== -1) sA += 100000 + ((lowPriorityStaff.length - idxA) * 10000); if (idxB !== -1) sB += 100000 + ((lowPriorityStaff.length - idxB) * 10000); if (sA !== sB) return sA - sB; return a.localeCompare(b, 'ja'); });
         let picked = candidates.find(n => !prevLateStaff.includes(n));
         if (!picked && candidates.length > 0) picked = candidates[0];
         if (picked) {
           current.push(`${picked}${rule.lateTime}`);
-          this.blockMap.set(picked, this.blockMap.get(picked) === 'AM' ? 'ALL' : 'PM');
+          const prevBlock = this.blockMap.get(picked);
+          this.blockMap.set(picked, prevBlock === 'AM' ? 'ALL' : (prevBlock || 'PM'));
           this.dayCells[rule.section] = join(current);
           this.lateShiftAssigned.add(picked);
-          this.assignCounts[picked] = 1;
+          this.assignCounts[picked] = this.getAssignedUsage(picked);
           this.log(`🌙 [遅番確定] ${picked} を ${rule.section} の遅番に配置`);
         }
       }
@@ -1240,8 +1300,10 @@ export class AutoAssigner {
     });
 
     this.releaseSupportPartnersForEmptyRooms();
+    this.trimOverloadedSupportPartners();
     this.placeSupportStaffAsLastResort();
     this.releaseSupportPartnersForEmptyRooms();
+    this.trimOverloadedSupportPartners();
     this.rebalanceNoConsecutiveRooms();
     this.refreshAssignmentState();
 
@@ -2468,7 +2530,7 @@ export default function App(): any {
                   </div>
               </div>
               <div style={{ marginTop: 14, background: "#ffffff", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 14px", color: "#166534", fontSize: 14, fontWeight: 700, lineHeight: 1.6 }}>
-                基本は対象部屋の2人目として兼務で使います。通常の基本兼務・空室救済・遅番・未配置救済が終わった後、1号室・5号室などが空いていて対象部屋にサポートスタッフ＋相方がいる場合は、サポートスタッフを残して相方を空室へ移動します。サポートスタッフの単独配置は、それでも対象部屋が埋まらない場合の最後の手段です。
+                基本は対象部屋の2人目として兼務で使います。通常の基本兼務・空室救済の後、3件兼務を作る前に対象部屋をサポートスタッフ1人で維持できる場合は相方を外します。1号室・5号室などが空いている場合はサポートスタッフを残して相方を空室へ移動します。サポートスタッフの単独配置は、通常候補と救済でも埋まらない場合に、3件兼務より先に使います。
               </div>
             </RuleCard>
 
@@ -2677,14 +2739,14 @@ export default function App(): any {
               <li style={{ marginBottom: 8 }}>
                 <strong>兼務・交換・救済:</strong>
                 <div style={{ background: "#f0fdf4", padding: "8px 12px", borderRadius: 6, border: "1px solid #bbf7d0", margin: "4px 0" }}>
-                   💡 フェーズ4では、<strong>サポート兼務 → 交換ルール → 基本兼務 → 空室救済 → 遅番</strong> の順で処理します。<br/>
+                   💡 フェーズ4では、<strong>交換ルール → 基本兼務 → 空室救済 → サポート最終整理 → 遅番</strong> の順で処理します。<br/>
                    候補の選び方はルールの種類ごとに少し違いますが、主に <strong>当日の兼務負荷</strong>、<strong>過去担当回数</strong>、<strong>設定した優先順</strong> を見ながら安全な候補を選びます。
                 </div>
                 定員割れがある場合は、ほかの部屋への影響が少ない候補から兼務や救済を呼びます。
               </li>
               <li style={{ marginBottom: 8 }}>
                 <strong>総仕上げ（昼当番・余剰配置）:</strong>
-                昼当番を決定後、余力のあるスタッフは優先的に兼務解消（専任化）にあてられます。サポート専任の単独配置は、通常候補と空室救済でも埋まらない場合の最後の手段として行います。
+                昼当番を決定後、余力のあるスタッフは優先的に兼務解消（専任化）にあてられます。3件兼務は最後の手段に寄せ、サポート対象部屋は可能ならサポートスタッフ1人で維持して負担を逃がします。
               </li>
             </ol>
 
