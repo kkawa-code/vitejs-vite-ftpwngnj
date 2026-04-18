@@ -966,6 +966,15 @@ export class AutoAssigner {
     const auxCores = new Set<string>();
     AUX_FOLLOWUP_SECTIONS.forEach(sec => split(this.dayCells[sec] || "").forEach(m => auxCores.add(extractStaffName(m))));
     const femaleList = split(this.ctx.customRules.femaleStaffList || "").map(extractStaffName);
+    const exclusivePairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive && p.s1 && p.s2);
+    const getSwapRoomsForCandidate = (sourceRoom: string, candidateCore: string) => {
+      const pair = exclusivePairs.find((p: any) =>
+        p.s1 !== "MMG" && p.s2 !== "MMG" && p.s1 !== "透視（11号）" && p.s2 !== "透視（11号）" &&
+        [p.s1, p.s2].includes(sourceRoom) &&
+        [p.s1, p.s2].some((r: string) => split(this.dayCells[r] || "").some(m => extractStaffName(m) === candidateCore))
+      );
+      return pair ? [pair.s1, pair.s2] : [sourceRoom];
+    };
     const isCandidateMmgOk = (core: string) => !auxCores.has(core) && core !== staffCore && !this.isForbidden(core, "MMG") && (femaleList.includes(core) || this.isMmgCapable(core));
     const sourceRooms = ["MMG", "骨塩", "検像", "パノラマCT", "5号室", "2号室", "ポータブル", "CT", "RI", "治療", "1号室", "透視（6号）"].filter(r => !this.skipSections.includes(r) && !this.shouldSkipAutoAssignRoom(r));
     for (const sourceRoom of sourceRooms) {
@@ -984,20 +993,34 @@ export class AutoAssigner {
         const candidateCore = extractStaffName(candidateEntry);
         const candidateTag = this.getMemberTimeTag(candidateEntry);
         if (this.isTimeTagBlockedByFullDayRule("MMG", candidateTag) || this.isTimeTagBlockedByFullDayRule("透視（11号）", candidateTag)) continue;
-        const sourcePeers = sourceMembers.filter(m => m !== candidateEntry).map(extractStaffName);
-        const replacementForSource = `${staffCore}${candidateTag}`;
-        const canMoveStaffToSource = sourceRoom === "MMG" || (!this.isForbidden(staffCore, sourceRoom) && !this.isHalfDayBlocked(staffCore, sourceRoom).hard && !this.hasNGPair(staffCore, sourcePeers, false) && !this.isTimeTagBlockedByFullDayRule(sourceRoom, replacementForSource));
-        if (!canMoveStaffToSource) continue;
-        if (sourceRoom !== "MMG") {
-          this.dayCells[sourceRoom] = join(sourceMembers.map(m => m === candidateEntry ? replacementForSource : m));
-        }
+        const swapRooms = getSwapRoomsForCandidate(sourceRoom, candidateCore);
+        const swapPlans = swapRooms.map(room => ({ room, members: split(this.dayCells[room] || "") })).map(plan => ({
+          ...plan,
+          candidateEntries: plan.members.filter(m => extractStaffName(m) === candidateCore && !m.includes("17:") && !m.includes("19:")),
+        }));
+        if (swapPlans.some(plan => plan.candidateEntries.length === 0)) continue;
+        const candidateRooms = ROOM_SECTIONS.filter(r =>
+          !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r) &&
+          split(this.dayCells[r] || "").some(m => extractStaffName(m) === candidateCore && !m.includes("17:") && !m.includes("19:"))
+        );
+        if (candidateRooms.some(r => !swapRooms.includes(r) && r !== "MMG" && r !== "透視（11号）")) continue;
+        const canSwapPair = swapPlans.every(plan => {
+          const nextPeers = plan.members.filter(m => extractStaffName(m) !== candidateCore).map(extractStaffName);
+          return plan.candidateEntries.every(entry => {
+            const replacement = staffCore + this.getMemberTimeTag(entry);
+            return !this.isForbidden(staffCore, plan.room) && !this.isHalfDayBlocked(staffCore, plan.room).hard && !this.hasNGPair(staffCore, nextPeers, false) && !this.isTimeTagBlockedByFullDayRule(plan.room, replacement);
+          });
+        });
+        if (!canSwapPair) continue;
+        swapPlans.forEach(plan => {
+          this.dayCells[plan.room] = join(plan.members.map(m => extractStaffName(m) === candidateCore ? staffCore + this.getMemberTimeTag(m) : m));
+        });
         const nextMmg = mmgMembers.filter(m => extractStaffName(m) !== staffCore && extractStaffName(m) !== candidateCore);
         const nextEleven = elevenMembers.filter(m => extractStaffName(m) !== staffCore && extractStaffName(m) !== candidateCore);
-        this.dayCells["MMG"] = join([...nextMmg, `${candidateCore}${candidateTag}`]);
-        this.dayCells["透視（11号）"] = join([...nextEleven, `${candidateCore}${candidateTag}`]);
-        this.assignCounts[staffCore] = this.getAssignedUsage(staffCore);
-        this.assignCounts[candidateCore] = this.getAssignedUsage(candidateCore);
-        this.log(`🔁 [MMG・11号調整] 待機/透析後胸部と重なる ${staffCore} の代わりに ${candidateCore} を MMG・透視（11号）へ移しました`);
+        this.dayCells["MMG"] = join([...nextMmg, candidateCore + candidateTag]);
+        this.dayCells["透視（11号）"] = join([...nextEleven, candidateCore + candidateTag]);
+        this.refreshAssignmentState();
+        this.log("🔁 [MMG・11号調整] 待機/透析後胸部と重なる " + staffCore + " の代わりに " + candidateCore + " を MMG・透視（11号）へ移し、" + swapRooms.join("・") + " は " + staffCore + " に戻しました");
         return true;
       }
     }
