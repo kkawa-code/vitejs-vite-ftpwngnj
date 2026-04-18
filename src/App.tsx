@@ -762,6 +762,33 @@ export class AutoAssigner {
     this.refreshAssignmentState();
   }
 
+  private releaseSupportPartnersForEmptyRooms(targetRooms: string[] = ["1号室", "5号室"]) {
+    targetRooms.forEach(room => this.releaseSupportPartnerForEmptyRoom(room));
+  }
+
+  private placeSupportStaffAsLastResort() {
+    const supportStaff = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
+    const supportRooms = split(this.ctx.customRules.supportTargetRooms || "");
+    if (!supportStaff.length || !supportRooms.length) return;
+    this.initialAvailSupport.forEach(staff => {
+      if (!supportStaff.includes(extractStaffName(staff)) || this.isUsed(staff) || this.blockMap.get(staff) === 'ALL') return;
+      const tag = this.getPreferredWorkTag(staff);
+      for (const rm of supportRooms) {
+        if (this.skipSections.includes(rm) || rm === "透析後胸部" || this.shouldSkipAutoAssignRoom(rm) || this.isForbidden(staff, rm)) continue;
+        if (split(this.dayCells[rm] || "").length > 0) continue;
+        const eff = this.getEffectiveTarget(rm, this.dynamicCapacity[rm] ?? (["CT", "MRI", "治療"].includes(rm) ? 3 : 1));
+        if (eff.allClosed || (tag === "(PM)" && eff.pmClosed) || (tag === "(AM)" && eff.amClosed)) continue;
+        if (this.isTimeTagBlockedByFullDayRule(rm, tag) || !this.canAddKenmu(staff, rm)) continue;
+        this.dayCells[rm] = `${staff}${tag}`;
+        this.addUsage(staff, tag ? 0.5 : 1);
+        this.blockMap.set(staff, 'ALL');
+        this.log(`🚨 [サポート最終配置] 通常候補で埋まらないため ${staff}${tag} を ${rm} に単独配置`);
+        break;
+      }
+    });
+    this.refreshAssignmentState();
+  }
+
   private getNoConsecutiveSourceRooms(room: string): string[] {
     const rooms: string[] = [];
     (this.ctx.customRules.linkedRooms || []).filter((r: any) => r.target === room).forEach((r: any) => split(r.sources || "").forEach((src: string) => rooms.push(parseRoomCond(src).r)));
@@ -970,7 +997,7 @@ export class AutoAssigner {
       return { ...this.day, cells: this.dayCells, logInfo: this.logInfo };
     }
     
-    this.logPhase("フェーズ2：例外処理");
+    this.logPhase("フェーズ2：固定・例外処理");
     (this.ctx.customRules.fixed || []).forEach((r: any) => { if (!r.staff || !r.section) return; Object.keys(this.dayCells).forEach(sec => { if (sec === r.section || REST_SECTIONS.includes(sec)) return; const bef = split(this.dayCells[sec]); const aft = bef.filter(m => extractStaffName(m) !== extractStaffName(r.staff)); if (bef.length !== aft.length) { this.dayCells[sec] = join(aft); this.assignCounts[extractStaffName(r.staff)] = 0; this.blockMap.set(extractStaffName(r.staff), 'NONE'); } }); });
     (this.ctx.customRules.fixed || []).forEach((r: any) => { const core = extractStaffName(r.staff); if (!core || !r.section || !this.initialAvailAll.includes(core) || this.isUsed(core) || this.isForbidden(core, r.section) || r.section === "透析後胸部" || this.skipSections.includes(r.section)) return; const cur = split(this.dayCells[r.section]); if (cur.map(extractStaffName).includes(core) || this.hasNGPair(core, cur.map(extractStaffName), false)) return; let t = this.getPreferredWorkTag(core); if (this.isTimeTagBlockedByFullDayRule(r.section, t)) return; this.blockMap.set(core, 'ALL'); this.dayCells[r.section] = join([...cur, `${core}${t}`]); this.addUsage(core, t?0.5:1); this.log(`🔒 [専従] ${core} を ${r.section} に固定配置`); });
     this.staffAssignments.forEach((r: any) => { const core = extractStaffName(r.staff); if (!core || !r.section || !this.initialAvailAll.includes(core) || this.isUsed(core) || this.isForbidden(core, r.section) || r.section === "透析後胸部" || this.skipSections.includes(r.section)) return; const cur = split(this.dayCells[r.section]); if (cur.map(extractStaffName).includes(core) || this.hasNGPair(core, cur.map(extractStaffName), false)) return; let t = this.getPreferredWorkTag(core); if (this.isTimeTagBlockedByFullDayRule(r.section, t)) return; this.blockMap.set(core, 'ALL'); this.dayCells[r.section] = join([...cur, `${core}${t}`]); this.addUsage(core, t?0.5:1); this.log(`🚨 [緊急強制] ${core} を ${r.section} に配置`); });
@@ -1028,10 +1055,26 @@ export class AutoAssigner {
   }
 
   processPostTasks() {
+    this.logPhase("フェーズ4：兼務・救済・遅番");
     const sSL = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName); const lowPriorityStaff = split(this.ctx.customRules.lateShiftLowPriorityStaff || "").map(extractStaffName);
-    this.initialAvailSupport.forEach(staff => { if (this.isUsed(staff)) return; let asg = false; for (const rm of split(this.ctx.customRules.supportTargetRooms)) { if (this.skipSections.includes(rm) || this.isForbidden(staff, rm) || rm === "透析後胸部") continue; let c = split(this.dayCells[rm]); if (c.length > 0 && !c.map(extractStaffName).includes(staff) && !this.hasNGPair(staff, c.map(extractStaffName), false)) { let t = this.getPreferredWorkTag(staff); if (this.isTimeTagBlockedByFullDayRule(rm, t)) continue; this.dayCells[rm] = join([...c, `${staff}${t}`]); this.addUsage(staff, t ? 0.5 : 1); this.blockMap.set(staff, 'ALL'); asg = true; break; } } if (!asg) { for (const rm of split(this.ctx.customRules.supportTargetRooms)) { if (this.skipSections.includes(rm) || this.isForbidden(staff, rm) || rm === "透析後胸部") continue; if (!split(this.dayCells[rm]).length && this.canAddKenmu(staff, rm)) { let t = this.getPreferredWorkTag(staff); if (this.isTimeTagBlockedByFullDayRule(rm, t)) continue; this.dayCells[rm] = `${staff}${t}`; this.addUsage(staff, t ? 0.5 : 1); this.blockMap.set(staff, 'ALL'); break; } } } });
+    this.initialAvailSupport.forEach(staff => {
+      if (this.isUsed(staff)) return;
+      for (const rm of split(this.ctx.customRules.supportTargetRooms)) {
+        if (this.skipSections.includes(rm) || this.isForbidden(staff, rm) || rm === "透析後胸部" || this.shouldSkipAutoAssignRoom(rm)) continue;
+        const c = split(this.dayCells[rm]);
+        if (c.length > 0 && !c.map(extractStaffName).includes(staff) && !this.hasNGPair(staff, c.map(extractStaffName), false)) {
+          const t = this.getPreferredWorkTag(staff);
+          if (this.isTimeTagBlockedByFullDayRule(rm, t)) continue;
+          this.dayCells[rm] = join([...c, `${staff}${t}`]);
+          this.addUsage(staff, t ? 0.5 : 1);
+          this.blockMap.set(staff, 'ALL');
+          this.log(`🤝 [サポート兼務] ${staff} を ${rm} の2人目として追加`);
+          break;
+        }
+      }
+    });
     
-    this.releaseSupportPartnerForEmptyRoom("5号室");
+    this.releaseSupportPartnersForEmptyRooms();
     
     (this.ctx.customRules.swapRules || []).forEach((r: any) => {
       if (!r.targetRoom || !r.triggerRoom || !r.sourceRooms || r.targetRoom === "透析後胸部" || r.triggerRoom === "透析後胸部") return;
@@ -1122,7 +1165,7 @@ export class AutoAssigner {
       if (sRms.length > 0) { let cnds: { c: string, fS: string, i: number }[] = []; sRms.forEach((sS: string, i: number) => { const { r: sR, min } = parseRoomCond(sS); if (sR === tR || sR === "透析後胸部" || (min > 0 && split(this.dayCells[sR]).reduce((s, m) => s + getStaffAmount(m), 0) < min)) return; split(this.dayCells[sR]).forEach(m => { const c = extractStaffName(m); if (!ROLE_PLACEHOLDERS.includes(c) && !cnds.some(x => x.c === c) && !this.isForbidden(c, tR) && !this.isHalfDayBlocked(c, tR).hard && !m.includes("17:") && !this.isTimeTagBlockedByFullDayRule(tR, m)) cnds.push({ c, fS: m, i }); }); }); const cCs = cM.map(extractStaffName); cnds = cnds.filter(c => !cCs.includes(c.c) && (tR === "MMG" ? this.isMmgCapable(c.c) : true) && this.canAddKenmu(c.c, tR, true)); if (tR === "ポータブル") cnds = this.preferNonRepeatCandidates(cnds, tR, (item) => item.c); cnds.sort((a, b) => this.getRepeatAvoidPenalty(a.c, tR) - this.getRepeatAvoidPenalty(b.c, tR) || this.getTodayRoomCount(a.c) - this.getTodayRoomCount(b.c) || this.getPastRoomCount(a.c, tR) - this.getPastRoomCount(b.c, tR) || a.i - b.i || (this.assignCounts[a.c] || 0) - (this.assignCounts[b.c] || 0)); for (const cn of cnds) { if (cA >= tC && cP >= tC) break; if (this.hasNGPair(cn.c, cCs, false)) continue; let pS = cn.fS; if (cA < tC && cP >= tC) { if (cn.fS.includes("(PM)")) continue; pS = `${cn.c}(AM)`; } else if (cA >= tC && cP < tC) { if (cn.fS.includes("(AM)")) continue; pS = `${cn.c}(PM)`; } else if (e.pmClosed) { if (cn.fS.includes("(PM)")) continue; pS = `${cn.c}(AM)`; } else if (e.amClosed) { if (cn.fS.includes("(AM)")) continue; pS = `${cn.c}(PM)`; } cM.push(pS); if (pS.includes("(AM)")) cA++; else if (pS.includes("(PM)")) cP++; else { cA++; cP++; } this.addUsage(cn.c, getStaffAmount(pS)); this.updateBlockMapAfterKenmu(cn.c, pS); } this.dayCells[tR] = join(cM); }
     });
 
-    this.releaseSupportPartnerForEmptyRoom("5号室");
+    this.releaseSupportPartnersForEmptyRooms();
 
     (this.ctx.customRules.emergencies || []).forEach((em: any) => {
       if (em.type !== "empty_room_swap") return; const wR = em.section; const sRL = split(em.sourceRooms || em.sourceRoom || ""); if (!wR || !sRL.length || this.skipSections.includes(wR) || wR === "透析後胸部") return; const wC = this.dynamicCapacity[wR] ?? 1; if (split(this.dayCells[wR]).reduce((s, m) => s + getStaffAmount(m), 0) >= wC) return;
@@ -1195,12 +1238,14 @@ export class AutoAssigner {
       if (!asg) { for (const fbR of ["2号室", "1号室", "5号室", "3号室"]) { if (this.skipSections.includes(fbR) || this.shouldSkipAutoAssignRoom(fbR) || this.isForbidden(st, fbR)) continue; const e = this.getEffectiveTarget(fbR, 1); if (e.allClosed || (t === "(PM)" && e.pmClosed) || (t === "(AM)" && e.amClosed) || this.isTimeTagBlockedByFullDayRule(fbR, t)) continue; let cM = split(this.dayCells[fbR]); if (this.hasNGPair(st, cM.map(extractStaffName), false)) continue; this.dayCells[fbR] = join([...cM, `${st}${t}`]); this.addUsage(st, t ? 0.5 : 1); this.blockMap.set(st, 'ALL'); this.log(`🚨 [最終救済] 定員超過でも未配置を防ぐため ${st} を ${fbR} に強制配置`); asg = true; break; } }
     });
 
-    this.releaseSupportPartnerForEmptyRoom("5号室");
+    this.releaseSupportPartnersForEmptyRooms();
+    this.placeSupportStaffAsLastResort();
+    this.releaseSupportPartnersForEmptyRooms();
     this.rebalanceNoConsecutiveRooms();
     this.removeFullDayOnlyKenmuAssignments();
     this.refreshAssignmentState();
 
-    this.logPhase("仕上げ");
+    this.logPhase("フェーズ5：仕上げ");
     if (!this.skipSections.includes("昼当番")) {
       let cL = split(this.dayCells["昼当番"]); let lT = this.ctx.customRules.lunchBaseCount ?? 3; const dC = this.day.label.match(/\((.*?)\)/)?.[1]; if (dC) { const sd = (this.ctx.customRules.lunchSpecialDays || []).find((x: any) => x.day === dC); if (sd) lT = Number(sd.count); }
       const canLunch = (n: string) => this.isLunchAvailable(n) && !this.isForbidden(n, "昼当番") && !this.hasNGPair(n, cL, false);
@@ -1224,7 +1269,7 @@ export class AutoAssigner {
     }
     const uT = this.dynamicCapacity.受付 !== undefined ? this.dynamicCapacity.受付 : 2;
     if (split(this.dayCells["受付"]).reduce((s, m) => s + getStaffAmount(m), 0) < uT && !this.skipSections.includes("受付ヘルプ")) { let hm = split(this.dayCells["受付ヘルプ"]); if (hm.length === 0) { const lC = split(this.dayCells["昼当番"]).map(extractStaffName); const gH = (exS: string[]) => { let c = this.initialAvailGeneral.filter((n: string) => !exS.includes(n) && !hm.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !this.hasNGPair(n, hm.map(extractStaffName), false)); if (c.length > 0) { c.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return c[0]; } return null; }; const lH = gH(lC); if (lH) hm.push(`${lH}(12:15〜13:00)`); const vK = split(this.dayCells["検像"]).map(extractStaffName).filter((n: string) => this.blockMap.get(n) !== 'PM' && !hm.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !this.hasNGPair(n, hm.map(extractStaffName), false)); let pk = vK.length > 0 ? vK[0] : null; if (!pk) pk = gH(lH ? [lH] : []); if (pk) hm.push(`${pk}(16:00〜)`); } this.dayCells["受付ヘルプ"] = join(hm); }
-    this.releaseSupportPartnerForEmptyRoom("5号室");
+    this.releaseSupportPartnersForEmptyRooms();
     this.refreshAssignmentState();
   }
 }
@@ -2148,7 +2193,7 @@ export default function App(): any {
           <h3 style={{ fontSize: 27, fontWeight: 900, marginBottom: 32, color: "#0f766e" }}>📋 ルールの優先順位（システムはこの上から順に処理します）</h3>
 
           <div style={{ borderLeft: "8px solid #94a3b8", paddingLeft: 24, marginBottom: 40 }}>
-            <h4 style={{ fontSize: 23, fontWeight: 900, color: "#475569", marginBottom: 20, borderBottom: "2px solid #cbd5e1", paddingBottom: 10 }}>フェーズ1：前提・固定ルール（最優先）</h4>
+            <h4 style={{ fontSize: 23, fontWeight: 900, color: "#475569", marginBottom: 20, borderBottom: "2px solid #cbd5e1", paddingBottom: 10 }}>フェーズ1：前提処理（前日・不在・閉室準備）</h4>
             
             <RuleCard bg="#f8fafc" border="#cbd5e1" color="#334155" icon="🙅" title="担当不可ルール">
               {(customRules.forbidden || []).map((rule: any, idx: number) => (
@@ -2160,12 +2205,6 @@ export default function App(): any {
               <button className="rule-add" style={{color:"#475569", borderColor:"#cbd5e1"}} onClick={() => addRule("forbidden", { staff: "", sections: "" })}>＋ 追加</button>
             </RuleCard>
 
-            <RuleCard bg="#f0fdf4" border="#bbf7d0" color="#15803d" icon="🔒" title="専従ルール">
-              {(customRules.fixed || []).map((rule: any, idx: number) => (
-                  <Row key={idx}><StaffSel v={rule.staff} onChange={(v:any)=>updateRule("fixed", idx, "staff", v)} list={activeGeneralStaff} /><RoomSel v={rule.section} onChange={(v:any)=>updateRule("fixed", idx, "section", v)} list={ROOM_SECTIONS} /><DelBtn onClick={()=>removeRule("fixed", idx)} /></Row>
-              ))}
-              <button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("fixed", { staff: "", section: "" })}>＋ 追加</button>
-            </RuleCard>
 
             <RuleCard bg="#fef2f2" border="#fecaca" color="#b91c1c" icon="🚫" title="NGペア">
               {(customRules.ngPairs || []).map((rule: any, idx: number) => (
@@ -2191,8 +2230,15 @@ export default function App(): any {
           </div>
 
           <div style={{ borderLeft: "8px solid #f59e0b", paddingLeft: 24, marginBottom: 40 }}>
-            <h4 style={{ fontSize: 24, fontWeight: 900, color: "#b45309", marginBottom: 20, borderBottom: "2px solid #fcd34d", paddingBottom: 10 }}>フェーズ2：例外・代打処理</h4>
+            <h4 style={{ fontSize: 24, fontWeight: 900, color: "#b45309", marginBottom: 20, borderBottom: "2px solid #fcd34d", paddingBottom: 10 }}>フェーズ2：固定・例外・代打処理</h4>
             
+
+            <RuleCard bg="#f0fdf4" border="#bbf7d0" color="#15803d" icon="🔒" title="専従ルール">
+              {(customRules.fixed || []).map((rule: any, idx: number) => (
+                  <Row key={idx}><StaffSel v={rule.staff} onChange={(v:any)=>updateRule("fixed", idx, "staff", v)} list={activeGeneralStaff} /><RoomSel v={rule.section} onChange={(v:any)=>updateRule("fixed", idx, "section", v)} list={ROOM_SECTIONS} /><DelBtn onClick={()=>removeRule("fixed", idx)} /></Row>
+              ))}
+              <button className="rule-add" style={{color:"#15803d", borderColor:"#86efac"}} onClick={() => addRule("fixed", { staff: "", section: "" })}>＋ 追加</button>
+            </RuleCard>
             <RuleCard bg="#fef08a" border="#fde047" color="#a16207" icon="🚨" title="緊急ルール（人数不足時）">
               <div style={{ marginBottom: 16, padding: "12px", background: "#fef8f8", borderRadius: "8px", border: "1px dashed #fca5a5", color: "#991b1b", fontSize: "15px", fontWeight: "600" }}>💡 <b>「左側（発動条件）」から「右側（アクション）」へ</b> 流れるようにルールを設定します。</div>
               {(customRules.emergencies || []).map((em: any, idx: number) => (
@@ -2320,6 +2366,24 @@ export default function App(): any {
           <div style={{ borderLeft: "8px solid #10b981", paddingLeft: 24, marginBottom: 40 }}>
             <h4 style={{ fontSize: 24, fontWeight: 900, color: "#047857", marginBottom: 20, borderBottom: "2px solid #a7f3d0", paddingBottom: 10 }}>フェーズ4：兼務・救済・遅番</h4>
             
+            <RuleCard bg="#f0fdf4" border="#bbf7d0" color="#15803d" icon="🤝" title="サポート専任（2人目要員）ルール">
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, minWidth: "260px" }}>
+                    <label style={{ fontSize: 17, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>対象スタッフ名（複数可）</label>
+                    <div style={{ background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #86efac", minHeight: "56px", display: "flex", alignItems: "center" }}>
+                      <MultiPicker selected={customRules.supportStaffList || ""} onChange={(v: string) => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" />
+                    </div>
+                  </div>
+                  <div style={{ flex: 2, minWidth: "260px" }}>
+                    <label style={{ fontSize: 17, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>基本で担当させる対象部屋</label>
+                    <MultiPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
+                  </div>
+              </div>
+              <div style={{ marginTop: 14, background: "#ffffff", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 14px", color: "#166534", fontSize: 14, fontWeight: 700, lineHeight: 1.6 }}>
+                基本は対象部屋の2人目として追加します。通常候補で1号室・5号室などが空く場合は、対象部屋にサポートスタッフを残して相方を空室へ移動します。単独配置は通常救済でも埋まらない場合の最後の手段として扱います。
+              </div>
+            </RuleCard>
+
             <RuleCard bg="#ecfdf5" border="#a7f3d0" color="#065f46" icon="🔗" title="兼務・セット配置ルール">
               <h6 style={{ fontSize: 17, color: "#047857", marginTop: 0, marginBottom: 12 }}>■ 常時兼務ペア</h6>
               {(customRules.kenmuPairs || []).map((rule: any, idx: number) => (
@@ -2472,23 +2536,7 @@ export default function App(): any {
               </div>
             </RuleCard>
 
-            <RuleCard bg="#f0fdf4" border="#bbf7d0" color="#15803d" icon="🤝" title="サポート専任（2人目要員）ルール">
-              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
-                  <div style={{ flex: 1, minWidth: "260px" }}>
-                    <label style={{ fontSize: 17, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>対象スタッフ名（複数可）</label>
-                    <div style={{ background: "#fff", padding: "12px", borderRadius: 8, border: "1px solid #86efac", minHeight: "56px", display: "flex", alignItems: "center" }}>
-                      <MultiPicker selected={customRules.supportStaffList || ""} onChange={(v: string) => setCustomRules({...customRules, supportStaffList: v})} options={allStaff} placeholder="＋スタッフを選択" />
-                    </div>
-                  </div>
-                  <div style={{ flex: 2, minWidth: "260px" }}>
-                    <label style={{ fontSize: 17, fontWeight: 800, color: "#166534", display: "block", marginBottom: 8 }}>基本で担当させる対象部屋</label>
-                    <MultiPicker selected={customRules.supportTargetRooms ?? "1号室,2号室,5号室,パノラマCT"} onChange={(v: string) => setCustomRules({...customRules, supportTargetRooms: v})} options={ROOM_SECTIONS} />
-                  </div>
-              </div>
-              <div style={{ marginTop: 14, background: "#ffffff", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 14px", color: "#166534", fontSize: 14, fontWeight: 700, lineHeight: 1.6 }}>
-                この設定はサポート専任スタッフの基本配置先だけに使います。救済・兼務の全体優先順位はここでは変更しません。
-              </div>
-            </RuleCard>
+
           </div>
           
         </div>
@@ -2628,14 +2676,14 @@ export default function App(): any {
               <li style={{ marginBottom: 8 }}>
                 <strong>兼務・交換・救済:</strong>
                 <div style={{ background: "#f0fdf4", padding: "8px 12px", borderRadius: 6, border: "1px solid #bbf7d0", margin: "4px 0" }}>
-                   💡 フェーズ4では、<strong>交換ルール → 基本兼務 → 空室救済 → 遅番</strong> の順で処理します。<br/>
+                   💡 フェーズ4では、<strong>サポート兼務 → 交換ルール → 基本兼務 → 空室救済 → 遅番</strong> の順で処理します。<br/>
                    候補の選び方はルールの種類ごとに少し違いますが、主に <strong>当日の兼務負荷</strong>、<strong>過去担当回数</strong>、<strong>設定した優先順</strong> を見ながら安全な候補を選びます。
                 </div>
                 定員割れがある場合は、ほかの部屋への影響が少ない候補から兼務や救済を呼びます。
               </li>
               <li style={{ marginBottom: 8 }}>
                 <strong>総仕上げ（昼当番・余剰配置）:</strong>
-                昼当番を決定後、余力のあるスタッフは優先的に兼務解消（専任化）にあてられます。また未配置の人をなくすため、最後の余剰人員は定員オーバーでも汎用部屋（3号室等）に押し込まれます。
+                昼当番を決定後、余力のあるスタッフは優先的に兼務解消（専任化）にあてられます。サポート専任の単独配置は、通常候補と空室救済でも埋まらない場合の最後の手段として行います。
               </li>
             </ol>
 
