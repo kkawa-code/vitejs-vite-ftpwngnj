@@ -638,8 +638,32 @@ export class AutoAssigner {
   private shouldAvoidWeeklyRepeat(s: string, r: string): boolean { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!noC.includes(r)) return false; return this.getPastWeekRoomCount(s, r) >= 1; }
   private getRoomDependencyCount(r: string): number { let sc = 0; (this.ctx.customRules.linkedRooms || []).forEach((x: any) => { if (split(x.sources || "").some((y: string) => parseRoomCond(y).r === r)) sc += 3; if (x.target === r) sc += 1; }); (this.ctx.customRules.rescueRules || []).forEach((x: any) => { if (split(x.sourceRooms || "").some((y: string) => parseRoomCond(y).r === r)) sc += 2; if (x.targetRoom === r) sc += 1; }); (this.ctx.customRules.swapRules || []).forEach((x: any) => { if (split(x.sourceRooms || "").some((y: string) => parseRoomCond(y).r === r)) sc += 2; if (x.triggerRoom === r) sc += 1; if (x.targetRoom === r) sc += 1; }); (this.ctx.customRules.kenmuPairs || []).forEach((p: any) => { if (p.s1 === r || p.s2 === r) sc += 2; }); return sc; }
   private getRescueSourceScore(src: string, tgt: string, _st?: string): number { let sc = 0; if (src === tgt) sc += 9999; sc += this.getRoomDependencyCount(src) * 100; const sm = split(this.dayCells[src] || ""); const sList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName); const isOnly = sm.length > 0 && sm.every(m => sList.includes(extractStaffName(m))); if (isOnly) sc += 5000; else { const amt = sm.reduce((sum, m) => sum + getStaffAmount(m), 0); if (amt <= 1) sc += 500; else if (amt <= 2) sc += 200; } if (this.clearSections.includes(src) || this.skipSections.includes(src)) sc += 5000; return sc; }
-  private getRepeatAvoidPenalty(staff: string, room: string): number { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!noC.includes(room)) return 0; return this.shouldAvoidConsecutive(staff, room) ? 100000 : 0; }
-  private preferNonRepeatCandidates<T>(items: T[], room: string, getStaff: (item: T) => string): T[] { const fresh = items.filter(item => !this.shouldAvoidConsecutive(getStaff(item), room)); return fresh.length > 0 ? fresh : items; }
+  private getRepeatAvoidPenalty(staff: string, room: string): number { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!noC.includes(room)) return 0; if (this.shouldAvoidConsecutive(staff, room)) return 100000; return (this.shouldAvoidWeeklyRepeat(staff, room) ? 300 : 0) + this.getPastMonthRoomCount(staff, room) * 50; }
+  private preferNonRepeatCandidates<T>(items: T[], room: string, getStaff: (item: T) => string): T[] { const noConsecutive = items.filter(item => !this.shouldAvoidConsecutive(getStaff(item), room)); const base = noConsecutive.length > 0 ? noConsecutive : items; const noWeekly = base.filter(item => !this.shouldAvoidWeeklyRepeat(getStaff(item), room)); return noWeekly.length > 0 ? noWeekly : base; }
+  private getFullDayOnlyRoomsForStaff(staff: string): string[] { const core = extractStaffName(staff); return split(this.ctx.customRules.fullDayOnlyRooms || "").filter(room => split(this.dayCells[room] || "").some(m => extractStaffName(m) === core)); }
+  private isMovingOutOfFullDayOnly(staff: string, fromRoom: string): boolean { const rooms = this.getFullDayOnlyRoomsForStaff(staff); return rooms.length > 0 && rooms.every(room => room === fromRoom); }
+  private removeFullDayOnlyKenmuAssignments() {
+    const fullDayOnlyRooms = split(this.ctx.customRules.fullDayOnlyRooms || "");
+    if (fullDayOnlyRooms.length === 0) return;
+    const fullDayStaffRoom: Record<string, string> = {};
+    fullDayOnlyRooms.forEach(room => {
+      split(this.dayCells[room] || "").forEach(m => {
+        const core = extractStaffName(m);
+        if (!ROLE_PLACEHOLDERS.includes(core)) fullDayStaffRoom[core] = room;
+      });
+    });
+    Object.keys(this.dayCells).forEach(room => {
+      if (this.isMetadataKey(room) || fullDayOnlyRooms.includes(room) || REST_SECTIONS.includes(room) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return;
+      const current = split(this.dayCells[room] || "");
+      const filtered = current.filter(m => {
+        const core = extractStaffName(m);
+        if (!fullDayStaffRoom[core]) return true;
+        this.log(`↪️ [終日専任兼務解除] ${fullDayStaffRoom[core]} の ${core} を ${room} から外しました`);
+        return false;
+      });
+      if (filtered.length !== current.length) this.dayCells[room] = join(filtered);
+    });
+  }
   private getPushOutRoomScore(staff: string, room: string): number { const baseCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); const eff = this.getEffectiveTarget(room, baseCap); if (eff.allClosed) return 999999; const roomMembers = split(this.dayCells[room]); let roomAm = eff.amClosed ? 999 : 0; let roomPm = eff.pmClosed ? 999 : 0; roomMembers.forEach(m => { if (m.includes("(AM)")) roomAm++; else if (m.includes("(PM)")) roomPm++; else { roomAm++; roomPm++; } }); const fullness = Math.min(roomAm, eff.cap) + Math.min(roomPm, eff.cap); return this.getRepeatAvoidPenalty(staff, room) * 10 + fullness * 100 + roomMembers.length; }
   private getNoConsecutiveSourceRooms(room: string): string[] {
     const rooms: string[] = [];
@@ -753,7 +777,8 @@ export class AutoAssigner {
             this.log(`🎱 [玉突き] ${s1} と被ったため ${s2} を ${tSec} から外しました`);
             return true;
           }
-          if (this.isForbidden(s2, room) || this.isHalfDayBlocked(s2, room).hard || this.hasNGPair(s2, roomMembers.map(extractStaffName), false) || !this.canAddKenmu(s2, room)) continue;
+          const canPlaceTarget = this.isMovingOutOfFullDayOnly(s2, tSec) || this.canAddKenmu(s2, room);
+          if (this.isForbidden(s2, room) || this.isHalfDayBlocked(s2, room).hard || this.hasNGPair(s2, roomMembers.map(extractStaffName), false) || !canPlaceTarget) continue;
           const baseCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
           const eff = this.getEffectiveTarget(room, baseCap);
           if (eff.allClosed) continue;
@@ -785,7 +810,7 @@ export class AutoAssigner {
     });
   }
   updateBlockMapAfterKenmu(core: string, pushStr: string) { const cur = this.blockMap.get(core); let nx: string; if (pushStr.includes("(AM)")) nx = (cur === 'PM' || cur === 'ALL') ? 'ALL' : 'AM'; else if (pushStr.includes("(PM)")) nx = (cur === 'AM' || cur === 'ALL') ? 'ALL' : 'PM'; else nx = 'ALL'; this.blockMap.set(core, nx); }
-  canAddKenmu(st: string, tgt: string, bypass: boolean = false): boolean { const limit = this.ctx.customRules.alertMaxKenmu || 3; const cLoad = this.getTodayRoomLoad(st); if (!split(this.dayCells[tgt] || "").map(extractStaffName).includes(st) && cLoad >= limit) return false; const exPairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive); for (const p of exPairs) { const inS1 = split(this.dayCells[p.s1] || "").map(extractStaffName).includes(st); const inS2 = split(this.dayCells[p.s2] || "").map(extractStaffName).includes(st); if (inS1 || inS2) { if (tgt !== p.s1 && tgt !== p.s2) return false; } if (tgt === p.s1 || tgt === p.s2) { if (!bypass) { const curR = ROOM_SECTIONS.filter(r => split(this.dayCells[r] || "").map(extractStaffName).includes(st) && !["待機", "昼当番", "受付", "受付ヘルプ"].includes(r)); const hasOut = curR.some(r => r !== p.s1 && r !== p.s2); if (hasOut) return false; } } } return true; }
+  canAddKenmu(st: string, tgt: string, bypass: boolean = false): boolean { const limit = this.ctx.customRules.alertMaxKenmu || 3; const cLoad = this.getTodayRoomLoad(st); const fullDayRooms = this.getFullDayOnlyRoomsForStaff(st); if (fullDayRooms.some(room => room !== tgt)) return false; if (!split(this.dayCells[tgt] || "").map(extractStaffName).includes(st) && cLoad >= limit) return false; const exPairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive); for (const p of exPairs) { const inS1 = split(this.dayCells[p.s1] || "").map(extractStaffName).includes(st); const inS2 = split(this.dayCells[p.s2] || "").map(extractStaffName).includes(st); if (inS1 || inS2) { if (tgt !== p.s1 && tgt !== p.s2) return false; } if (tgt === p.s1 || tgt === p.s2) { if (!bypass) { const curR = ROOM_SECTIONS.filter(r => split(this.dayCells[r] || "").map(extractStaffName).includes(st) && !["待機", "昼当番", "受付", "受付ヘルプ"].includes(r)); const hasOut = curR.some(r => r !== p.s1 && r !== p.s2); if (hasOut) return false; } } } return true; }
   isMmgCapable(st: string): boolean { return split(this.ctx.monthlyAssign.MMG || "").map(extractStaffName).includes(extractStaffName(st)); }
   getEffectiveTarget(room: string, baseCap: number) { const dayChar = this.day.label.match(/\((.*?)\)/)?.[1]; if (!dayChar) return { cap: baseCap, amClosed: false, pmClosed: false, allClosed: false }; const closed = (this.ctx.customRules.closedRooms || []).filter((r: any) => r.room === room && r.day === dayChar); let amClosed = false; let pmClosed = false; let allClosed = false; closed.forEach((r: any) => { if (r.time === "全日") allClosed = true; else if (r.time === "(AM)") amClosed = true; else if (r.time === "(PM)") pmClosed = true; }); if (amClosed && pmClosed) allClosed = true; if (allClosed) return { cap: 0, amClosed: true, pmClosed: true, allClosed: true }; if (amClosed || pmClosed) return { cap: baseCap / 2, amClosed, pmClosed, allClosed: false }; return { cap: baseCap, amClosed: false, pmClosed: false, allClosed: false }; }
   
@@ -975,6 +1000,9 @@ export class AutoAssigner {
       this.dayCells[r.target] = join(cM);
     });
 
+    this.removeFullDayOnlyKenmuAssignments();
+    this.refreshAssignmentState();
+
     ROOM_SECTIONS.forEach(tR => {
       if (this.clearSections.includes(tR) || ["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(tR)) return; const tC = this.dynamicCapacity[tR] ?? (["CT", "MRI", "治療"].includes(tR) ? 3 : 1); const e = this.getEffectiveTarget(tR, tC); if (e.allClosed) return;
       let cM = split(this.dayCells[tR]); let cA = e.amClosed ? 999 : 0, cP = e.pmClosed ? 999 : 0; cM.forEach(x => { if (x.includes("(AM)")) cA++; else if (x.includes("(PM)")) cP++; else { cA++; cP++; } }); if (cM.length > 0 && cM.every(m => sSL.includes(extractStaffName(m)))) { cA = e.amClosed ? 999 : 0; cP = e.pmClosed ? 999 : 0; } if (cA >= tC && cP >= tC) return;
@@ -1054,6 +1082,8 @@ export class AutoAssigner {
     });
 
     this.rebalanceNoConsecutiveRooms();
+    this.removeFullDayOnlyKenmuAssignments();
+    this.refreshAssignmentState();
 
     this.logPhase("仕上げ");
     if (!this.skipSections.includes("昼当番")) {
