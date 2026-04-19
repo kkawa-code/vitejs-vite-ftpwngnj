@@ -4,8 +4,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
-  * { box-sizing: border-box; }
+  body { background: #f4f7f9; color: #334155; -weba
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -806,6 +805,18 @@ export class AutoAssigner {
     return nextLoad <= limit;
   }
 
+  private isLinkedTargetSourcePair(targetRoom: string, existingRoom: string): boolean {
+    return (this.ctx.customRules.linkedRooms || []).some((rule: any) => {
+      const target = String(rule.target || "");
+      const sources = split(rule.sources || "").map(src => parseRoomCond(src).r);
+      return (target === existingRoom && sources.includes(targetRoom)) || (target === targetRoom && sources.includes(existingRoom));
+    });
+  }
+
+  private isAllowedLinkedSwapTarget(targetRoom: string, existingRooms: string[]): boolean {
+    return existingRooms.some(existingRoom => this.isLinkedTargetSourcePair(targetRoom, existingRoom));
+  }
+
   private sharePartialHelpersWithLinkedTargets() {
     const linkedTargets = Array.from(new Set((this.ctx.customRules.linkedRooms || []).map((r: any) => r.target).filter(Boolean))) as string[];
     const linkedTargetSet = new Set(linkedTargets);
@@ -917,7 +928,7 @@ export class AutoAssigner {
     const exPairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive);
     for (const p of exPairs) {
       const hadPairBefore = beforeRooms.includes(p.s1) || beforeRooms.includes(p.s2);
-      if (hadPairBefore && targetRoom !== p.s1 && targetRoom !== p.s2) return false;
+      if (hadPairBefore && targetRoom !== p.s1 && targetRoom !== p.s2 && !this.isAllowedLinkedSwapTarget(targetRoom, beforeRooms)) return false;
     }
     return true;
   }
