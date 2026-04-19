@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Meiryo", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.01em; font-size: 17px; overflow-x: hidden; }
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Meiryo", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -390,7 +390,7 @@ export function isAllDayAbsenceEntry(entry: string) {
 // ===================== 🌟 UI Components =====================
 export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
 export const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "20px", boxShadow: "0 4px 14px -10px rgba(15,23,42,0.16)", width: "100%", boxSizing: "border-box" });
-export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 800 : 700, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 17 : 16, color: isHoliday && isHeader ? "#dc2626" : "#1e293b", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
+export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 800 : 700, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 16 : 15, color: isHoliday && isHeader ? "#dc2626" : "#1e293b", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
 
 export const Modal = ({ title, onClose, wide, children }: any) => ( <div className="modal-overlay" onClick={onClose}><div className={`modal-content modal-animate ${wide ? 'modal-wide' : ''}`} onClick={e => e.stopPropagation()}><div className="modal-header"><h3 className="modal-title">{title}</h3><button onClick={onClose} className="close-btn">✖</button></div>{children}<div style={{ textAlign: "center", marginTop: 32 }}><button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "16px" }}>閉じる</button></div></div></div> );
 export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any) => ( <div style={{ background: bg, padding: 24, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}><h5 style={{ margin: "0 0 12px 0", color, fontSize: 18, fontWeight: 800 }}>{icon} {title}</h5>{desc && <p style={{ fontSize: 15, color: "#166534", marginTop: 0, marginBottom: 16 }}>{desc}</p>}{children}</div> );
@@ -612,6 +612,310 @@ export class AutoAssigner {
   private getPortableTag(staff: string): string {
     return this.getPreferredWorkTag(staff);
   }
+  private isLateOrNightEntry(entry: string): boolean {
+    return entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:");
+  }
+
+  private normalizePortableSourceCond(src: string): { r: string; min: number } | null {
+    const cond = parseRoomCond(src);
+    if (!cond.r || cond.r === "ポータブル" || cond.r === "透析後胸部") return null;
+    // ポータブルは「兼務候補部屋」閉域で扱う。MRI/治療/RIからの直接補充はしない。
+    if (["MRI", "治療", "RI", "受付", "受付ヘルプ", "昼当番", "待機"].includes(cond.r)) return null;
+    // CT は4人体制の余剰枠だけを候補にする。CT3人体制からは持ってこない。
+    if (cond.r === "CT" && cond.min < 4) return { r: "CT", min: 4 };
+    return { r: cond.r, min: cond.min };
+  }
+
+  private getPortableSourceConds(): { r: string; min: number }[] {
+    const raw: string[] = [];
+    (this.ctx.customRules.linkedRooms || [])
+      .filter((rule: any) => rule.target === "ポータブル")
+      .forEach((rule: any) => split(rule.sources || "").forEach((src: string) => raw.push(src)));
+    (this.ctx.customRules.rescueRules || [])
+      .filter((rule: any) => rule.targetRoom === "ポータブル")
+      .forEach((rule: any) => split(rule.sourceRooms || "").forEach((src: string) => raw.push(src)));
+    if (raw.length === 0) raw.push("3号室", "2号室", "1号室", "5号室", "CT(4)");
+
+    const result: { r: string; min: number }[] = [];
+    const seen = new Set<string>();
+    raw.forEach(src => {
+      const cond = this.normalizePortableSourceCond(src);
+      if (!cond) return;
+      const key = `${cond.r}:${cond.min}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(cond);
+    });
+    return result;
+  }
+
+  private sourceAmount(room: string): number {
+    return split(this.dayCells[room] || "").reduce((sum, m) => sum + getStaffAmount(m), 0);
+  }
+
+  private isPortableSourceAvailable(cond: { r: string; min: number }, allowClearedThree: boolean = false): boolean {
+    if (!cond.r || cond.r === "ポータブル" || cond.r === "透析後胸部") return false;
+    if (this.skipSections.includes(cond.r) && !(allowClearedThree && cond.r === "3号室")) return false;
+    if (this.shouldSkipAutoAssignRoom(cond.r)) return false;
+    if (cond.r === "CT" && this.sourceAmount("CT") < Math.max(cond.min, 4)) return false;
+    if (cond.min > 0 && this.sourceAmount(cond.r) < cond.min) return false;
+    return true;
+  }
+
+  private getRoomsForStaff(core: string): string[] {
+    return ROOM_SECTIONS.filter(r =>
+      !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r) &&
+      split(this.dayCells[r] || "").some(m => extractStaffName(m) === core)
+    );
+  }
+
+  private isFixedToRoom(core: string, room: string): boolean {
+    return (this.ctx.customRules.fixed || []).some((rule: any) =>
+      extractStaffName(rule.staff) === extractStaffName(core) && rule.section === room
+    );
+  }
+
+  private isProtectedModalityStaff(core: string, room: string): boolean {
+    if (!["CT", "MRI", "治療", "RI"].includes(room)) return false;
+    if (this.isFixedToRoom(core, room)) return true;
+    return isMonthlyMainStaff(room, core, this.ctx.monthlyAssign);
+  }
+
+  private isProtectedInCurrentModality(core: string): boolean {
+    return this.getRoomsForStaff(core).some(room => this.isProtectedModalityStaff(core, room));
+  }
+
+  private canPlaceEntryInRoomStrict(core: string, entry: string, room: string, members: string[]): boolean {
+    if (!core || ROLE_PLACEHOLDERS.includes(core)) return false;
+    if (this.isLateOrNightEntry(entry)) return false;
+    if (this.isForbidden(core, room) || this.isHalfDayBlocked(core, room).hard) return false;
+    if (this.hasNGPair(core, members.filter(m => extractStaffName(m) !== core).map(extractStaffName), false)) return false;
+    if (this.isTimeTagBlockedByFullDayRule(room, entry)) return false;
+    return true;
+  }
+
+  private canUseEntryForPortable(core: string, entry: string, portableMembers: string[], currentIndex: number = -1, allowWeeklyRepeat: boolean = true): boolean {
+    if (!this.canPlaceEntryInRoomStrict(core, entry, "ポータブル", portableMembers.filter((_, idx) => idx !== currentIndex))) return false;
+    // 連日はフェーズ4以降も一発アウト。週内2回目は最後の妥協候補としてだけ許可する。
+    if (this.shouldAvoidConsecutive(core, "ポータブル")) return false;
+    if (!allowWeeklyRepeat && this.shouldAvoidWeeklyRepeat(core, "ポータブル")) return false;
+    const otherPortableCores = portableMembers
+      .filter((_, idx) => idx !== currentIndex)
+      .map(extractStaffName);
+    if (otherPortableCores.includes(core)) return false;
+    if (this.hasNGPair(core, otherPortableCores, false)) return false;
+    return this.canAddKenmu(core, "ポータブル", true);
+  }
+
+  private getPortableSourceInfo(core: string, allowClearedThree: boolean = false): { idx: number; room: string; entry: string; members: string[] } | null {
+    const sources = this.getPortableSourceConds();
+    for (let idx = 0; idx < sources.length; idx++) {
+      const cond = sources[idx];
+      if (!this.isPortableSourceAvailable(cond, allowClearedThree)) continue;
+      const members = split(this.dayCells[cond.r] || "");
+      const entry = members.find(m => extractStaffName(m) === core) || "";
+      if (entry) return { idx, room: cond.r, entry, members };
+    }
+    return null;
+  }
+
+  private tryAttachPortableOnlyToSource(core: string, entry: string): string | null {
+    if (this.isProtectedInCurrentModality(core)) return null;
+    const sources = this.getPortableSourceConds();
+    const ordered = [
+      ...sources.filter(s => s.r === "3号室"),
+      ...sources.filter(s => s.r !== "3号室")
+    ];
+
+    for (const cond of ordered) {
+      const allowClearedThree = cond.r === "3号室";
+      if (!this.isPortableSourceAvailable({ ...cond, min: 0 }, allowClearedThree)) continue;
+      if (cond.r === "CT" && this.sourceAmount("CT") < 4) continue;
+      const members = split(this.dayCells[cond.r] || "");
+      if (members.some(m => extractStaffName(m) === core)) return cond.r;
+      const baseCap = this.dynamicCapacity[cond.r] ?? (["CT", "MRI", "治療"].includes(cond.r) ? 3 : 1);
+      const eff = this.getEffectiveTarget(cond.r, baseCap);
+      if (eff.allClosed) continue;
+      if (members.reduce((sum, m) => sum + getStaffAmount(m), 0) >= eff.cap) continue;
+      if (!this.canPlaceEntryInRoomStrict(core, entry, cond.r, members)) continue;
+      if (!this.canAddKenmu(core, cond.r, true)) continue;
+      this.dayCells[cond.r] = join([...members, entry]);
+      this.refreshAssignmentState();
+      this.log(`🔒 [ポータブル閉域] ${entry} を ${cond.r} にも配置し、ポータブルを候補部屋由来に正規化しました`);
+      return cond.r;
+    }
+    return null;
+  }
+
+  private findPortableStrictSourceCandidate(
+    portableMembers: string[],
+    currentIndex: number,
+    options: { allowWeeklyRepeat?: boolean; maxSourceIndex?: number } = {}
+  ): { entry: string; sourceRoom: string; sourceIndex: number; staff: string } | null {
+    const allowWeeklyRepeat = options.allowWeeklyRepeat ?? true;
+    const maxSourceIndex = options.maxSourceIndex ?? Infinity;
+    const sources = this.getPortableSourceConds();
+    const candidates: { entry: string; sourceRoom: string; sourceIndex: number; staff: string }[] = [];
+
+    sources.forEach((cond, sourceIndex) => {
+      if (sourceIndex >= maxSourceIndex) return;
+      if (!this.isPortableSourceAvailable(cond, false)) return;
+      const sourceMembers = split(this.dayCells[cond.r] || "");
+      sourceMembers.forEach(entry => {
+        const staff = extractStaffName(entry);
+        // MRI/治療/RIなどの専従・月間主担当が別途候補部屋に紛れ込んでいても、ポータブル直行にはしない。
+        // ただし CT(4) は明示された候補元なので、4人体制を満たす場合だけ候補として残す。
+        if (cond.r !== "CT" && this.isProtectedInCurrentModality(staff)) return;
+        if (!this.canUseEntryForPortable(staff, entry, portableMembers, currentIndex, allowWeeklyRepeat)) return;
+        candidates.push({ entry, sourceRoom: cond.r, sourceIndex, staff });
+      });
+    });
+
+    candidates.sort((a, b) =>
+      // まず設定された候補部屋の順番を絶対優先する。
+      a.sourceIndex - b.sourceIndex ||
+      // 同じ候補部屋内では、週内2回目・月内過多・当日負荷をなるべく避ける。
+      this.getRepeatAvoidPenalty(a.staff, "ポータブル") - this.getRepeatAvoidPenalty(b.staff, "ポータブル") ||
+      this.getTodayRoomCount(a.staff) - this.getTodayRoomCount(b.staff) ||
+      this.getPastRoomCount(a.staff, "ポータブル") - this.getPastRoomCount(b.staff, "ポータブル") ||
+      a.staff.localeCompare(b.staff, "ja")
+    );
+    return candidates[0] || null;
+  }
+
+  private tryPortableModalitySourceSwap(
+    portableMembers: string[],
+    currentIndex: number,
+    options: { allowWeeklyRepeat?: boolean; maxSourceIndex?: number } = {}
+  ): { entry: string; sourceRoom: string; sourceIndex: number; modalityRoom: string; modalityStaff: string; sourceStaff: string } | null {
+    const allowWeeklyRepeat = options.allowWeeklyRepeat ?? true;
+    const maxSourceIndex = options.maxSourceIndex ?? Infinity;
+    const sources = this.getPortableSourceConds();
+    const modalityRooms = ["MRI", "CT"].filter(room => !this.skipSections.includes(room) && !this.shouldSkipAutoAssignRoom(room));
+
+    for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
+      if (sourceIndex >= maxSourceIndex) break;
+      const cond = sources[sourceIndex];
+      if (!this.isPortableSourceAvailable(cond, false)) continue;
+      const sourceMembers = split(this.dayCells[cond.r] || "");
+      for (const sourceEntry of sourceMembers) {
+        const sourceStaff = extractStaffName(sourceEntry);
+        if (!sourceStaff || ROLE_PLACEHOLDERS.includes(sourceStaff) || this.isLateOrNightEntry(sourceEntry)) continue;
+
+        for (const modalityRoom of modalityRooms) {
+          const modalityMembers = split(this.dayCells[modalityRoom] || "");
+          for (const modalityEntry of modalityMembers) {
+            const modalityStaff = extractStaffName(modalityEntry);
+            if (!modalityStaff || ROLE_PLACEHOLDERS.includes(modalityStaff) || modalityStaff === sourceStaff || this.isLateOrNightEntry(modalityEntry)) continue;
+            // CT/MRIの固定者・月間主担当は交換で崩さない。非専従者だけを一般候補部屋へ動かす。
+            if (this.isProtectedModalityStaff(modalityStaff, modalityRoom)) continue;
+
+            const sourceTag = this.getMemberTimeTag(sourceEntry);
+            const modalityTag = this.getMemberTimeTag(modalityEntry);
+            const movedSourceToModality = `${sourceStaff}${modalityTag}`;
+            const movedModalityToSource = `${modalityStaff}${sourceTag}`;
+            const nextSourceMembers = sourceMembers.map(m => m === sourceEntry ? movedModalityToSource : m);
+            const nextModalityMembers = modalityMembers.map(m => m === modalityEntry ? movedSourceToModality : m);
+
+            if (!this.canPlaceEntryInRoomStrict(sourceStaff, movedSourceToModality, modalityRoom, nextModalityMembers)) continue;
+            if (!this.canPlaceEntryInRoomStrict(modalityStaff, movedModalityToSource, cond.r, nextSourceMembers)) continue;
+            if (!this.canUseEntryForPortable(modalityStaff, movedModalityToSource, portableMembers, currentIndex, allowWeeklyRepeat)) continue;
+            if (!this.canSwapKeepKenmuLimit(sourceStaff, modalityRoom, cond.r, sourceEntry, movedSourceToModality)) continue;
+            if (!this.canSwapKeepKenmuLimit(modalityStaff, cond.r, modalityRoom, modalityEntry, movedModalityToSource)) continue;
+
+            this.dayCells[cond.r] = join(nextSourceMembers);
+            this.dayCells[modalityRoom] = join(nextModalityMembers);
+            this.refreshAssignmentState();
+            this.log(`🔁 [ポータブル閉域交換] ${cond.r} の ${sourceStaff} と ${modalityRoom} の非専従 ${modalityStaff} を交換し、${modalityStaff} を候補部屋由来のポータブル候補にしました`);
+            return { entry: movedModalityToSource, sourceRoom: cond.r, sourceIndex, modalityRoom, modalityStaff, sourceStaff };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private enforcePortableClosedSourcePolicy() {
+    if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
+    let portableMembers = split(this.dayCells["ポータブル"] || "");
+    if (portableMembers.length === 0) return;
+
+    let changed = false;
+    for (let i = 0; i < portableMembers.length; i++) {
+      const entry = portableMembers[i];
+      const core = extractStaffName(entry);
+      if (!core || ROLE_PLACEHOLDERS.includes(core)) continue;
+
+      const sourceInfo = this.getPortableSourceInfo(core, true);
+      const protectedModalityLeak = !!sourceInfo && sourceInfo.room !== "CT" && this.isProtectedInCurrentModality(core);
+      const isValidSourceMember = !!sourceInfo && !protectedModalityLeak && this.canUseEntryForPortable(core, entry, portableMembers, i, true);
+      if (isValidSourceMember) continue;
+
+      const canUseCurrentForPortable = this.canUseEntryForPortable(core, entry, portableMembers, i, true);
+      const attachedRoom = canUseCurrentForPortable ? this.tryAttachPortableOnlyToSource(core, entry) : null;
+      if (attachedRoom) {
+        changed = true;
+        portableMembers = split(this.dayCells["ポータブル"] || "");
+        continue;
+      }
+
+      // 第1候補：設定された候補部屋の優先順から、連日なし・週内初回の人を使う。
+      const directNonWeekly = this.findPortableStrictSourceCandidate(portableMembers, i, { allowWeeklyRepeat: false });
+      if (directNonWeekly) {
+        portableMembers[i] = directNonWeekly.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`🔒 [ポータブル閉域] 候補外の ${entry} を使わず、設定順 ${directNonWeekly.sourceRoom} 由来の ${directNonWeekly.entry} に差し替えました`);
+        changed = true;
+        continue;
+      }
+
+      // 第2候補：候補部屋の人が禁止・連日・週内重複で難しい場合、CT/MRIの非専従者と候補部屋の人を交換する。
+      const swappedNonWeekly = this.tryPortableModalitySourceSwap(portableMembers, i, { allowWeeklyRepeat: false });
+      if (swappedNonWeekly) {
+        portableMembers[i] = swappedNonWeekly.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`🔒 [ポータブル閉域] MRI/CTから直接補充せず、${swappedNonWeekly.sourceRoom} と ${swappedNonWeekly.modalityRoom} の交換後に ${swappedNonWeekly.entry} をポータブルへ配置しました`);
+        changed = true;
+        continue;
+      }
+
+      // 第3候補：交換しても無理なら、連日だけは避けたうえで週内2回目を許容する。
+      const directWeekly = this.findPortableStrictSourceCandidate(portableMembers, i, { allowWeeklyRepeat: true });
+      if (directWeekly) {
+        portableMembers[i] = directWeekly.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`⚠️ [ポータブル週内再担当] 交換でも候補がないため、連日ではない ${directWeekly.sourceRoom} 由来の ${directWeekly.entry} を週内2回目候補として配置しました`);
+        changed = true;
+        continue;
+      }
+
+      const swappedWeekly = this.tryPortableModalitySourceSwap(portableMembers, i, { allowWeeklyRepeat: true });
+      if (swappedWeekly) {
+        portableMembers[i] = swappedWeekly.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`⚠️ [ポータブル週内再担当交換] 週内初回では埋まらないため、${swappedWeekly.sourceRoom} と ${swappedWeekly.modalityRoom} を交換して ${swappedWeekly.entry} を配置しました`);
+        changed = true;
+        continue;
+      }
+
+      portableMembers.splice(i, 1);
+      i--;
+      this.dayCells["ポータブル"] = join(portableMembers);
+      this.refreshAssignmentState();
+      this.log(`🚫 [ポータブル閉域] ${entry} は候補部屋由来にできず、連日回避も満たせないため、無理にMRI/CT等から補充せずポータブルから外しました`);
+      changed = true;
+    }
+
+    if (changed) {
+      this.dayCells["ポータブル"] = join(portableMembers);
+      this.refreshAssignmentState();
+    }
+  }
+
   private isMetadataKey(sec: string) { return sec.startsWith("__"); }
   private hhmmToMinutes(s: string) { const [h, m] = s.split(":").map(Number); return h * 60 + m; }
   private isLunchAvailable(staff: string): boolean {
@@ -648,7 +952,7 @@ export class AutoAssigner {
   private shouldAvoidWeeklyRepeat(s: string, r: string): boolean { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!noC.includes(r)) return false; return this.getPastWeekRoomCount(s, r) >= 1; }
   private getRoomDependencyCount(r: string): number { let sc = 0; (this.ctx.customRules.linkedRooms || []).forEach((x: any) => { if (split(x.sources || "").some((y: string) => parseRoomCond(y).r === r)) sc += 3; if (x.target === r) sc += 1; }); (this.ctx.customRules.rescueRules || []).forEach((x: any) => { if (split(x.sourceRooms || "").some((y: string) => parseRoomCond(y).r === r)) sc += 2; if (x.targetRoom === r) sc += 1; }); (this.ctx.customRules.swapRules || []).forEach((x: any) => { if (split(x.sourceRooms || "").some((y: string) => parseRoomCond(y).r === r)) sc += 2; if (x.triggerRoom === r) sc += 1; if (x.targetRoom === r) sc += 1; }); (this.ctx.customRules.kenmuPairs || []).forEach((p: any) => { if (p.s1 === r || p.s2 === r) sc += 2; }); return sc; }
   private getRescueSourceScore(src: string, tgt: string, _st?: string): number { let sc = 0; if (src === tgt) sc += 9999; sc += this.getRoomDependencyCount(src) * 100; const sm = split(this.dayCells[src] || ""); const sList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName); const isOnly = sm.length > 0 && sm.every(m => sList.includes(extractStaffName(m))); if (isOnly) sc += 5000; else { const amt = sm.reduce((sum, m) => sum + getStaffAmount(m), 0); if (amt <= 1) sc += 500; else if (amt <= 2) sc += 200; } if (this.clearSections.includes(src) || this.skipSections.includes(src)) sc += 5000; return sc; }
-  private getRepeatAvoidPenalty(staff: string, room: string): number { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!noC.includes(room)) return 0; if (this.shouldAvoidConsecutive(staff, room)) return 100000; return (this.shouldAvoidWeeklyRepeat(staff, room) ? 1200 : 0) + this.getPastMonthRoomCount(staff, room) * 250; }
+  private getRepeatAvoidPenalty(staff: string, room: string): number { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!noC.includes(room)) return 0; if (this.shouldAvoidConsecutive(staff, room)) return 100000; return (this.shouldAvoidWeeklyRepeat(staff, room) ? 300 : 0) + this.getPastMonthRoomCount(staff, room) * 50; }
   private preferNonRepeatCandidates<T>(items: T[], room: string, getStaff: (item: T) => string): T[] { const noConsecutive = items.filter(item => !this.shouldAvoidConsecutive(getStaff(item), room)); const base = noConsecutive.length > 0 ? noConsecutive : items; const noWeekly = base.filter(item => !this.shouldAvoidWeeklyRepeat(getStaff(item), room)); return noWeekly.length > 0 ? noWeekly : base; }
   // fullDayOnlyRooms は「半日・AM/PM配置を避ける部屋」として扱い、兼務自体はここでは禁止しない。
   private getPushOutRoomScore(staff: string, room: string): number { const baseCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); const eff = this.getEffectiveTarget(room, baseCap); if (eff.allClosed) return 999999; const roomMembers = split(this.dayCells[room]); let roomAm = eff.amClosed ? 999 : 0; let roomPm = eff.pmClosed ? 999 : 0; roomMembers.forEach(m => { if (m.includes("(AM)")) roomAm++; else if (m.includes("(PM)")) roomPm++; else { roomAm++; roomPm++; } }); const fullness = Math.min(roomAm, eff.cap) + Math.min(roomPm, eff.cap); return this.getRepeatAvoidPenalty(staff, room) * 10 + fullness * 100 + roomMembers.length; }
@@ -910,127 +1214,80 @@ export class AutoAssigner {
   }
 
   private enforcePortableSourcePriority() {
-    const rule = (this.ctx.customRules.linkedRooms || []).find((r: any) => r.target === "ポータブル");
-    if (!rule || this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
-    const sources = split(rule.sources || "").map((src: string) => parseRoomCond(src));
-    if (!sources.length) return;
-    let targetMembers = split(this.dayCells["ポータブル"] || "");
-    if (targetMembers.length === 0) return;
-    const sourceInfoOf = (core: string): { idx: number; room: string; entry: string; members: string[] } => {
-      for (let idx = 0; idx < sources.length; idx++) {
-        const { r, min } = sources[idx] as any;
-        if (!r || r === "ポータブル" || this.skipSections.includes(r) || this.shouldSkipAutoAssignRoom(r)) continue;
-        const members = split(this.dayCells[r] || "");
-        if (min > 0 && members.reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
-        const entry = members.find(m => extractStaffName(m) === core) || "";
-        if (entry) return { idx, room: r, entry, members };
-      }
-      return { idx: 999, room: "", entry: "", members: [] };
-    };
-    const isLateOrNightEntry = (entry: string) => entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:");
-    const canPlaceEntryInRoom = (core: string, entry: string, room: string, members: string[]) => {
-      if (!core || ROLE_PLACEHOLDERS.includes(core)) return false;
-      if (this.isForbidden(core, room) || this.isHalfDayBlocked(core, room).hard) return false;
-      if (this.hasNGPair(core, members.filter(m => extractStaffName(m) !== core).map(extractStaffName), false)) return false;
-      if (this.isTimeTagBlockedByFullDayRule(room, entry)) return false;
-      return true;
-    };
-    const tryMovePortableOnlyToTopSource = (currentCore: string, currentEntry: string) => {
-      if (this.getTodayRoomLoad(currentCore) > getStaffAmount(currentEntry)) return false;
-      for (const { r: sourceRoom } of sources as any[]) {
-        if (!sourceRoom || sourceRoom === "ポータブル" || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
-        const sourceMembers = split(this.dayCells[sourceRoom] || "");
-        if (sourceMembers.some(m => extractStaffName(m) === currentCore)) return true;
-        const baseCap = this.dynamicCapacity[sourceRoom] ?? (["CT", "MRI", "治療"].includes(sourceRoom) ? 3 : 1);
-        const eff = this.getEffectiveTarget(sourceRoom, baseCap);
-        if (eff.allClosed) continue;
-        if (sourceMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) >= eff.cap) continue;
-        if (!canPlaceEntryInRoom(currentCore, currentEntry, sourceRoom, sourceMembers)) continue;
-        if (!this.canAddKenmu(currentCore, sourceRoom, true)) continue;
-        this.dayCells[sourceRoom] = join([...sourceMembers, currentEntry]);
-        this.refreshAssignmentState();
-        this.log(`🔗 [基本兼務優先] ポータブルのみの ${currentEntry} を ${sourceRoom} にも配置しました`);
-        return true;
-      }
-      return false;
-    };
-    const trySwapPortableSourceRoom = (currentCore: string, currentSource: { idx: number; room: string; entry: string; members: string[] }, maxSourceIndex: number) => {
-      if (!currentSource.room || currentSource.idx <= 0 || currentSource.idx >= 999) return false;
-      for (let sourceIndex = 0; sourceIndex < Math.min(currentSource.idx, maxSourceIndex, sources.length); sourceIndex++) {
-        const { r: sourceRoom, min } = sources[sourceIndex] as any;
-        if (!sourceRoom || sourceRoom === "ポータブル" || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
-        const sourceMembers = split(this.dayCells[sourceRoom] || "");
-        if (min > 0 && sourceMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
-        for (const sourceEntry of sourceMembers) {
-          const sourceCore = extractStaffName(sourceEntry);
-          if (!sourceCore || sourceCore === currentCore || ROLE_PLACEHOLDERS.includes(sourceCore) || isLateOrNightEntry(sourceEntry)) continue;
-          const movedCurrent = `${currentCore}${this.getMemberTimeTag(currentSource.entry)}`;
-          const movedSource = `${sourceCore}${this.getMemberTimeTag(sourceEntry)}`;
-          const nextHighSourceMembers = sourceMembers.map(m => m === sourceEntry ? movedCurrent : m);
-          const nextCurrentSourceMembers = currentSource.members.map(m => m === currentSource.entry ? movedSource : m);
-          if (!canPlaceEntryInRoom(currentCore, movedCurrent, sourceRoom, nextHighSourceMembers)) continue;
-          if (!canPlaceEntryInRoom(sourceCore, movedSource, currentSource.room, nextCurrentSourceMembers)) continue;
-          if (!this.canSwapKeepKenmuLimit(currentCore, sourceRoom, currentSource.room, currentSource.entry, movedCurrent)) continue;
-          if (!this.canSwapKeepKenmuLimit(sourceCore, currentSource.room, sourceRoom, sourceEntry, movedSource)) continue;
-          this.dayCells[sourceRoom] = join(nextHighSourceMembers);
-          this.dayCells[currentSource.room] = join(nextCurrentSourceMembers);
-          this.refreshAssignmentState();
-          this.log(`🔗 [基本兼務優先] ポータブル担当は変えず、${currentSource.room} の ${currentCore} と ${sourceRoom} の ${sourceCore} を入れ替えました`);
-          return true;
-        }
-      }
-      return false;
-    };
-    for (let targetIndex = 0; targetIndex < targetMembers.length; targetIndex++) {
-      const currentEntry = targetMembers[targetIndex];
+    if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
+    let portableMembers = split(this.dayCells["ポータブル"] || "");
+    if (portableMembers.length === 0) return;
+
+    for (let targetIndex = 0; targetIndex < portableMembers.length; targetIndex++) {
+      const currentEntry = portableMembers[targetIndex];
       const currentCore = extractStaffName(currentEntry);
       if (!currentCore || ROLE_PLACEHOLDERS.includes(currentCore)) continue;
-      const currentSource = sourceInfoOf(currentCore);
-      const currentSourceIndex = currentSource.idx;
-      const currentRepeatPenalty = this.getRepeatAvoidPenalty(currentCore, "ポータブル");
-      if (currentSourceIndex === 0) continue;
-      if (currentSourceIndex === 999 && tryMovePortableOnlyToTopSource(currentCore, currentEntry)) return;
-      if (trySwapPortableSourceRoom(currentCore, currentSource, sources.length)) return;
-      for (let sourceIndex = 0; sourceIndex < Math.min(currentSourceIndex, sources.length); sourceIndex++) {
-        const { r: sourceRoom, min } = sources[sourceIndex] as any;
-        if (!sourceRoom || sourceRoom === "ポータブル" || sourceRoom === "透析後胸部" || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
-        const sourceMembers = split(this.dayCells[sourceRoom] || "");
-        if (min > 0 && sourceMembers.reduce((s, m) => s + getStaffAmount(m), 0) < min) continue;
-        const otherTargetCores = targetMembers.filter((_, i) => i !== targetIndex).map(extractStaffName);
-        const candidates = sourceMembers
-          .filter(entry => {
-            const core = extractStaffName(entry);
-            if (!core || ROLE_PLACEHOLDERS.includes(core) || otherTargetCores.includes(core) || core === currentCore) return false;
-            if (entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:")) return false;
-            if (this.isForbidden(core, "ポータブル") || this.isHalfDayBlocked(core, "ポータブル").hard) return false;
-            if (this.hasNGPair(core, otherTargetCores, false)) return false;
-            if (this.isTimeTagBlockedByFullDayRule("ポータブル", entry)) return false;
-            const candidateRepeatPenalty = this.getRepeatAvoidPenalty(core, "ポータブル");
-            if (candidateRepeatPenalty > currentRepeatPenalty) return false;
-            return this.canAddKenmu(core, "ポータブル", true);
-          })
-          .sort((a, b) => {
-            const ca = extractStaffName(a), cb = extractStaffName(b);
-            return this.getRepeatAvoidPenalty(ca, "ポータブル") - this.getRepeatAvoidPenalty(cb, "ポータブル")
-              || this.getTodayRoomCount(ca) - this.getTodayRoomCount(cb)
-              || this.getPastRoomCount(ca, "ポータブル") - this.getPastRoomCount(cb, "ポータブル");
-          });
-        if (candidates.length === 0) continue;
-        const replacementCore = extractStaffName(candidates[0]);
-        const currentTag = this.getMemberTimeTag(currentEntry);
-        const candidateTag = this.getMemberTimeTag(candidates[0]);
-        const replacementEntry = currentTag && !candidateTag ? `${replacementCore}${currentTag}` : candidates[0];
-        targetMembers[targetIndex] = replacementEntry;
-        this.dayCells["ポータブル"] = join(targetMembers);
+
+      const currentSource = this.getPortableSourceInfo(currentCore, true);
+      // 候補部屋由来でないもの、またはMRI等の専従者が候補部屋に紛れ込んだものは閉域ポリシー側で処理する。
+      if (!currentSource || (currentSource.room !== "CT" && this.isProtectedInCurrentModality(currentCore)) || !this.canUseEntryForPortable(currentCore, currentEntry, portableMembers, targetIndex, true)) continue;
+      if (currentSource.idx === 0) continue;
+
+      // まず、より優先度の高い候補部屋から週内初回の人へ差し替える。
+      const betterDirect = this.findPortableStrictSourceCandidate(portableMembers, targetIndex, {
+        allowWeeklyRepeat: false,
+        maxSourceIndex: currentSource.idx,
+      });
+      if (betterDirect) {
+        portableMembers[targetIndex] = betterDirect.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
         this.refreshAssignmentState();
-        this.log(`🔗 [基本兼務優先] ポータブルは設定順を優先し、${sourceRoom} の ${replacementEntry} に変更しました`);
+        this.log(`🔗 [ポータブル優先順] 設定順を優先し、${currentSource.room} 由来の ${currentEntry} から ${betterDirect.sourceRoom} 由来の ${betterDirect.entry} に変更しました`);
         return;
+      }
+
+      // 次に、より優先度の高い候補部屋へCT/MRIの非専従者を交換で入れられるか試す。
+      const betterSwap = this.tryPortableModalitySourceSwap(portableMembers, targetIndex, {
+        allowWeeklyRepeat: false,
+        maxSourceIndex: currentSource.idx,
+      });
+      if (betterSwap) {
+        portableMembers[targetIndex] = betterSwap.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`🔗 [ポータブル優先順交換] ${betterSwap.sourceRoom} と ${betterSwap.modalityRoom} を交換し、優先度の高い候補部屋由来の ${betterSwap.entry} に変更しました`);
+        return;
+      }
+
+      // 現在の担当が既に週内2回目なら、より優先度の高い候補部屋の週内2回目にも差し替えを許す。
+      if (this.shouldAvoidWeeklyRepeat(currentCore, "ポータブル")) {
+        const betterWeekly = this.findPortableStrictSourceCandidate(portableMembers, targetIndex, {
+          allowWeeklyRepeat: true,
+          maxSourceIndex: currentSource.idx,
+        });
+        if (betterWeekly) {
+          portableMembers[targetIndex] = betterWeekly.entry;
+          this.dayCells["ポータブル"] = join(portableMembers);
+          this.refreshAssignmentState();
+          this.log(`⚠️ [ポータブル優先順週内再担当] 週内2回目同士のため、設定順を優先して ${betterWeekly.sourceRoom} 由来の ${betterWeekly.entry} に変更しました`);
+          return;
+        }
       }
     }
   }
 
   private getNoConsecutiveSourceRooms(room: string): string[] {
     const rooms: string[] = [];
+    if (room === "ポータブル") {
+      this.getPortableSourceConds().forEach(cond => {
+        if (this.isPortableSourceAvailable(cond, false)) rooms.push(cond.r);
+      });
+      if (rooms.length === 0) {
+        ["3号室", "2号室", "1号室", "5号室"].forEach(r => {
+          const cond = this.normalizePortableSourceCond(r);
+          if (cond && this.isPortableSourceAvailable(cond, false)) rooms.push(cond.r);
+        });
+        const ctCond = this.normalizePortableSourceCond("CT(4)");
+        if (ctCond && this.isPortableSourceAvailable(ctCond, false)) rooms.push("CT");
+      }
+      return Array.from(new Set(rooms)).filter(r => r && r !== room && r !== "透析後胸部");
+    }
+
     (this.ctx.customRules.linkedRooms || []).filter((r: any) => r.target === room).forEach((r: any) => split(r.sources || "").forEach((src: string) => rooms.push(parseRoomCond(src).r)));
     (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === room).forEach((r: any) => split(r.sourceRooms || "").forEach((src: string) => rooms.push(parseRoomCond(src).r)));
     ["3号室", "2号室", "1号室", "5号室", "CT"].forEach(r => rooms.push(r));
@@ -1607,7 +1864,7 @@ export class AutoAssigner {
         if (sR === "透析後胸部" || this.shouldSkipAutoAssignRoom(sR) || (min > 0 && split(this.dayCells[sR]).reduce((s, m) => s + getStaffAmount(m), 0) < min)) return;
         split(this.dayCells[sR]).forEach(m => {
           const c = extractStaffName(m);
-          if (ROLE_PLACEHOLDERS.includes(c) || linkedCandidates.some(x => extractStaffName(x.member) === c) || cM.map(extractStaffName).includes(c) || this.isForbidden(c, r.target) || this.isHalfDayBlocked(c, r.target).hard || this.hasNGPair(c, cM.map(extractStaffName), false) || (r.target === "MMG" && !this.isMmgCapable(c)) || !this.canAddKenmu(c, r.target, true) || m.includes("17:") || m.includes("19:") || this.isTimeTagBlockedByFullDayRule(r.target, m)) return;
+          if (ROLE_PLACEHOLDERS.includes(c) || linkedCandidates.some(x => extractStaffName(x.member) === c) || cM.map(extractStaffName).includes(c) || this.isForbidden(c, r.target) || this.isHalfDayBlocked(c, r.target).hard || this.shouldAvoidConsecutive(c, r.target) || this.hasNGPair(c, cM.map(extractStaffName), false) || (r.target === "MMG" && !this.isMmgCapable(c)) || !this.canAddKenmu(c, r.target, true) || m.includes("17:") || m.includes("19:") || this.isTimeTagBlockedByFullDayRule(r.target, m)) return;
           linkedCandidates.push({ member: m, sourceRoom: sR, sourceIndex });
         });
       });
@@ -1617,7 +1874,7 @@ export class AutoAssigner {
         const repeatDiff = this.getRepeatAvoidPenalty(extractStaffName(a.member), r.target) - this.getRepeatAvoidPenalty(extractStaffName(b.member), r.target);
         const todayDiff = this.getTodayRoomCount(extractStaffName(a.member)) - this.getTodayRoomCount(extractStaffName(b.member));
         const pastDiff = this.getPastRoomCount(extractStaffName(a.member), r.target) - this.getPastRoomCount(extractStaffName(b.member), r.target);
-        return r.target === "ポータブル" ? (repeatDiff || pastDiff || todayDiff || srcDiff) : (repeatDiff || todayDiff || pastDiff || srcDiff);
+        return r.target === "ポータブル" ? (srcDiff || repeatDiff || todayDiff || pastDiff) : (repeatDiff || todayDiff || pastDiff || srcDiff);
       });
       for (const candidate of narrowedLinkedCandidates) { if (cA >= tC && cP >= tC) break; const sR = candidate.sourceRoom; const m = candidate.member; const c = extractStaffName(m); if (cM.map(extractStaffName).includes(c)) continue; let pS = m; if (r.target === "パノラマCT" && sR === "透視（6号）") { if (m.includes("(PM)")) continue; pS = `${c}(AM)`; } else { if (cA < tC && cP >= tC) { if (m.includes("(PM)")) continue; pS = `${c}(AM)`; } else if (cA >= tC && cP < tC) { if (m.includes("(AM)")) continue; pS = `${c}(PM)`; } else if (e.pmClosed) { if (m.includes("(PM)")) continue; pS = `${c}(AM)`; } else if (e.amClosed) { if (m.includes("(AM)")) continue; pS = `${c}(PM)`; } } cM.push(pS); if (pS.includes("(AM)")) cA++; else if (pS.includes("(PM)")) cP++; else { cA++; cP++; } this.addUsage(c, getStaffAmount(pS)); this.updateBlockMapAfterKenmu(c, pS); this.log(`🔗 [基本兼務] ${sR} の ${pS} を ${r.target} にセット配置しました`); }
       this.dayCells[r.target] = join(cM);
@@ -1629,7 +1886,7 @@ export class AutoAssigner {
       if (this.clearSections.includes(tR) || ["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(tR) || this.shouldSkipAutoAssignRoom(tR)) return; const tC = this.dynamicCapacity[tR] ?? (["CT", "MRI", "治療"].includes(tR) ? 3 : 1); const e = this.getEffectiveTarget(tR, tC); if (e.allClosed) return;
       let cM = split(this.dayCells[tR]); let cA = e.amClosed ? 999 : 0, cP = e.pmClosed ? 999 : 0; cM.forEach(x => { if (x.includes("(AM)")) cA++; else if (x.includes("(PM)")) cP++; else { cA++; cP++; } }); if (cM.length > 0 && cM.every(m => sSL.includes(extractStaffName(m)))) { cA = e.amClosed ? 999 : 0; cP = e.pmClosed ? 999 : 0; } if (cA >= tC && cP >= tC) return;
       const mR = (this.ctx.customRules.rescueRules || []).filter((r: any) => r.targetRoom === tR); let sRms = mR.length > 0 ? mR.flatMap((r: any) => split(r.sourceRooms || "")).sort((a: string, b: string) => this.getRescueSourceScore(parseRoomCond(a).r, tR) - this.getRescueSourceScore(parseRoomCond(b).r, tR)) : ["3号室", "パノラマCT", "2号室", "1号室", "5号室", "CT(4)"].filter(r => r !== tR);
-      if (sRms.length > 0) { let cnds: { c: string, fS: string, i: number }[] = []; sRms.forEach((sS: string, i: number) => { const { r: sR, min } = parseRoomCond(sS); if (sR === tR || sR === "透析後胸部" || (min > 0 && split(this.dayCells[sR]).reduce((s, m) => s + getStaffAmount(m), 0) < min)) return; split(this.dayCells[sR]).forEach(m => { const c = extractStaffName(m); if (!ROLE_PLACEHOLDERS.includes(c) && !cnds.some(x => x.c === c) && !this.isForbidden(c, tR) && !this.isHalfDayBlocked(c, tR).hard && !m.includes("17:") && !this.isTimeTagBlockedByFullDayRule(tR, m)) cnds.push({ c, fS: m, i }); }); }); const cCs = cM.map(extractStaffName); cnds = cnds.filter(c => !cCs.includes(c.c) && (tR === "MMG" ? this.isMmgCapable(c.c) : true) && this.canAddKenmu(c.c, tR, true)); if (tR === "ポータブル") cnds = this.preferNonRepeatCandidates(cnds, tR, (item) => item.c); cnds.sort((a, b) => this.getRepeatAvoidPenalty(a.c, tR) - this.getRepeatAvoidPenalty(b.c, tR) || this.getTodayRoomCount(a.c) - this.getTodayRoomCount(b.c) || this.getPastRoomCount(a.c, tR) - this.getPastRoomCount(b.c, tR) || a.i - b.i || (this.assignCounts[a.c] || 0) - (this.assignCounts[b.c] || 0)); for (const cn of cnds) { if (cA >= tC && cP >= tC) break; if (this.hasNGPair(cn.c, cCs, false)) continue; let pS = cn.fS; if (cA < tC && cP >= tC) { if (cn.fS.includes("(PM)")) continue; pS = `${cn.c}(AM)`; } else if (cA >= tC && cP < tC) { if (cn.fS.includes("(AM)")) continue; pS = `${cn.c}(PM)`; } else if (e.pmClosed) { if (cn.fS.includes("(PM)")) continue; pS = `${cn.c}(AM)`; } else if (e.amClosed) { if (cn.fS.includes("(AM)")) continue; pS = `${cn.c}(PM)`; } cM.push(pS); if (pS.includes("(AM)")) cA++; else if (pS.includes("(PM)")) cP++; else { cA++; cP++; } this.addUsage(cn.c, getStaffAmount(pS)); this.updateBlockMapAfterKenmu(cn.c, pS); } this.dayCells[tR] = join(cM); }
+      if (sRms.length > 0) { let cnds: { c: string, fS: string, i: number }[] = []; sRms.forEach((sS: string, i: number) => { const { r: sR, min } = parseRoomCond(sS); if (sR === tR || sR === "透析後胸部" || (min > 0 && split(this.dayCells[sR]).reduce((s, m) => s + getStaffAmount(m), 0) < min)) return; split(this.dayCells[sR]).forEach(m => { const c = extractStaffName(m); if (!ROLE_PLACEHOLDERS.includes(c) && !cnds.some(x => x.c === c) && !this.isForbidden(c, tR) && !this.isHalfDayBlocked(c, tR).hard && !this.shouldAvoidConsecutive(c, tR) && !m.includes("17:") && !this.isTimeTagBlockedByFullDayRule(tR, m)) cnds.push({ c, fS: m, i }); }); }); const cCs = cM.map(extractStaffName); cnds = cnds.filter(c => !cCs.includes(c.c) && (tR === "MMG" ? this.isMmgCapable(c.c) : true) && this.canAddKenmu(c.c, tR, true)); if (tR === "ポータブル") cnds = this.preferNonRepeatCandidates(cnds, tR, (item) => item.c); cnds.sort((a, b) => this.getRepeatAvoidPenalty(a.c, tR) - this.getRepeatAvoidPenalty(b.c, tR) || this.getTodayRoomCount(a.c) - this.getTodayRoomCount(b.c) || this.getPastRoomCount(a.c, tR) - this.getPastRoomCount(b.c, tR) || a.i - b.i || (this.assignCounts[a.c] || 0) - (this.assignCounts[b.c] || 0)); for (const cn of cnds) { if (cA >= tC && cP >= tC) break; if (this.hasNGPair(cn.c, cCs, false)) continue; let pS = cn.fS; if (cA < tC && cP >= tC) { if (cn.fS.includes("(PM)")) continue; pS = `${cn.c}(AM)`; } else if (cA >= tC && cP < tC) { if (cn.fS.includes("(AM)")) continue; pS = `${cn.c}(PM)`; } else if (e.pmClosed) { if (cn.fS.includes("(PM)")) continue; pS = `${cn.c}(AM)`; } else if (e.amClosed) { if (cn.fS.includes("(AM)")) continue; pS = `${cn.c}(PM)`; } cM.push(pS); if (pS.includes("(AM)")) cA++; else if (pS.includes("(PM)")) cP++; else { cA++; cP++; } this.addUsage(cn.c, getStaffAmount(pS)); this.updateBlockMapAfterKenmu(cn.c, pS); } this.dayCells[tR] = join(cM); }
     });
 
     this.releaseSupportPartnersForEmptyRooms();
@@ -1717,6 +1974,7 @@ export class AutoAssigner {
     this.sharePartialHelpersWithLinkedTargets();
     this.rebalanceNoConsecutiveRooms();
     this.enforcePortableSourcePriority();
+    this.enforcePortableClosedSourcePolicy();
     this.refreshAssignmentState();
 
     this.logPhase("フェーズ5：仕上げ");
@@ -3144,7 +3402,7 @@ export default function App(): any {
             <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
               <li style={{ marginBottom: 8 }}><strong>担当不可・NGペアの厳守:</strong> 「この部屋はまだ不可」「この2人は同室にしない」設定は必ず守ります。</li>
               <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点で⚠️注意が出ます。上限を超える自動配置はブロックされます。</li>
-              <li style={{ marginBottom: 8 }}><strong>連日を強く回避・週1回優先:</strong> ポータブルなど指定部屋は、連日担当を強く避け、今週2回目以降もできれば避けます。ただし人不足時は特例で入ることがあります。</li>
+              <li style={{ marginBottom: 8 }}><strong>連日禁止・週1回優先:</strong> ポータブルなど指定部屋は、連日担当をフェーズ4以降の強制除外として扱います。ポータブルは設定した候補部屋の優先順を守り、禁止・連日の場合はCT/MRIの非専従者との交換を先に試し、それでも無理な場合のみ週内2回目を許容します。</li>
               <li style={{ marginBottom: 8 }}><strong>半日不可部屋のブロック:</strong> 午前後休の人をDSA/MRI等にAM/PM配置しない設定です。兼務自体を禁止する設定ではありません。</li>
             </ul>
 
