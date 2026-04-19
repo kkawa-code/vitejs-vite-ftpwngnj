@@ -2235,31 +2235,40 @@ export class AutoAssigner {
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
       let current = split(this.dayCells[rule.section]);
-      if (current.length > 0 && !current.some(m => m.includes("17:") || m.includes("18:"))) {
-        const usedCountThisWeek = this.pastDaysInWeek.filter((pd: DayData) =>
-          split(pd.cells[rule.section] || "").some((m: string) =>
-            !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:")
+      const isLateEntry = (m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:");
+      if (current.length > 0 && !current.some(isLateEntry)) {
+        const daytimeEntries = current.filter((m: string) => !isLateEntry(m) && !ROLE_PLACEHOLDERS.includes(extractStaffName(m)));
+        const repeatedDaytimeStaff = daytimeEntries.map(extractStaffName).filter((staff: string, idx: number, arr: string[]) =>
+          arr.indexOf(staff) === idx && this.pastDaysInWeek.some((pd: DayData) =>
+            split(pd.cells[rule.section] || "").some((m: string) => extractStaffName(m) === staff && !isLateEntry(m))
           )
-        ).length;
-        if (rule.fromSecondUseInWeek && usedCountThisWeek === 0) {
-          this.log(`🕒 [遅番保留] ${rule.section} は部屋として今週初回のため遅番を付与しない`);
+        );
+        if (rule.fromSecondUseInWeek && repeatedDaytimeStaff.length === 0) {
+          this.log(`🕒 [遅番保留] ${rule.section} は担当者として今週初回のため遅番を付与しない`);
           return;
         }
         const currentCore = current.map(extractStaffName);
-        const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")).map(extractStaffName) : [];
+        const prevLateStaff = this.prevDay ? split(this.prevDay.cells[rule.section] || "").filter((m: string) => isLateEntry(m)).map(extractStaffName) : [];
         const excludeStaff = Array.from(new Set([...split(this.ctx.customRules.noLateShiftStaff || "").map(extractStaffName), ...split(this.ctx.customRules.noLateShiftRooms || "").flatMap(r => split(this.dayCells[r] || "").map(extractStaffName))]));
         const candidates = this.initialAvailGeneral.filter(n => !currentCore.includes(n) && !this.isForbidden(n, rule.section) && !excludeStaff.includes(n) && !this.hasPmAbsence(n) && this.getTodayRoomLoad(n) > 0 && !hasFluoroAuxConflict(this.dayCells, n, rule.section, this.ctx.customRules.fluoroAuxConflictRooms));
         candidates.sort((a, b) => { let sA = this.getPastLateShiftCount(a) * 100; let sB = this.getPastLateShiftCount(b) * 100; const idxA = lowPriorityStaff.indexOf(a); const idxB = lowPriorityStaff.indexOf(b); if (idxA !== -1) sA += 100000 + ((lowPriorityStaff.length - idxA) * 10000); if (idxB !== -1) sB += 100000 + ((lowPriorityStaff.length - idxB) * 10000); if (sA !== sB) return sA - sB; return a.localeCompare(b, 'ja'); });
         let picked = candidates.find(n => !prevLateStaff.includes(n));
         if (!picked && candidates.length > 0) picked = candidates[0];
         if (picked) {
+          const shouldApplyDayEnd = !!rule.dayEndTime;
+          current = current.map((m: string) => {
+            const core = extractStaffName(m);
+            if (!shouldApplyDayEnd || ROLE_PLACEHOLDERS.includes(core) || isLateEntry(m) || m.includes("(AM)") || m.includes("(PM)") || m.includes("〜")) return m;
+            return `${core}${rule.dayEndTime}`;
+          });
           current.push(`${picked}${rule.lateTime}`);
           const prevBlock = this.blockMap.get(picked);
           this.blockMap.set(picked, prevBlock === 'AM' ? 'ALL' : (prevBlock || 'PM'));
           this.dayCells[rule.section] = join(current);
           this.lateShiftAssigned.add(picked);
           this.assignCounts[picked] = this.getAssignedUsage(picked);
-          this.log(`🌙 [遅番確定] ${picked} を ${rule.section} の遅番に配置`);
+          const triggerLabel = rule.fromSecondUseInWeek ? `（${repeatedDaytimeStaff.join("、")} が担当者として今週2回目以降）` : "";
+          this.log(`🌙 [遅番確定] ${picked} を ${rule.section} の遅番に配置${triggerLabel}`);
         }
       }
     });
@@ -3521,7 +3530,7 @@ export default function App(): any {
                     <span className="rule-label" style={{color:"#6d28d9"}}>とする）</span>
                     <label style={{display:"inline-flex", alignItems:"center", gap:6, fontSize:14, fontWeight:700, color:"#6d28d9", marginLeft:4}}>
                       <input type="checkbox" checked={!!rule.fromSecondUseInWeek} onChange={(e:any)=>updateRule("lateShifts", idx, "fromSecondUseInWeek", e.target.checked)} />
-                      部屋の今週2回目以降
+                      担当者の今週2回目以降
                     </label>
                     <DelBtn onClick={()=>removeRule("lateShifts", idx)} />
                   </div>
