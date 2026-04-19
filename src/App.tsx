@@ -3,18 +3,21 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #1f2937; -webkit-print-color-adjust: exact; font-family: "BIZ UDPGothic", "Yu Gothic", "Yu Gothic UI", "Meiryo", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.01em; font-size: 17px; font-weight: 800; line-height: 1.55; overflow-x: hidden; text-rendering: geometricPrecision; }
+  body { background: #f4f7f9; color: #0f172a; -webkit-print-color-adjust: exact; font-family: "Meiryo", "Yu Gothic UI", "Yu Gothic", "BIZ UDPGothic", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.005em; font-size: 18px; font-weight: 900; line-height: 1.5; overflow-x: hidden; text-rendering: optimizeLegibility; -webkit-font-smoothing: auto; }
   * { box-sizing: border-box; }
   body, table, th, td, button, select, input, textarea { -webkit-font-smoothing: auto; text-rendering: geometricPrecision; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-  textarea, select, button, input { font: inherit; font-weight: 850; color: #111827; }
+  textarea, select, button, input { font: inherit; font-weight: 900; color: #0f172a; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
-  .scroll-container table, .scroll-container th, .scroll-container td { font-size: 16.5px !important; font-weight: 850 !important; color: #111827 !important; line-height: 1.45 !important; }
-  .print-sheet-table, .print-sheet-table th, .print-sheet-table td, .print-sheet-table .p-line { font-weight: 800 !important; }
+  .scroll-container table, .scroll-container th, .scroll-container td { font-size: 17.5px !important; font-weight: 900 !important; color: #0f172a !important; line-height: 1.42 !important; }
+  .print-sheet-table, .print-sheet-table th, .print-sheet-table td, .print-sheet-table .p-line { font-weight: 900 !important; }
+  [data-print-chip="1"] { border-width: 2px !important; font-size: 16px !important; font-weight: 900 !important; }
+  [data-print-name="1"] { font-weight: 900 !important; color: inherit !important; }
+  [data-print-badge="1"], [data-print-mod="1"] { font-weight: 900 !important; border-width: 2px !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
   details>summary:hover { color: #0d9488; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; }
@@ -27,7 +30,7 @@ const globalStyle = `
   .card-hover { transition: box-shadow 0.2s, transform 0.2s; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
   .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; width: 100%; }
-  .rule-sel, .rule-num { padding: 9px 12px; border-radius: 6px; border: 1px solid #94a3b8; font-weight: 850; font-size: 16px; transition: border-color 0.2s; color: #111827; }
+  .rule-sel, .rule-num { padding: 9px 12px; border-radius: 6px; border: 2px solid #64748b; font-weight: 900; font-size: 17px; transition: border-color 0.2s; color: #111827; }
   .rule-num { width: 60px; text-align: center; flex-shrink: 0; }
   .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 24px; flex-shrink: 0; padding: 0 8px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
@@ -37,7 +40,7 @@ const globalStyle = `
   .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 17px; font-weight: 800; color: #475569; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
-  .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #94a3b8; font-weight: 850; line-height: 1.55; color: #111827; }
+  .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 17px; border-radius: 8px; border: 2px solid #64748b; font-weight: 900; line-height: 1.55; color: #111827; }
   .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); }
   .modal-content { background: #fff; padding: 32px; border-radius: 16px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; }
   .modal-wide { max-width: 1000px; }
@@ -394,9 +397,9 @@ export function isAllDayAbsenceEntry(entry: string) {
 }
 
 // ===================== 🌟 UI Components =====================
-export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
+export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 900, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
 export const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "20px", boxShadow: "0 4px 14px -10px rgba(15,23,42,0.16)", width: "100%", boxSizing: "border-box" });
-export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 900 : 850, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 17 : 16, color: isHoliday && isHeader ? "#dc2626" : "#111827", lineHeight: 1.45, verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
+export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: 900, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 18 : 17, color: isHoliday && isHeader ? "#dc2626" : "#0f172a", lineHeight: 1.42, verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
 
 export const Modal = ({ title, onClose, wide, children }: any) => ( <div className="modal-overlay" onClick={onClose}><div className={`modal-content modal-animate ${wide ? 'modal-wide' : ''}`} onClick={e => e.stopPropagation()}><div className="modal-header"><h3 className="modal-title">{title}</h3><button onClick={onClose} className="close-btn">✖</button></div>{children}<div style={{ textAlign: "center", marginTop: 32 }}><button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "16px" }}>閉じる</button></div></div></div> );
 export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any) => ( <div style={{ background: bg, padding: 24, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}><h5 style={{ margin: "0 0 12px 0", color, fontSize: 18, fontWeight: 800 }}>{icon} {title}</h5>{desc && <p style={{ fontSize: 15, color: "#166534", marginTop: 0, marginBottom: 16 }}>{desc}</p>}{children}</div> );
@@ -478,10 +481,10 @@ export const SectionEditor = ({ section, value, activeStaff, onChange, noTime = 
         {members.map((m, i) => {
           const coreName = extractStaffName(m); const currentMod = m.substring(coreName.length); const isPlaceholder = ROLE_PLACEHOLDERS.includes(coreName) || (customOptions.includes(coreName) && !activeStaff.includes(coreName));
           return (
-            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 16, padding: "8px 12px 8px 14px", fontSize: 15, display: "flex", alignItems: isFuzai ? "flex-start" : "center", flexWrap: isFuzai ? "wrap" : "nowrap", gap: 6, border: `1px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#cbd5e1" : "#bae6fd")}`, fontWeight: 700, maxWidth: "100%", minWidth: 0, overflow: "hidden" }}>
+            <div key={i} style={{ background: isPlaceholder ? "#fef08a" : (noTime && !isFuzai ? "#f1f5f9" : "#e0f2fe"), color: isPlaceholder ? "#a16207" : (noTime && !isFuzai ? "#334155" : "#0369a1"), borderRadius: 16, padding: "8px 12px 8px 14px", fontSize: 15, display: "flex", alignItems: isFuzai ? "flex-start" : "center", flexWrap: isFuzai ? "wrap" : "nowrap", gap: 6, border: `2px solid ${isPlaceholder ? "#fde047" : (noTime && !isFuzai ? "#94a3b8" : "#7dd3fc")}`, fontWeight: 900, maxWidth: "100%", minWidth: 0, overflow: "hidden" }}>
               <span>{coreName}</span>
               {(!noTime || isFuzai || isHelp) && (
-                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: "inherit", cursor: "pointer", padding: "0 20px 0 6px", minWidth: 0, maxWidth: isFuzai ? 92 : undefined, flexShrink: 1 }}>
+                <select value={currentMod} onChange={(e: any) => handleTimeChange(i, e.target.value)} style={{ appearance: "none", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 900, color: "inherit", cursor: "pointer", padding: "0 20px 0 6px", minWidth: 0, maxWidth: isFuzai ? 92 : undefined, flexShrink: 1 }}>
                   {isFuzai
                     ? FUZAI_TIMES.map(t => <option key={t} value={t}>{FUZAI_LABELS[t]}</option>)
                     : isHelp
@@ -2957,13 +2960,13 @@ export default function App(): any {
                                 const otherRooms = isRoomLikeSection ? sameDayRooms.filter(r => r !== section) : [];
                                 const showKenmuMeta = isRoomLikeSection && roomCount >= 2;
 
-                                let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#475569";
-                                let metaBg = "#f8fafc"; let metaColor = "#475569"; let metaBorder = "#e2e8f0";
+                                let tagBg = "#ffffff"; let tagColor = "#0f172a"; let tagBorder = "#64748b";
+                                let metaBg = "#f8fafc"; let metaColor = "#475569"; let metaBorder = "#cbd5e1";
                                 let countBg = "#e2e8f0"; let countColor = "#475569";
                                 let dangerDot: string | null = null;
-                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#fff7f7"; tagColor = "#991b1b"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#991b1b"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#991b1b"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fff6ee"; tagColor = "#0f172a"; tagBorder = "#d9b68e"; metaBg = "#ffe3c2"; metaColor = "#9a3412"; metaBorder = "#f5b978"; countBg = "#f7c98f"; countColor = "#9a3412"; }
-                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#f1fbf3"; tagColor = "#0f172a"; tagBorder = "#86bf96"; metaBg = "#e4f6e8"; metaColor = "#166534"; metaBorder = "#b5dfbf"; countBg = "#c8ebd1"; countColor = "#166534"; }
+                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#f0fdf4"; tagColor = "#0f172a"; tagBorder = "#16a34a"; metaBg = "#dcfce7"; metaColor = "#166534"; metaBorder = "#22c55e"; countBg = "#fee2e2"; countColor = "#991b1b"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#f0fdf4"; tagColor = "#0f172a"; tagBorder = "#16a34a"; metaBg = "#dcfce7"; metaColor = "#166534"; metaBorder = "#22c55e"; countBg = "#fed7aa"; countColor = "#9a3412"; }
+                                else if (showKenmuMeta && roomCount === 2) { tagBg = "#f0fdf4"; tagColor = "#0f172a"; tagBorder = "#16a34a"; metaBg = "#dcfce7"; metaColor = "#166534"; metaBorder = "#22c55e"; countBg = "#bbf7d0"; countColor = "#14532d"; }
 
                                 if (hasRedWarning) { tagBg = "#fff7f7"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#b91c1c"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#b91c1c"; }
                                 else if (hasOrangeWarning) { dangerDot = "#f59e0b"; }
@@ -2972,15 +2975,15 @@ export default function App(): any {
                                 let inlineStyle: React.CSSProperties = {
                                   background: tagBg,
                                   color: tagColor,
-                                  border: `1px solid ${tagBorder}`,
-                                  padding: showKenmuMeta ? "6px 9px 7px" : "6px 10px",
-                                  borderRadius: "8px",
+                                  border: `2px solid ${tagBorder}`,
+                                  padding: showKenmuMeta ? "7px 10px 8px" : "7px 11px",
+                                  borderRadius: "9px",
                                   display: "flex",
                                   alignItems: "stretch",
                                   flexDirection: "column",
                                   gap: "4px",
-                                  fontSize: "15px",
-                                  fontWeight: hasRedWarning ? 800 : 700,
+                                  fontSize: "16px",
+                                  fontWeight: 900,
                                   transition: "all 0.2s ease",
                                   boxShadow: "none",
                                   alignSelf: "flex-start"
@@ -2996,7 +2999,7 @@ export default function App(): any {
 
                                 const titleText = showKenmuMeta ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
-                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #bae6fd", fontWeight: 800 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #fbcfe8", fontWeight: 800 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13px", padding: "2px 4px", borderRadius: "4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{mod.replace(/[()]/g, '')}</span>);
+                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #bae6fd", fontWeight: 900 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #fbcfe8", fontWeight: 900 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #d1d5db", fontWeight: 900 }}>{mod.replace(/[()]/g, '')}</span>);
 
                                 return (
                                   <div key={mIdx} className="btn-hover" data-print-chip="1" 
@@ -3022,10 +3025,10 @@ export default function App(): any {
                                           padding: roomCount >= 4 ? "1px 6px" : roomCount === 2 ? "2px 8px" : "1px 5px",
                                           background: isHighlighted ? "rgba(255,255,255,0.16)" : countBg,
                                           color: isHighlighted ? "#fff" : countColor,
-                                          border: isHighlighted ? "1px solid rgba(255,255,255,0.28)" : roomCount === 2 ? `1px solid ${metaBorder}` : "1px solid transparent",
+                                          border: isHighlighted ? "2px solid rgba(255,255,255,0.35)" : `2px solid ${metaBorder}`,
                                           borderRadius: "999px",
-                                          fontSize: roomCount === 2 ? "11px" : "10px",
-                                          fontWeight: roomCount === 2 ? 900 : 800,
+                                          fontSize: roomCount === 2 ? "12px" : "11px",
+                                          fontWeight: 900,
                                           letterSpacing: roomCount === 2 ? "0.01em" : 0,
                                           lineHeight: 1.2
                                         }}>{roomCount}件</span>
@@ -3041,10 +3044,10 @@ export default function App(): any {
                                         padding: roomCount >= 3 ? "2px 7px" : "2px 6px",
                                         background: isHighlighted ? "rgba(255,255,255,0.16)" : metaBg,
                                         color: isHighlighted ? "#fff" : metaColor,
-                                        border: isHighlighted ? "1px solid rgba(255,255,255,0.32)" : `1px solid ${metaBorder}`,
+                                        border: isHighlighted ? "2px solid rgba(255,255,255,0.35)" : `2px solid ${metaBorder}`,
                                         borderRadius: "999px",
-                                        fontSize: roomCount >= 3 ? "10.5px" : "10.5px",
-                                        fontWeight: 700,
+                                        fontSize: roomCount >= 3 ? "11.5px" : "11.5px",
+                                        fontWeight: 900,
                                         lineHeight: 1.1,
                                         whiteSpace: "nowrap",
                                         maxWidth: roomCount === 2 ? "138px" : "156px",
