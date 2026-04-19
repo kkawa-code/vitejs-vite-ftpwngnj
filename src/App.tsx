@@ -1245,13 +1245,6 @@ export class AutoAssigner {
     }
   }
 
-  private getPortableSourceRank(room: string): number {
-    const sources = this.getPortableSourceConds();
-    const idx = sources.findIndex(cond => cond.r === room);
-    if (idx >= 0) return idx;
-    const fallback: Record<string, number> = { "3号室": 0, "CT": 1, "2号室": 2, "1号室": 3, "5号室": 4 };
-    return fallback[room] ?? 99;
-  }
 
   private canMoveEntryBetweenRooms(core: string, entry: string, fromRoom: string, toRoom: string, toMembers: string[]): boolean {
     if (!this.canPlaceEntryInRoomStrict(core, entry, toRoom, toMembers)) return false;
