@@ -818,14 +818,20 @@ export class AutoAssigner {
     };
     const helperRooms = linkedTargets
       .filter(room => !this.skipSections.includes(room) && room !== "透析後胸部" && !this.shouldSkipAutoAssignRoom(room))
-      .map(room => ({ room, members: split(this.dayCells[room] || "") }))
-      .filter(x => x.members.length === 1)
-      .map(x => ({ ...x, helperEntry: x.members[0], helperCore: extractStaffName(x.members[0]) }))
+      .flatMap(room => {
+        const members = split(this.dayCells[room] || "");
+        return members.map(helperEntry => ({ room, members, helperEntry, helperCore: extractStaffName(helperEntry) }));
+      })
       .filter(x => {
         if (!x.helperCore || ROLE_PLACEHOLDERS.includes(x.helperCore) || isLateOrNightEntry(x.helperEntry)) return false;
         if (this.getTodayRoomLoad(x.helperCore) > 1) return false;
         const otherRooms = ROOM_SECTIONS.filter(r => r !== x.room && split(this.dayCells[r] || "").some(m => extractStaffName(m) === x.helperCore));
         return otherRooms.every(r => linkedTargetSet.has(r));
+      })
+      .sort((a, b) => {
+        const aSplit = isSplitTargetEntry(a.helperEntry) ? 0 : 1;
+        const bSplit = isSplitTargetEntry(b.helperEntry) ? 0 : 1;
+        return aSplit - bSplit || this.getTodayRoomLoad(a.helperCore) - this.getTodayRoomLoad(b.helperCore);
       });
 
     for (const helper of helperRooms) {
