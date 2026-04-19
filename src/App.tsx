@@ -794,6 +794,18 @@ export class AutoAssigner {
     if (changed) this.refreshAssignmentState();
   }
 
+  private canAddLinkedTargetLoadShare(staff: string, fromRoom: string, targetRoom: string, entryForTarget: string): boolean {
+    const linkedTargets = Array.from(new Set((this.ctx.customRules.linkedRooms || []).map((r: any) => r.target).filter(Boolean))) as string[];
+    const linkedTargetSet = new Set(linkedTargets);
+    const core = extractStaffName(staff);
+    if (!core || !linkedTargetSet.has(fromRoom) || !linkedTargetSet.has(targetRoom)) return false;
+    if (hasFluoroAuxConflict(this.dayCells, core, targetRoom, this.ctx.customRules.fluoroAuxConflictRooms)) return false;
+    const alreadyInTarget = split(this.dayCells[targetRoom] || "").map(extractStaffName).includes(core);
+    const limit = this.ctx.customRules.alertMaxKenmu || 3;
+    const nextLoad = this.getTodayRoomLoad(core) + (alreadyInTarget ? 0 : getStaffAmount(entryForTarget));
+    return nextLoad <= limit;
+  }
+
   private sharePartialHelpersWithLinkedTargets() {
     const linkedTargets = Array.from(new Set((this.ctx.customRules.linkedRooms || []).map((r: any) => r.target).filter(Boolean))) as string[];
     const linkedTargetSet = new Set(linkedTargets);
@@ -866,11 +878,11 @@ export class AutoAssigner {
         if (room === "MMG" && !this.isMmgCapable(helper.helperCore)) continue;
         if (this.isForbidden(helper.helperCore, room) || this.isHalfDayBlocked(helper.helperCore, room).hard) continue;
         if (this.hasNGPair(helper.helperCore, candidate.members.map(extractStaffName), false)) continue;
-        if (!this.canAddKenmu(helper.helperCore, room, true)) continue;
         const targetEntry = candidate.replaceable[0];
         const targetCore = extractStaffName(targetEntry);
         const splitPlan = getHelperSplit(helper.helperEntry, targetCore);
         if (!splitPlan.helperForTarget) continue;
+        if (!this.canAddKenmu(helper.helperCore, room, true) && !this.canAddLinkedTargetLoadShare(helper.helperCore, helper.room, room, splitPlan.helperForTarget)) continue;
         const replacement = splitPlan.targetRemainder ? [splitPlan.helperForTarget, splitPlan.targetRemainder] : [splitPlan.helperForTarget];
         this.dayCells[room] = join(candidate.members.flatMap(m => m === targetEntry ? replacement : [m]));
         this.log(`🪄 [基本兼務負担軽減] ${helper.room} の ${helper.helperEntry} を ${room} にも入れ、${targetCore} の負担を減らしました`);
