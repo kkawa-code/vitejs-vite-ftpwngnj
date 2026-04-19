@@ -1795,6 +1795,108 @@ export class AutoAssigner {
       if (!tryMove()) this.log(`↪️ [玉突き未実行] ${tSec} の ${s1}/${s2}: 通常定員内で移動・交換できる候補がありません`);
     });
   }
+
+  private normalizePushOutMonthlyBackfill() {
+    (this.ctx.customRules.pushOuts || []).forEach((po: any) => {
+      const triggerStaff = extractStaffName(po.s1 || po.triggerStaff);
+      const targetStaff = extractStaffName(po.s2 || po.targetStaff);
+      const triggerSection = po.triggerSection;
+      if (!triggerStaff || !targetStaff || !triggerSection || !po.targetSections) return;
+      if (this.skipSections.includes(triggerSection) || triggerSection === "透析後胸部") return;
+
+      const targetRooms = split(po.targetSections).filter(room =>
+        room &&
+        !this.skipSections.includes(room) &&
+        room !== "透析後胸部" &&
+        !this.shouldSkipAutoAssignRoom(room)
+      );
+      if (targetRooms.length === 0) return;
+
+      const triggerMembers = split(this.dayCells[triggerSection] || "");
+      const triggerCores = triggerMembers.map(extractStaffName);
+      if (!triggerCores.includes(triggerStaff)) return;
+      if (triggerCores.includes(targetStaff)) return;
+
+      const targetStaffRoom = targetRooms.find(room => split(this.dayCells[room] || "").some(m => extractStaffName(m) === targetStaff));
+      if (!targetStaffRoom) return;
+
+      const monthlyTriggerStaff = getMonthlyStaffForSection(triggerSection, this.ctx.monthlyAssign)
+        .map(extractStaffName)
+        .filter(Boolean);
+      if (monthlyTriggerStaff.length === 0) return;
+      const monthlySet = new Set(monthlyTriggerStaff);
+
+      const fillerEntries = triggerMembers.filter(entry => {
+        const core = extractStaffName(entry);
+        if (!core || ROLE_PLACEHOLDERS.includes(core)) return false;
+        if (core === triggerStaff || core === targetStaff) return false;
+        return !monthlySet.has(core);
+      });
+      if (fillerEntries.length === 0) return;
+
+      type MonthlySwapCandidate = {
+        sourceRoom: string;
+        sourceEntry: string;
+        fillerEntry: string;
+        sourceIndex: number;
+        monthlyStaff: string;
+        fillerStaff: string;
+        movedMonthly: string;
+        movedFiller: string;
+      };
+      const candidates: MonthlySwapCandidate[] = [];
+
+      targetRooms.forEach((sourceRoom, sourceIndex) => {
+        const sourceMembers = split(this.dayCells[sourceRoom] || "");
+        sourceMembers.forEach(sourceEntry => {
+          const monthlyStaff = extractStaffName(sourceEntry);
+          if (!monthlyStaff || ROLE_PLACEHOLDERS.includes(monthlyStaff)) return;
+          if (monthlyStaff === triggerStaff || monthlyStaff === targetStaff) return;
+          if (!monthlySet.has(monthlyStaff) || triggerCores.includes(monthlyStaff)) return;
+          if (sourceEntry.includes("17:") || sourceEntry.includes("18:") || sourceEntry.includes("19:") || sourceEntry.includes("22:")) return;
+
+          fillerEntries.forEach(fillerEntry => {
+            const fillerStaff = extractStaffName(fillerEntry);
+            if (!fillerStaff || ROLE_PLACEHOLDERS.includes(fillerStaff) || fillerStaff === monthlyStaff) return;
+            const monthlyTag = this.getMemberTimeTag(sourceEntry);
+            const fillerTag = this.getMemberTimeTag(fillerEntry);
+            const movedMonthly = `${monthlyStaff}${fillerTag}`;
+            const movedFiller = `${fillerStaff}${monthlyTag}`;
+
+            const triggerPeers = triggerMembers.filter(m => m !== fillerEntry).map(extractStaffName);
+            const sourcePeers = sourceMembers.filter(m => m !== sourceEntry).map(extractStaffName);
+
+            if (this.isForbidden(monthlyStaff, triggerSection) || this.isHalfDayBlocked(monthlyStaff, triggerSection).hard) return;
+            if (this.hasNGPair(monthlyStaff, triggerPeers, false)) return;
+            if (this.isTimeTagBlockedByFullDayRule(triggerSection, movedMonthly)) return;
+            if (!this.canSwapKeepKenmuLimit(monthlyStaff, triggerSection, sourceRoom, sourceEntry, movedMonthly)) return;
+
+            if (this.isForbidden(fillerStaff, sourceRoom) || this.isHalfDayBlocked(fillerStaff, sourceRoom).hard) return;
+            if (this.hasNGPair(fillerStaff, sourcePeers, false)) return;
+            if (this.isTimeTagBlockedByFullDayRule(sourceRoom, movedFiller)) return;
+            if (!this.canSwapKeepKenmuLimit(fillerStaff, sourceRoom, triggerSection, fillerEntry, movedFiller)) return;
+
+            candidates.push({ sourceRoom, sourceEntry, fillerEntry, sourceIndex, monthlyStaff, fillerStaff, movedMonthly, movedFiller });
+          });
+        });
+      });
+
+      if (candidates.length === 0) return;
+      candidates.sort((a, b) =>
+        a.sourceIndex - b.sourceIndex ||
+        this.getPastRoomCount(a.monthlyStaff, triggerSection) - this.getPastRoomCount(b.monthlyStaff, triggerSection) ||
+        this.getTodayRoomLoad(a.fillerStaff) - this.getTodayRoomLoad(b.fillerStaff) ||
+        a.monthlyStaff.localeCompare(b.monthlyStaff, 'ja')
+      );
+
+      const picked = candidates[0];
+      this.dayCells[triggerSection] = join(triggerMembers.map(m => m === picked.fillerEntry ? picked.movedMonthly : m));
+      const sourceMembers = split(this.dayCells[picked.sourceRoom] || "");
+      this.dayCells[picked.sourceRoom] = join(sourceMembers.map(m => m === picked.sourceEntry ? picked.movedFiller : m));
+      this.refreshAssignmentState();
+      this.log(`🎱 [玉突き月担当交換] ${triggerSection} の非月担当 ${picked.fillerStaff} と ${picked.sourceRoom} の月担当 ${picked.monthlyStaff} を交換`);
+    });
+  }
   updateBlockMapAfterKenmu(core: string, pushStr: string) { const cur = this.blockMap.get(core); let nx: string; if (pushStr.includes("(AM)")) nx = (cur === 'PM' || cur === 'ALL') ? 'ALL' : 'AM'; else if (pushStr.includes("(PM)")) nx = (cur === 'AM' || cur === 'ALL') ? 'ALL' : 'PM'; else nx = 'ALL'; this.blockMap.set(core, nx); }
   private repairMmgElevenConflict(conflictStaff: string): boolean {
     const staffCore = extractStaffName(conflictStaff);
@@ -2231,6 +2333,7 @@ export class AutoAssigner {
     });
 
     this.applyPushOutRules();
+    this.normalizePushOutMonthlyBackfill();
     this.rebalanceNoConsecutiveRooms();
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
