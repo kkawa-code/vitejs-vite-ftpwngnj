@@ -3,16 +3,17 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Meiryo", "Yu Gothic UI", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.02em; font-size: 16px; font-weight: 700; overflow-x: hidden; }
+  body { background: #f4f7f9; color: #1f2937; -webkit-print-color-adjust: exact; font-family: "BIZ UDPGothic", "Yu Gothic", "Yu Gothic UI", "Meiryo", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.01em; font-size: 17px; font-weight: 800; line-height: 1.55; overflow-x: hidden; text-rendering: geometricPrecision; }
   * { box-sizing: border-box; }
+  body, table, th, td, button, select, input, textarea { -webkit-font-smoothing: auto; text-rendering: geometricPrecision; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-  textarea, select, button, input { font: inherit; font-weight: 800; }
+  textarea, select, button, input { font: inherit; font-weight: 850; color: #111827; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
-  .scroll-container table, .scroll-container th, .scroll-container td { font-weight: 800 !important; }
+  .scroll-container table, .scroll-container th, .scroll-container td { font-size: 16.5px !important; font-weight: 850 !important; color: #111827 !important; line-height: 1.45 !important; }
   .print-sheet-table, .print-sheet-table th, .print-sheet-table td, .print-sheet-table .p-line { font-weight: 800 !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
   details>summary:hover { color: #0d9488; }
@@ -26,7 +27,7 @@ const globalStyle = `
   .card-hover { transition: box-shadow 0.2s, transform 0.2s; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
   .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; width: 100%; }
-  .rule-sel, .rule-num { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 800; font-size: 15px; transition: border-color 0.2s; }
+  .rule-sel, .rule-num { padding: 9px 12px; border-radius: 6px; border: 1px solid #94a3b8; font-weight: 850; font-size: 16px; transition: border-color 0.2s; color: #111827; }
   .rule-num { width: 60px; text-align: center; flex-shrink: 0; }
   .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 24px; flex-shrink: 0; padding: 0 8px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
@@ -36,7 +37,7 @@ const globalStyle = `
   .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 17px; font-weight: 800; color: #475569; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
-  .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 800; line-height: 1.5; }
+  .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #94a3b8; font-weight: 850; line-height: 1.55; color: #111827; }
   .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); }
   .modal-content { background: #fff; padding: 32px; border-radius: 16px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; }
   .modal-wide { max-width: 1000px; }
@@ -395,7 +396,7 @@ export function isAllDayAbsenceEntry(entry: string) {
 // ===================== 🌟 UI Components =====================
 export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
 export const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "20px", boxShadow: "0 4px 14px -10px rgba(15,23,42,0.16)", width: "100%", boxSizing: "border-box" });
-export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 900 : 800, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 16 : 15, color: isHoliday && isHeader ? "#dc2626" : "#1e293b", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
+export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 900 : 850, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 17 : 16, color: isHoliday && isHeader ? "#dc2626" : "#111827", lineHeight: 1.45, verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
 
 export const Modal = ({ title, onClose, wide, children }: any) => ( <div className="modal-overlay" onClick={onClose}><div className={`modal-content modal-animate ${wide ? 'modal-wide' : ''}`} onClick={e => e.stopPropagation()}><div className="modal-header"><h3 className="modal-title">{title}</h3><button onClick={onClose} className="close-btn">✖</button></div>{children}<div style={{ textAlign: "center", marginTop: 32 }}><button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "16px" }}>閉じる</button></div></div></div> );
 export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any) => ( <div style={{ background: bg, padding: 24, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}><h5 style={{ margin: "0 0 12px 0", color, fontSize: 18, fontWeight: 800 }}>{icon} {title}</h5>{desc && <p style={{ fontSize: 15, color: "#166534", marginTop: 0, marginBottom: 16 }}>{desc}</p>}{children}</div> );
@@ -1027,7 +1028,6 @@ export class AutoAssigner {
   private getRepeatAvoidPenalty(staff: string, room: string): number { const noC = split(this.ctx.customRules.noConsecutiveRooms || ""); if (!noC.includes(room)) return 0; if (this.shouldAvoidConsecutive(staff, room)) return 100000; return (this.shouldAvoidWeeklyRepeat(staff, room) ? 300 : 0) + this.getPastMonthRoomCount(staff, room) * 50; }
   private preferNonRepeatCandidates<T>(items: T[], room: string, getStaff: (item: T) => string): T[] { const noConsecutive = items.filter(item => !this.shouldAvoidConsecutive(getStaff(item), room)); const base = noConsecutive.length > 0 ? noConsecutive : items; const noWeekly = base.filter(item => !this.shouldAvoidWeeklyRepeat(getStaff(item), room)); return noWeekly.length > 0 ? noWeekly : base; }
   // fullDayOnlyRooms は「半日・AM/PM配置を避ける部屋」として扱い、兼務自体はここでは禁止しない。
-  private getPushOutRoomScore(staff: string, room: string): number { const baseCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1); const eff = this.getEffectiveTarget(room, baseCap); if (eff.allClosed) return 999999; const roomMembers = split(this.dayCells[room]); let roomAm = eff.amClosed ? 999 : 0; let roomPm = eff.pmClosed ? 999 : 0; roomMembers.forEach(m => { if (m.includes("(AM)")) roomAm++; else if (m.includes("(PM)")) roomPm++; else { roomAm++; roomPm++; } }); const fullness = Math.min(roomAm, eff.cap) + Math.min(roomPm, eff.cap); return this.getRepeatAvoidPenalty(staff, room) * 10 + fullness * 100 + roomMembers.length; }
   private releaseSupportPartnerForEmptyRoom(targetRoom: string) {
     if (!targetRoom || this.skipSections.includes(targetRoom) || targetRoom === "透析後胸部" || this.shouldSkipAutoAssignRoom(targetRoom)) return;
     const supportStaff = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName);
@@ -1712,97 +1712,17 @@ export class AutoAssigner {
   }
   private applyPushOutRules() {
     (this.ctx.customRules.pushOuts || []).forEach((po: any) => {
-      const s1 = extractStaffName(po.s1 || po.triggerStaff);
-      const s2 = extractStaffName(po.s2 || po.targetStaff);
-      const tSec = po.triggerSection;
-      if (!s1 || !s2 || !tSec || !po.targetSections || this.skipSections.includes(tSec) || tSec === "透析後胸部") return;
-      const triggerMembers = split(this.dayCells[tSec]);
-      if (!triggerMembers.map(extractStaffName).includes(s1) || !triggerMembers.map(extractStaffName).includes(s2)) return;
-      const currentEntry = triggerMembers.find(m => extractStaffName(m) === s2);
-      if (!currentEntry) return;
-
-      const targetRoomsInOrder = split(po.targetSections).filter(room => !this.skipSections.includes(room) && room !== "透析後胸部" && !this.shouldSkipAutoAssignRoom(room));
-      const targetRoomsByScore = [...targetRoomsInOrder].sort((a, b) => this.getPushOutRoomScore(s2, a) - this.getPushOutRoomScore(s2, b));
-
-      const trySwap = (): boolean => {
-        const triggerWithoutTarget = triggerMembers.filter(m => extractStaffName(m) !== s2);
-        for (const room of targetRoomsInOrder) {
-          const roomMembers = split(this.dayCells[room]);
-          const baseCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
-          const eff = this.getEffectiveTarget(room, baseCap);
-          if (eff.allClosed) continue;
-          for (const roomEntry of roomMembers) {
-            const swapStaff = extractStaffName(roomEntry);
-            if (!swapStaff || ROLE_PLACEHOLDERS.includes(swapStaff) || swapStaff === s1 || swapStaff === s2) continue;
-            const sourceTag = this.getMemberTimeTag(roomEntry);
-            const targetTag = this.getMemberTimeTag(currentEntry);
-            const movedTarget = `${s2}${sourceTag}`;
-            const movedSwap = `${swapStaff}${targetTag}`;
-            if ((sourceTag === "(AM)" && eff.amClosed) || (sourceTag === "(PM)" && eff.pmClosed)) continue;
-            if (this.isTimeTagBlockedByFullDayRule(room, movedTarget) || this.isTimeTagBlockedByFullDayRule(tSec, movedSwap)) continue;
-
-            const sourcePeers = roomMembers.filter(m => m !== roomEntry).map(extractStaffName);
-            const triggerPeers = triggerWithoutTarget.map(extractStaffName);
-            if (this.isForbidden(s2, room) || this.isHalfDayBlocked(s2, room).hard || this.hasNGPair(s2, sourcePeers, false)) continue;
-            if (this.isForbidden(swapStaff, tSec) || this.isHalfDayBlocked(swapStaff, tSec).hard || this.hasNGPair(swapStaff, triggerPeers, false)) continue;
-
-            this.dayCells[tSec] = join(triggerMembers.map(m => m === currentEntry ? movedSwap : m));
-            this.dayCells[room] = join(roomMembers.map(m => m === roomEntry ? movedTarget : m));
-            this.refreshAssignmentState();
-            this.log(`🎱 [玉突き交換] ${tSec} の ${s2} と ${room} の ${swapStaff} を交換`);
-            return true;
-          }
-        }
-        return false;
-      };
-
-      const tryMove = (): boolean => {
-        for (const room of targetRoomsByScore) {
-          const roomMembers = split(this.dayCells[room]);
-          if (roomMembers.map(extractStaffName).includes(s2)) {
-            this.dayCells[tSec] = join(triggerMembers.filter(m => extractStaffName(m) !== s2));
-            this.refreshAssignmentState();
-            this.log(`🎱 [玉突き] ${s1} と被ったため ${s2} を ${tSec} から外しました`);
-            return true;
-          }
-          if (this.isForbidden(s2, room) || this.isHalfDayBlocked(s2, room).hard || this.hasNGPair(s2, roomMembers.map(extractStaffName), false) || !this.canAddKenmu(s2, room)) continue;
-          const baseCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
-          const eff = this.getEffectiveTarget(room, baseCap);
-          if (eff.allClosed) continue;
-          let roomAm = eff.amClosed ? 999 : 0;
-          let roomPm = eff.pmClosed ? 999 : 0;
-          roomMembers.forEach(m => { if (m.includes("(AM)")) roomAm++; else if (m.includes("(PM)")) roomPm++; else { roomAm++; roomPm++; } });
-          let moved = currentEntry;
-          if (eff.pmClosed) { if (currentEntry.includes("(PM)")) continue; moved = `${s2}(AM)`; if (roomAm >= eff.cap) continue; }
-          else if (eff.amClosed) { if (currentEntry.includes("(AM)")) continue; moved = `${s2}(PM)`; if (roomPm >= eff.cap) continue; }
-          else if (!currentEntry.includes("(")) {
-            if (roomAm >= eff.cap && roomPm < eff.cap) moved = `${s2}(PM)`;
-            else if (roomPm >= eff.cap && roomAm < eff.cap) moved = `${s2}(AM)`;
-            else if (roomAm >= eff.cap && roomPm >= eff.cap) continue;
-          } else if (currentEntry.includes("(AM)")) { if (roomAm >= eff.cap) continue; }
-          else if (currentEntry.includes("(PM)")) { if (roomPm >= eff.cap) continue; }
-          if (this.isTimeTagBlockedByFullDayRule(room, moved)) continue;
-          this.dayCells[tSec] = join(triggerMembers.filter(m => extractStaffName(m) !== s2));
-          this.dayCells[room] = join([...roomMembers, moved]);
-          this.refreshAssignmentState();
-          this.log(`🎱 [玉突き] ${s1} と被ったため ${s2} を ${room} に移動`);
-          return true;
-        }
-        return false;
-      };
-
-      if (trySwap()) return;
-      if (!tryMove()) this.log(`↪️ [玉突き未実行] ${tSec} の ${s1}/${s2}: 通常定員内で移動・交換できる候補がありません`);
-    });
-  }
-
-  private normalizePushOutMonthlyBackfill() {
-    (this.ctx.customRules.pushOuts || []).forEach((po: any) => {
       const triggerStaff = extractStaffName(po.s1 || po.triggerStaff);
       const targetStaff = extractStaffName(po.s2 || po.targetStaff);
       const triggerSection = po.triggerSection;
-      if (!triggerStaff || !targetStaff || !triggerSection || !po.targetSections) return;
-      if (this.skipSections.includes(triggerSection) || triggerSection === "透析後胸部") return;
+      if (!triggerStaff || !targetStaff || !triggerSection || !po.targetSections || this.skipSections.includes(triggerSection) || triggerSection === "透析後胸部") return;
+
+      const triggerMembers = split(this.dayCells[triggerSection] || "");
+      const triggerCores = triggerMembers.map(extractStaffName);
+      if (!triggerCores.includes(triggerStaff) || !triggerCores.includes(targetStaff)) return;
+
+      const currentEntry = triggerMembers.find(m => extractStaffName(m) === targetStaff);
+      if (!currentEntry) return;
 
       const targetRooms = split(po.targetSections).filter(room =>
         room &&
@@ -1812,89 +1732,94 @@ export class AutoAssigner {
       );
       if (targetRooms.length === 0) return;
 
-      const triggerMembers = split(this.dayCells[triggerSection] || "");
-      const triggerCores = triggerMembers.map(extractStaffName);
-      if (!triggerCores.includes(triggerStaff)) return;
-      if (triggerCores.includes(targetStaff)) return;
-
-      const targetStaffRoom = targetRooms.find(room => split(this.dayCells[room] || "").some(m => extractStaffName(m) === targetStaff));
-      if (!targetStaffRoom) return;
-
-      const monthlyTriggerStaff = getMonthlyStaffForSection(triggerSection, this.ctx.monthlyAssign)
+      // 玉突きは「押し出された人を空き枠へ単独移動」ではなく、
+      // 移動先候補に triggerSection の月担当者がいる場合だけ、その人と交換する。
+      // 例: MRI で玉突きが起きた場合、1号室/2号室/3号室/ポータブル等に MRI月担当者がいる時だけ交換する。
+      const monthlyStaffInTrigger = getMonthlyStaffForSection(triggerSection, this.ctx.monthlyAssign)
         .map(extractStaffName)
-        .filter(Boolean);
-      if (monthlyTriggerStaff.length === 0) return;
-      const monthlySet = new Set(monthlyTriggerStaff);
+        .filter(s => !!s && s !== triggerStaff && s !== targetStaff);
+      const monthlySet = new Set(monthlyStaffInTrigger);
+      if (monthlySet.size === 0) {
+        this.log(`↪️ [玉突き未実行] ${triggerSection}: 月担当者リストがないため ${targetStaff} を移動しません`);
+        return;
+      }
 
-      const fillerEntries = triggerMembers.filter(entry => {
-        const core = extractStaffName(entry);
-        if (!core || ROLE_PLACEHOLDERS.includes(core)) return false;
-        if (core === triggerStaff || core === targetStaff) return false;
-        return !monthlySet.has(core);
-      });
-      if (fillerEntries.length === 0) return;
-
-      type MonthlySwapCandidate = {
+      type PushOutMonthlySwap = {
         sourceRoom: string;
         sourceEntry: string;
-        fillerEntry: string;
         sourceIndex: number;
         monthlyStaff: string;
-        fillerStaff: string;
+        movedTarget: string;
         movedMonthly: string;
-        movedFiller: string;
       };
-      const candidates: MonthlySwapCandidate[] = [];
+
+      const candidates: PushOutMonthlySwap[] = [];
+      let sawMonthlyInTargetRooms = false;
+      const targetTag = this.getMemberTimeTag(currentEntry);
+      const triggerPeers = triggerMembers.filter(m => m !== currentEntry).map(extractStaffName);
 
       targetRooms.forEach((sourceRoom, sourceIndex) => {
         const sourceMembers = split(this.dayCells[sourceRoom] || "");
+        const baseCap = this.dynamicCapacity[sourceRoom] ?? (["CT", "MRI", "治療"].includes(sourceRoom) ? 3 : 1);
+        const eff = this.getEffectiveTarget(sourceRoom, baseCap);
+        if (eff.allClosed) return;
+
         sourceMembers.forEach(sourceEntry => {
           const monthlyStaff = extractStaffName(sourceEntry);
           if (!monthlyStaff || ROLE_PLACEHOLDERS.includes(monthlyStaff)) return;
           if (monthlyStaff === triggerStaff || monthlyStaff === targetStaff) return;
-          if (!monthlySet.has(monthlyStaff) || triggerCores.includes(monthlyStaff)) return;
+          if (!monthlySet.has(monthlyStaff)) return;
+          if (triggerCores.includes(monthlyStaff)) return;
           if (sourceEntry.includes("17:") || sourceEntry.includes("18:") || sourceEntry.includes("19:") || sourceEntry.includes("22:")) return;
+          sawMonthlyInTargetRooms = true;
 
-          fillerEntries.forEach(fillerEntry => {
-            const fillerStaff = extractStaffName(fillerEntry);
-            if (!fillerStaff || ROLE_PLACEHOLDERS.includes(fillerStaff) || fillerStaff === monthlyStaff) return;
-            const monthlyTag = this.getMemberTimeTag(sourceEntry);
-            const fillerTag = this.getMemberTimeTag(fillerEntry);
-            const movedMonthly = `${monthlyStaff}${fillerTag}`;
-            const movedFiller = `${fillerStaff}${monthlyTag}`;
+          const sourceTag = this.getMemberTimeTag(sourceEntry);
+          if ((sourceTag === "(AM)" && eff.amClosed) || (sourceTag === "(PM)" && eff.pmClosed)) return;
 
-            const triggerPeers = triggerMembers.filter(m => m !== fillerEntry).map(extractStaffName);
-            const sourcePeers = sourceMembers.filter(m => m !== sourceEntry).map(extractStaffName);
+          const movedTarget = `${targetStaff}${sourceTag}`;
+          const movedMonthly = `${monthlyStaff}${targetTag}`;
+          const sourcePeers = sourceMembers.filter(m => m !== sourceEntry).map(extractStaffName);
 
-            if (this.isForbidden(monthlyStaff, triggerSection) || this.isHalfDayBlocked(monthlyStaff, triggerSection).hard) return;
-            if (this.hasNGPair(monthlyStaff, triggerPeers, false)) return;
-            if (this.isTimeTagBlockedByFullDayRule(triggerSection, movedMonthly)) return;
-            if (!this.canSwapKeepKenmuLimit(monthlyStaff, triggerSection, sourceRoom, sourceEntry, movedMonthly)) return;
+          if (this.isForbidden(targetStaff, sourceRoom) || this.isHalfDayBlocked(targetStaff, sourceRoom).hard) return;
+          if (sourceRoom === "MMG" && !this.isMmgCapable(targetStaff)) return;
+          if (this.hasNGPair(targetStaff, sourcePeers, false)) return;
+          if (this.isTimeTagBlockedByFullDayRule(sourceRoom, movedTarget)) return;
+          if (!this.canSwapKeepKenmuLimit(targetStaff, sourceRoom, triggerSection, currentEntry, movedTarget)) return;
 
-            if (this.isForbidden(fillerStaff, sourceRoom) || this.isHalfDayBlocked(fillerStaff, sourceRoom).hard) return;
-            if (this.hasNGPair(fillerStaff, sourcePeers, false)) return;
-            if (this.isTimeTagBlockedByFullDayRule(sourceRoom, movedFiller)) return;
-            if (!this.canSwapKeepKenmuLimit(fillerStaff, sourceRoom, triggerSection, fillerEntry, movedFiller)) return;
+          if (this.isForbidden(monthlyStaff, triggerSection) || this.isHalfDayBlocked(monthlyStaff, triggerSection).hard) return;
+          if (this.hasNGPair(monthlyStaff, triggerPeers, false)) return;
+          if (this.isTimeTagBlockedByFullDayRule(triggerSection, movedMonthly)) return;
+          if (!this.canSwapKeepKenmuLimit(monthlyStaff, triggerSection, sourceRoom, sourceEntry, movedMonthly)) return;
 
-            candidates.push({ sourceRoom, sourceEntry, fillerEntry, sourceIndex, monthlyStaff, fillerStaff, movedMonthly, movedFiller });
-          });
+          candidates.push({ sourceRoom, sourceEntry, sourceIndex, monthlyStaff, movedTarget, movedMonthly });
         });
       });
 
-      if (candidates.length === 0) return;
+      if (candidates.length === 0) {
+        this.log(sawMonthlyInTargetRooms
+          ? `↪️ [玉突き未実行] ${triggerSection}: 移動先候補に月担当者はいますが、安全に ${targetStaff} と交換できません`
+          : `↪️ [玉突き未実行] ${triggerSection}: 移動先候補に月担当者がいないため ${targetStaff} を移動しません`);
+        return;
+      }
+
+      const monthlyRank = (name: string) => {
+        const idx = monthlyStaffInTrigger.indexOf(extractStaffName(name));
+        return idx === -1 ? 999 : idx;
+      };
       candidates.sort((a, b) =>
         a.sourceIndex - b.sourceIndex ||
+        monthlyRank(a.monthlyStaff) - monthlyRank(b.monthlyStaff) ||
         this.getPastRoomCount(a.monthlyStaff, triggerSection) - this.getPastRoomCount(b.monthlyStaff, triggerSection) ||
-        this.getTodayRoomLoad(a.fillerStaff) - this.getTodayRoomLoad(b.fillerStaff) ||
+        this.getTodayRoomLoad(a.monthlyStaff) - this.getTodayRoomLoad(b.monthlyStaff) ||
         a.monthlyStaff.localeCompare(b.monthlyStaff, 'ja')
       );
 
       const picked = candidates[0];
-      this.dayCells[triggerSection] = join(triggerMembers.map(m => m === picked.fillerEntry ? picked.movedMonthly : m));
+      this.dayCells[triggerSection] = join(triggerMembers.map(m => m === currentEntry ? picked.movedMonthly : m));
       const sourceMembers = split(this.dayCells[picked.sourceRoom] || "");
-      this.dayCells[picked.sourceRoom] = join(sourceMembers.map(m => m === picked.sourceEntry ? picked.movedFiller : m));
+      this.dayCells[picked.sourceRoom] = join(sourceMembers.map(m => m === picked.sourceEntry ? picked.movedTarget : m));
       this.refreshAssignmentState();
-      this.log(`🎱 [玉突き月担当交換] ${triggerSection} の非月担当 ${picked.fillerStaff} と ${picked.sourceRoom} の月担当 ${picked.monthlyStaff} を交換`);
+      this.log(`🎱 [玉突き月担当交換] ${triggerSection} の ${targetStaff} と ${picked.sourceRoom} の月担当 ${picked.monthlyStaff} を交換`);
     });
   }
   updateBlockMapAfterKenmu(core: string, pushStr: string) { const cur = this.blockMap.get(core); let nx: string; if (pushStr.includes("(AM)")) nx = (cur === 'PM' || cur === 'ALL') ? 'ALL' : 'AM'; else if (pushStr.includes("(PM)")) nx = (cur === 'AM' || cur === 'ALL') ? 'ALL' : 'PM'; else nx = 'ALL'; this.blockMap.set(core, nx); }
@@ -2333,7 +2258,6 @@ export class AutoAssigner {
     });
 
     this.applyPushOutRules();
-    this.normalizePushOutMonthlyBackfill();
     this.rebalanceNoConsecutiveRooms();
 
     (this.ctx.customRules.lateShifts || []).forEach((rule: any) => {
@@ -2425,6 +2349,7 @@ export class AutoAssigner {
     this.enforcePortableThreeRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.enforcePortableClosedSourcePolicy();
+    this.enforceEmergencyClearedRoomsFinal();
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
 
