@@ -906,8 +906,7 @@ export class AutoAssigner {
 
             this.dayCells[tSec] = join(triggerMembers.map(m => m === currentEntry ? movedSwap : m));
             this.dayCells[room] = join(roomMembers.map(m => m === roomEntry ? movedTarget : m));
-            this.assignCounts[s2] = this.getAssignedUsage(s2);
-            this.assignCounts[swapStaff] = this.getAssignedUsage(swapStaff);
+            this.refreshAssignmentState();
             this.log(`🎱 [玉突き交換] ${tSec} の ${s2} と ${room} の ${swapStaff} を交換`);
             return true;
           }
@@ -942,8 +941,7 @@ export class AutoAssigner {
           if (this.isTimeTagBlockedByFullDayRule(room, moved)) continue;
           this.dayCells[tSec] = join(triggerMembers.filter(m => extractStaffName(m) !== s2));
           this.dayCells[room] = join([...roomMembers, moved]);
-          this.assignCounts[s2] = this.getAssignedUsage(s2);
-          this.updateBlockMapAfterKenmu(s2, moved);
+          this.refreshAssignmentState();
           this.log(`🎱 [玉突き] ${s1} と被ったため ${s2} を ${room} に移動`);
           return true;
         }
@@ -1319,9 +1317,8 @@ export class AutoAssigner {
           this.dayCells[sR] = join(sM.map(m => m === sm ? movedToSource : m));
           if (!targetMembers.some(m => extractStaffName(m) === sCo)) {
             this.dayCells[r.targetRoom] = join([...targetMembers, movedToTrigger]);
-            this.addUsage(sCo, getStaffAmount(movedToTrigger));
-            this.updateBlockMapAfterKenmu(sCo, movedToTrigger);
           }
+          this.refreshAssignmentState();
           this.log(`🔄 [交換成立] ${r.triggerRoom}の${extractStaffName(tTK)}と ${sR}の${sCo}を交換し、${sCo} を ${r.targetRoom} に配置`);
           swapped = true;
           break;
@@ -1395,7 +1392,7 @@ export class AutoAssigner {
           )
         ).length;
         if (rule.fromSecondUseInWeek && usedCountThisWeek === 0) {
-          this.log(`🕒 [遅番保留] ${rule.section} は今週初回のため遅番を付与しない`);
+          this.log(`🕒 [遅番保留] ${rule.section} は部屋として今週初回のため遅番を付与しない`);
           return;
         }
         const currentCore = current.map(extractStaffName);
@@ -1484,6 +1481,9 @@ export class AutoAssigner {
     if (split(this.dayCells["受付"]).reduce((s, m) => s + getStaffAmount(m), 0) < uT && !this.skipSections.includes("受付ヘルプ")) { let hm = split(this.dayCells["受付ヘルプ"]); if (hm.length === 0) { const lC = split(this.dayCells["昼当番"]).map(extractStaffName); const gH = (exS: string[]) => { let c = this.initialAvailGeneral.filter((n: string) => !exS.includes(n) && !hm.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !this.hasNGPair(n, hm.map(extractStaffName), false)); if (c.length > 0) { c.sort((a, b) => (this.assignCounts[a] || 0) - (this.assignCounts[b] || 0)); return c[0]; } return null; }; const lH = gH(lC); if (lH) hm.push(`${lH}(12:15〜13:00)`); const vK = split(this.dayCells["検像"]).map(extractStaffName).filter((n: string) => this.blockMap.get(n) !== 'PM' && !hm.map(extractStaffName).includes(n) && !this.isForbidden(n, "受付ヘルプ") && !this.hasNGPair(n, hm.map(extractStaffName), false)); let pk = vK.length > 0 ? vK[0] : null; if (!pk) pk = gH(lH ? [lH] : []); if (pk) hm.push(`${pk}(16:00〜)`); } this.dayCells["受付ヘルプ"] = join(hm); }
     this.releaseSupportPartnersForEmptyRooms();
     this.enforceFluoroAuxConflictRule();
+    this.refreshAssignmentState();
+    this.releaseSupportPartnersForEmptyRooms();
+    this.trimOverloadedSupportPartners();
     this.refreshAssignmentState();
   }
 }
@@ -2653,7 +2653,7 @@ export default function App(): any {
                     <span className="rule-label" style={{color:"#6d28d9"}}>とする）</span>
                     <label style={{display:"inline-flex", alignItems:"center", gap:6, fontSize:14, fontWeight:700, color:"#6d28d9", marginLeft:4}}>
                       <input type="checkbox" checked={!!rule.fromSecondUseInWeek} onChange={(e:any)=>updateRule("lateShifts", idx, "fromSecondUseInWeek", e.target.checked)} />
-                      週2回目以降
+                      部屋の今週2回目以降
                     </label>
                     <DelBtn onClick={()=>removeRule("lateShifts", idx)} />
                   </div>
