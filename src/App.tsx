@@ -3,15 +3,17 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Meiryo", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.02em; font-size: 16px; font-weight: 600; overflow-x: hidden; }
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Meiryo", "Yu Gothic UI", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.02em; font-size: 16px; font-weight: 700; overflow-x: hidden; }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-  textarea, select, button, input { font: inherit; font-weight: 700; }
+  textarea, select, button, input { font: inherit; font-weight: 800; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
+  .scroll-container table, .scroll-container th, .scroll-container td { font-weight: 800 !important; }
+  .print-sheet-table, .print-sheet-table th, .print-sheet-table td, .print-sheet-table .p-line { font-weight: 800 !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
   details>summary:hover { color: #0d9488; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; }
@@ -24,7 +26,7 @@ const globalStyle = `
   .card-hover { transition: box-shadow 0.2s, transform 0.2s; cursor: pointer; }
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
   .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; width: 100%; }
-  .rule-sel, .rule-num { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; font-size: 15px; transition: border-color 0.2s; }
+  .rule-sel, .rule-num { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 800; font-size: 15px; transition: border-color 0.2s; }
   .rule-num { width: 60px; text-align: center; flex-shrink: 0; }
   .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 24px; flex-shrink: 0; padding: 0 8px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
@@ -34,7 +36,7 @@ const globalStyle = `
   .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 17px; font-weight: 800; color: #475569; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; }
   .tab-btn:hover { color: #3b82f6; }
   .tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
-  .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; line-height: 1.5; }
+  .name-textarea { width: 100%; height: 120px; padding: 12px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 800; line-height: 1.5; }
   .modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); }
   .modal-content { background: #fff; padding: 32px; border-radius: 16px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; }
   .modal-wide { max-width: 1000px; }
@@ -58,7 +60,8 @@ const globalStyle = `
       background: #fff !important;
       color: #000 !important;
       font-size: 9px !important;
-      font-family: "Arial Narrow", "Helvetica Neue", Arial, sans-serif !important;
+      font-family: "Meiryo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif !important;
+      font-weight: 700 !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -97,8 +100,8 @@ const globalStyle = `
       background: #fff !important;
       color: #000 !important;
       padding: 0.72mm 0.75mm !important;
-      font-size: 10.5pt !important;
-      font-weight: 700 !important;
+      font-size: 10.6pt !important;
+      font-weight: 800 !important;
       line-height: 1.12 !important;
       vertical-align: middle !important;
       white-space: normal !important;
@@ -108,8 +111,8 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table th {
-      font-size: 10.9pt !important;
-      font-weight: 800 !important;
+      font-size: 11.0pt !important;
+      font-weight: 900 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
@@ -657,7 +660,9 @@ export class AutoAssigner {
 
   private isPortableSourceAvailable(cond: { r: string; min: number }, allowClearedThree: boolean = false): boolean {
     if (!cond.r || cond.r === "ポータブル" || cond.r === "透析後胸部") return false;
-    if (this.skipSections.includes(cond.r) && !(allowClearedThree && cond.r === "3号室")) return false;
+    const emergencyCleared = this.clearSections.includes(cond.r);
+    // 緊急ルールで空室扱いになった部屋は、ポータブル3号室寄せでも再利用しない。
+    if ((this.skipSections.includes(cond.r) || emergencyCleared) && !(allowClearedThree && cond.r === "3号室" && !emergencyCleared)) return false;
     if (this.shouldSkipAutoAssignRoom(cond.r)) return false;
     if (cond.r === "CT" && this.sourceAmount("CT") < Math.max(cond.min, 4)) return false;
     if (cond.min > 0 && this.sourceAmount(cond.r) < cond.min) return false;
@@ -714,6 +719,41 @@ export class AutoAssigner {
     if (otherPortableCores.includes(core)) return false;
     if (this.hasNGPair(core, otherPortableCores, false)) return false;
     return this.canAddKenmu(core, "ポータブル", true);
+  }
+
+  private enforceEmergencyClearedRoomsFinal(): void {
+    if (this.clearSections.length === 0) return;
+
+    // 17人以下などで「3号室を空室扱い」にした日は、ポータブルの3号室原則より緊急ルールを優先する。
+    // 3号室に入ってしまった人がいて、2号室が空いている場合は、可能なら2号室へ寄せてから3号室を空にする。
+    if (this.clearSections.includes("3号室")) {
+      const threeMembers = split(this.dayCells["3号室"] || "");
+      if (threeMembers.length > 0 && !this.skipSections.includes("2号室") && !this.shouldSkipAutoAssignRoom("2号室")) {
+        let twoMembers = split(this.dayCells["2号室"] || "");
+        const twoLoad = twoMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
+        if (twoLoad === 0) {
+          for (const entry of threeMembers) {
+            const core = extractStaffName(entry);
+            if (!core || ROLE_PLACEHOLDERS.includes(core)) continue;
+            if (!this.canPlaceEntryInRoomStrict(core, entry, "2号室", twoMembers)) continue;
+            twoMembers = [...twoMembers, entry];
+            this.dayCells["2号室"] = join(twoMembers);
+            const portableMembers = split(this.dayCells["ポータブル"] || "").map(m => extractStaffName(m) === core ? `${core}${this.getMemberTimeTag(entry)}` : m);
+            this.dayCells["ポータブル"] = join(portableMembers);
+            this.log(`🚨 [緊急空室優先] 3号室空室扱いを優先し、3号室の ${entry} を2号室へ移しました`);
+            break;
+          }
+        }
+      }
+    }
+
+    this.clearSections.forEach(sec => {
+      if (this.dayCells[sec]) {
+        this.log(`🚨 [緊急空室確定] ${sec} は緊急ルールにより最終的に空室へ戻しました`);
+      }
+      this.dayCells[sec] = "";
+    });
+    this.refreshAssignmentState();
   }
 
   private getPortableSourceInfo(core: string, allowClearedThree: boolean = false): { idx: number; room: string; entry: string; members: string[] } | null {
@@ -1386,6 +1426,8 @@ export class AutoAssigner {
 
     const threeCond = this.normalizePortableSourceCond("3号室");
     if (!threeCond) return;
+    // 緊急ルールで3号室が空室扱いのときは、ポータブルの3号室寄せで再配置しない。
+    if (this.clearSections.includes("3号室") || this.skipSections.includes("3号室")) return;
     const threeEff = this.getEffectiveTarget("3号室", this.dynamicCapacity["3号室"] ?? 1);
     if (threeEff.allClosed || this.shouldSkipAutoAssignRoom("3号室")) return;
 
@@ -2269,7 +2311,9 @@ export class AutoAssigner {
     this.enforcePortableSourceRoomSwapPreference();
     this.tryProtectOneRoomForPortable();
     this.enforcePortableThreeRoomPairing();
+    this.enforceEmergencyClearedRoomsFinal();
     this.enforcePortableClosedSourcePolicy();
+    this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
 
     this.logPhase("フェーズ5：仕上げ");
