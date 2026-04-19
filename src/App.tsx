@@ -728,6 +728,75 @@ export class AutoAssigner {
     return this.canAddKenmu(core, "ポータブル", true);
   }
 
+
+
+  private rescueUnassignedStaffToPortable(): void {
+    if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
+    const portableEff = this.getEffectiveTarget("ポータブル", this.dynamicCapacity["ポータブル"] ?? 1);
+    if (portableEff.allClosed) return;
+
+    this.refreshAssignmentState();
+    let portableMembers = split(this.dayCells["ポータブル"] || "");
+    const portableLoad = () => portableMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
+    if (portableLoad() >= portableEff.cap) return;
+
+    const sourceRooms = Array.from(new Set(
+      this.getPortableSourceConds()
+        .map(cond => cond.r)
+        .filter(room => room && room !== "CT" && room !== "ポータブル" && room !== "透析後胸部")
+        .filter(room => !this.clearSections.includes(room) && !this.skipSections.includes(room) && !this.shouldSkipAutoAssignRoom(room))
+    ));
+    if (sourceRooms.length === 0) return;
+
+    const candidates = this.initialAvailGeneral
+      .filter(staff => {
+        const tag = this.getPreferredWorkTag(staff);
+        return this.isUnassignedForRelief(staff, tag) && !this.isForbidden(staff, "ポータブル") && !this.isHalfDayBlocked(staff, "ポータブル").hard;
+      })
+      .sort((a, b) =>
+        this.getRepeatAvoidPenalty(a, "ポータブル") - this.getRepeatAvoidPenalty(b, "ポータブル") ||
+        this.getPastRoomCount(a, "ポータブル") - this.getPastRoomCount(b, "ポータブル") ||
+        a.localeCompare(b, 'ja')
+      );
+
+    const tryPlace = (allowSourceOverCap: boolean, allowWeeklyRepeat: boolean, allowConsecutive: boolean): boolean => {
+      for (const staff of candidates) {
+        if (portableLoad() >= portableEff.cap) return true;
+        const tag = this.getPortableTag(staff);
+        const portableEntry = `${staff}${tag}`;
+        if (!this.canUseEntryForPortable(staff, portableEntry, portableMembers, -1, allowWeeklyRepeat, allowConsecutive)) continue;
+        for (const sourceRoom of sourceRooms) {
+          let sourceMembers = split(this.dayCells[sourceRoom] || "");
+          if (sourceMembers.map(extractStaffName).includes(staff)) continue;
+          const sourceEff = this.getEffectiveTarget(sourceRoom, this.dynamicCapacity[sourceRoom] ?? 1);
+          if (sourceEff.allClosed) continue;
+          if ((tag === "(PM)" && sourceEff.pmClosed) || (tag === "(AM)" && sourceEff.amClosed)) continue;
+          if (!allowSourceOverCap && sourceMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) >= sourceEff.cap) continue;
+          if (!this.canPlaceEntryInRoomStrict(staff, portableEntry, sourceRoom, sourceMembers)) continue;
+          if (!this.canAddKenmu(staff, sourceRoom, true)) continue;
+          if (this.hasNGPair(staff, sourceMembers.map(extractStaffName), false)) continue;
+
+          sourceMembers = [...sourceMembers, portableEntry];
+          this.dayCells[sourceRoom] = join(sourceMembers);
+          portableMembers = [...portableMembers, portableEntry];
+          this.dayCells["ポータブル"] = join(portableMembers);
+          this.refreshAssignmentState();
+          this.log(allowSourceOverCap
+            ? `🚑 [未配置救済] 未配置の ${portableEntry} を ${sourceRoom}＋ポータブルに配置しました（定員超過許容）`
+            : `🚑 [未配置救済] 未配置の ${portableEntry} を ${sourceRoom}＋ポータブルに配置しました`);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // まずは通常条件、次に週2、最後に連日も含めて「未配置よりは候補部屋内でポータブル」を優先する。
+    tryPlace(false, false, false) ||
+      tryPlace(true, false, false) ||
+      tryPlace(true, true, false) ||
+      tryPlace(true, true, true);
+  }
+
   private enforceEmergencyClearedRoomsFinal(): void {
     if (this.clearSections.length === 0) return;
 
@@ -2439,6 +2508,8 @@ export class AutoAssigner {
     this.enforcePortableClosedSourcePolicy();
     this.enforceEmergencyClearedRoomsFinal();
     this.enforceEmergencyClearedRoomsFinal();
+    this.rescueUnassignedStaffToPortable();
+    this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
 
     this.logPhase("フェーズ5：仕上げ");
@@ -2470,6 +2541,8 @@ export class AutoAssigner {
     this.refreshAssignmentState();
     this.releaseSupportPartnersForEmptyRooms();
     this.trimOverloadedSupportPartners();
+    this.rescueUnassignedStaffToPortable();
+    this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
   }
 }
