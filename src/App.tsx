@@ -899,6 +899,28 @@ export class AutoAssigner {
     ["3号室", "2号室", "1号室", "5号室", "CT"].forEach(r => rooms.push(r));
     return Array.from(new Set(rooms)).filter(r => r && r !== room && r !== "透析後胸部" && !this.skipSections.includes(r) && !this.shouldSkipAutoAssignRoom(r));
   }
+  private canSwapKeepKenmuLimit(staff: string, targetRoom: string, removeRoom: string, removeEntry: string, addEntry: string): boolean {
+    const core = extractStaffName(staff);
+    if (!core) return false;
+    if (hasFluoroAuxConflict(this.dayCells, core, targetRoom, this.ctx.customRules.fluoroAuxConflictRooms)) return false;
+    const limit = this.ctx.customRules.alertMaxKenmu || 3;
+    const currentLoad = this.getTodayRoomLoad(core);
+    const beforeRooms = ROOM_SECTIONS.filter(r =>
+      r !== removeRoom &&
+      !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r) &&
+      split(this.dayCells[r] || "").some(m => extractStaffName(m) === core)
+    );
+    const alreadyInTargetAfterRemove = beforeRooms.includes(targetRoom);
+    const nextLoad = currentLoad - getStaffAmount(removeEntry) + (alreadyInTargetAfterRemove ? 0 : getStaffAmount(addEntry));
+    if (nextLoad > limit) return false;
+
+    const exPairs = (this.ctx.customRules.kenmuPairs || []).filter((p: any) => p.isExclusive);
+    for (const p of exPairs) {
+      const hadPairBefore = beforeRooms.includes(p.s1) || beforeRooms.includes(p.s2);
+      if (hadPairBefore && targetRoom !== p.s1 && targetRoom !== p.s2) return false;
+    }
+    return true;
+  }
   private findNoRepeatSwap(room: string, currentEntry: string, currentMembers: string[], preferWeeklyClean: boolean = false): { replacementEntry: string; sourceRoom: string; sourceEntry: string; sourceRoomEntries: string[] } | null {
     const currentCore = extractStaffName(currentEntry);
     const currentTag = this.getMemberTimeTag(currentEntry);
@@ -918,12 +940,13 @@ export class AutoAssigner {
         if (this.shouldAvoidConsecutive(staff, room)) return;
         if (preferWeeklyClean && this.shouldAvoidWeeklyRepeat(staff, room)) return;
         if (sourceEntry.includes("17:") || sourceEntry.includes("18:") || sourceEntry.includes("19:") || sourceEntry.includes("22:")) return;
-        if (this.isForbidden(staff, room) || this.isHalfDayBlocked(staff, room).hard || this.hasNGPair(staff, currentMembers.filter(m => m !== currentEntry).map(extractStaffName), false) || !this.canAddKenmu(staff, room, true)) return;
+        if (this.isForbidden(staff, room) || this.isHalfDayBlocked(staff, room).hard || this.hasNGPair(staff, currentMembers.filter(m => m !== currentEntry).map(extractStaffName), false)) return;
         const replacementEntry = splitFullDaySourceSwap ? `${staff}${currentTag}` : sourceEntry;
         const movedCurrentEntry = sameTagSwap ? `${currentCore}${sourceTag}` : `${currentCore}${currentTag}`;
+        if (!this.canSwapKeepKenmuLimit(staff, room, sourceRoom, sourceEntry, replacementEntry)) return;
         if (this.isTimeTagBlockedByFullDayRule(room, replacementEntry) || this.isTimeTagBlockedByFullDayRule(sourceRoom, movedCurrentEntry)) return;
         const sourcePeers = sourceMembers.filter(m => m !== sourceEntry).map(extractStaffName);
-        if (this.isForbidden(currentCore, sourceRoom) || this.isHalfDayBlocked(currentCore, sourceRoom).hard || this.hasNGPair(currentCore, sourcePeers, false) || !this.canAddKenmu(currentCore, sourceRoom, true)) return;
+        if (this.isForbidden(currentCore, sourceRoom) || this.isHalfDayBlocked(currentCore, sourceRoom).hard || this.hasNGPair(currentCore, sourcePeers, false) || !this.canSwapKeepKenmuLimit(currentCore, sourceRoom, room, currentEntry, movedCurrentEntry)) return;
         const sourceRoomEntries = sourceMembers.flatMap(m => {
           if (m !== sourceEntry) return [m];
           if (!splitFullDaySourceSwap) return [movedCurrentEntry];
