@@ -916,21 +916,81 @@ export class AutoAssigner {
     if (!sources.length) return;
     let targetMembers = split(this.dayCells["ポータブル"] || "");
     if (targetMembers.length === 0) return;
-    const sourceIndexOf = (core: string) => {
-      const idx = sources.findIndex(({ r, min }: any) => {
-        if (!r || r === "ポータブル" || this.skipSections.includes(r) || this.shouldSkipAutoAssignRoom(r)) return false;
+    const sourceInfoOf = (core: string): { idx: number; room: string; entry: string; members: string[] } => {
+      for (let idx = 0; idx < sources.length; idx++) {
+        const { r, min } = sources[idx] as any;
+        if (!r || r === "ポータブル" || this.skipSections.includes(r) || this.shouldSkipAutoAssignRoom(r)) continue;
         const members = split(this.dayCells[r] || "");
-        if (min > 0 && members.reduce((s, m) => s + getStaffAmount(m), 0) < min) return false;
-        return members.some(m => extractStaffName(m) === core);
-      });
-      return idx === -1 ? 999 : idx;
+        if (min > 0 && members.reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
+        const entry = members.find(m => extractStaffName(m) === core) || "";
+        if (entry) return { idx, room: r, entry, members };
+      }
+      return { idx: 999, room: "", entry: "", members: [] };
+    };
+    const isLateOrNightEntry = (entry: string) => entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:");
+    const canPlaceEntryInRoom = (core: string, entry: string, room: string, members: string[]) => {
+      if (!core || ROLE_PLACEHOLDERS.includes(core)) return false;
+      if (this.isForbidden(core, room) || this.isHalfDayBlocked(core, room).hard) return false;
+      if (this.hasNGPair(core, members.filter(m => extractStaffName(m) !== core).map(extractStaffName), false)) return false;
+      if (this.isTimeTagBlockedByFullDayRule(room, entry)) return false;
+      return true;
+    };
+    const tryMovePortableOnlyToTopSource = (currentCore: string, currentEntry: string) => {
+      if (this.getTodayRoomLoad(currentCore) > getStaffAmount(currentEntry)) return false;
+      for (const { r: sourceRoom } of sources as any[]) {
+        if (!sourceRoom || sourceRoom === "ポータブル" || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
+        const sourceMembers = split(this.dayCells[sourceRoom] || "");
+        if (sourceMembers.some(m => extractStaffName(m) === currentCore)) return true;
+        const baseCap = this.dynamicCapacity[sourceRoom] ?? (["CT", "MRI", "治療"].includes(sourceRoom) ? 3 : 1);
+        const eff = this.getEffectiveTarget(sourceRoom, baseCap);
+        if (eff.allClosed) continue;
+        if (sourceMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) >= eff.cap) continue;
+        if (!canPlaceEntryInRoom(currentCore, currentEntry, sourceRoom, sourceMembers)) continue;
+        if (!this.canAddKenmu(currentCore, sourceRoom, true)) continue;
+        this.dayCells[sourceRoom] = join([...sourceMembers, currentEntry]);
+        this.refreshAssignmentState();
+        this.log(`🔗 [基本兼務優先] ポータブルのみの ${currentEntry} を ${sourceRoom} にも配置しました`);
+        return true;
+      }
+      return false;
+    };
+    const trySwapPortableSourceRoom = (currentCore: string, currentSource: { idx: number; room: string; entry: string; members: string[] }, maxSourceIndex: number) => {
+      if (!currentSource.room || currentSource.idx <= 0 || currentSource.idx >= 999) return false;
+      for (let sourceIndex = 0; sourceIndex < Math.min(currentSource.idx, maxSourceIndex, sources.length); sourceIndex++) {
+        const { r: sourceRoom, min } = sources[sourceIndex] as any;
+        if (!sourceRoom || sourceRoom === "ポータブル" || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
+        const sourceMembers = split(this.dayCells[sourceRoom] || "");
+        if (min > 0 && sourceMembers.reduce((sum, m) => sum + getStaffAmount(m), 0) < min) continue;
+        for (const sourceEntry of sourceMembers) {
+          const sourceCore = extractStaffName(sourceEntry);
+          if (!sourceCore || sourceCore === currentCore || ROLE_PLACEHOLDERS.includes(sourceCore) || isLateOrNightEntry(sourceEntry)) continue;
+          const movedCurrent = `${currentCore}${this.getMemberTimeTag(currentSource.entry)}`;
+          const movedSource = `${sourceCore}${this.getMemberTimeTag(sourceEntry)}`;
+          const nextHighSourceMembers = sourceMembers.map(m => m === sourceEntry ? movedCurrent : m);
+          const nextCurrentSourceMembers = currentSource.members.map(m => m === currentSource.entry ? movedSource : m);
+          if (!canPlaceEntryInRoom(currentCore, movedCurrent, sourceRoom, nextHighSourceMembers)) continue;
+          if (!canPlaceEntryInRoom(sourceCore, movedSource, currentSource.room, nextCurrentSourceMembers)) continue;
+          if (!this.canSwapKeepKenmuLimit(currentCore, sourceRoom, currentSource.room, currentSource.entry, movedCurrent)) continue;
+          if (!this.canSwapKeepKenmuLimit(sourceCore, currentSource.room, sourceRoom, sourceEntry, movedSource)) continue;
+          this.dayCells[sourceRoom] = join(nextHighSourceMembers);
+          this.dayCells[currentSource.room] = join(nextCurrentSourceMembers);
+          this.refreshAssignmentState();
+          this.log(`🔗 [基本兼務優先] ポータブル担当は変えず、${currentSource.room} の ${currentCore} と ${sourceRoom} の ${sourceCore} を入れ替えました`);
+          return true;
+        }
+      }
+      return false;
     };
     for (let targetIndex = 0; targetIndex < targetMembers.length; targetIndex++) {
       const currentEntry = targetMembers[targetIndex];
       const currentCore = extractStaffName(currentEntry);
       if (!currentCore || ROLE_PLACEHOLDERS.includes(currentCore)) continue;
-      const currentSourceIndex = sourceIndexOf(currentCore);
+      const currentSource = sourceInfoOf(currentCore);
+      const currentSourceIndex = currentSource.idx;
+      const currentRepeatPenalty = this.getRepeatAvoidPenalty(currentCore, "ポータブル");
       if (currentSourceIndex === 0) continue;
+      if (currentSourceIndex === 999 && tryMovePortableOnlyToTopSource(currentCore, currentEntry)) return;
+      if (trySwapPortableSourceRoom(currentCore, currentSource, sources.length)) return;
       for (let sourceIndex = 0; sourceIndex < Math.min(currentSourceIndex, sources.length); sourceIndex++) {
         const { r: sourceRoom, min } = sources[sourceIndex] as any;
         if (!sourceRoom || sourceRoom === "ポータブル" || sourceRoom === "透析後胸部" || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
@@ -945,6 +1005,8 @@ export class AutoAssigner {
             if (this.isForbidden(core, "ポータブル") || this.isHalfDayBlocked(core, "ポータブル").hard) return false;
             if (this.hasNGPair(core, otherTargetCores, false)) return false;
             if (this.isTimeTagBlockedByFullDayRule("ポータブル", entry)) return false;
+            const candidateRepeatPenalty = this.getRepeatAvoidPenalty(core, "ポータブル");
+            if (candidateRepeatPenalty > currentRepeatPenalty) return false;
             return this.canAddKenmu(core, "ポータブル", true);
           })
           .sort((a, b) => {
