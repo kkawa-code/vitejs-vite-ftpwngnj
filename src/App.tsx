@@ -540,7 +540,7 @@ export class AutoAssigner {
   logInfo: string[] = []; staffAssignments: {staff: string, section: string}[] = []; lateShiftAssigned: Set<string> = new Set();
   
   constructor(day: DayData, prevDay: DayData | null, pastDaysInMonth: DayData[], pastDaysInWeek: DayData[], ctx: AutoAssignContext, isSmartFix: boolean = false) {
-    this.day = { ...day }; this.prevDay = prevDay; this.pastDaysInMonth = pastDaysInMonth; this.pastDaysInWeek = pastDaysInWeek; this.ctx = ctx; this.dayCells = { ...day.cells }; this.dynamicCapacity = { ...(ctx.customRules.capacity || {}) }; this.isSmartFix = isSmartFix;
+    this.day = { ...day }; this.prevDay = prevDay; this.pastDaysInMonth = pastDaysInMonth; this.pastDaysInWeek = pastDaysInWeek; const safeRules = sanitizeRulesInput(ctx.customRules); this.ctx = { ...ctx, customRules: safeRules }; this.dayCells = { ...day.cells }; this.dynamicCapacity = { ...(safeRules.capacity || {}) }; this.isSmartFix = isSmartFix;
   }
   
   private log(msg: string) { this.logInfo.push(`・${msg}`); } 
@@ -1650,6 +1650,13 @@ export default function App(): any {
   const [hoveredStaff, setHoveredStaff] = useState<string | null>(null);
 
   useEffect(() => { fetch("https://holidays-jp.github.io/api/v1/date.json").then(res => res.json()).then(data => setNationalHolidays(prev => ({ ...prev, ...data }))).catch(e => console.error(e)); }, []);
+  useEffect(() => {
+    const normalizedRules = sanitizeRulesInput(customRules);
+    if (JSON.stringify(normalizedRules) !== JSON.stringify(customRules)) {
+      setCustomRules(normalizedRules);
+    }
+  }, [customRules]);
+
   useEffect(() => { localStorage.setItem(KEY_ALL_DAYS, JSON.stringify(allDays)); localStorage.setItem(KEY_RULES, JSON.stringify(sanitizeRulesInput(customRules))); localStorage.setItem(KEY_MONTHLY, JSON.stringify(monthlyAssign)); }, [allDays, customRules, monthlyAssign]);
 
   const activeGeneralStaff = useMemo(() => parseAndSortStaff(customRules.staffList), [customRules.staffList]);
