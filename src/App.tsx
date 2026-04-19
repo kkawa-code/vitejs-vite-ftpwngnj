@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -weba
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
+  * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -219,13 +220,13 @@ export const DEFAULT_RULES: CustomRules = {
   dailyAdditions: [], priorityRooms: ["治療","受付","MMG","RI","MRI","CT","透視（6号）","透視（11号）","骨塩","1号室","5号室","2号室","ポータブル","DSA","検像","パノラマCT","3号室","受付ヘルプ","透析後胸部"], 
   fullDayOnlyRooms: "DSA、CT、MRI", noConsecutiveRooms: "ポータブル", 
   noLateShiftStaff: "", noLateShiftRooms: "透視（11号）", lateShiftLowPriorityStaff: "", fluoroAuxConflictRooms: "透視（6号）、透視（11号）", 
-  closedRooms: [{day:"月",room:"3号室",time:"全日"},{day:"火",room:"3号室",time:"全日"},{day:"水",room:"3号室",time:"全日"},{day:"木",room:"3号室",time:"全日"},{day:"金",room:"3号室",time:"全日"}], 
+  closedRooms: [], 
   ngPairs: [], 
   fixed: [], 
   forbidden: [], 
   substitutes: [], 
   pushOuts: [], 
-  emergencies: [{ threshold: 19, type: "change_capacity", role: "", section: "CT", newCapacity: 3 }, { threshold: 18, type: "clear", role: "", section: "3号室" }], 
+  emergencies: [{ threshold: 19, type: "change_capacity", role: "", section: "CT", newCapacity: 3 }, { threshold: 17, type: "clear", role: "", section: "3号室" }], 
   swapRules: [
     { targetRoom: "パノラマCT", triggerRoom: "5号室", sourceRooms: "1号室、2号室、CT(4)" },
     { targetRoom: "ポータブル", triggerRoom: "3号室", sourceRooms: "2号室、CT(4)、1号室、5号室" },
@@ -267,7 +268,7 @@ const sanitizeRulesInput = (raw: any): CustomRules => {
     ...rest
   } = raw || {};
   const merged = { ...DEFAULT_RULES, ...rest } as CustomRules;
-  merged.closedRooms = (merged.closedRooms || []).map((r: any) => (r?.room === "3号室" ? { ...r, time: "全日" } : r));
+  merged.closedRooms = merged.closedRooms || [];
   return merged;
 };
 
