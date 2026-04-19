@@ -2,9 +2,8 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: 'Inter', sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -268,7 +267,13 @@ const sanitizeRulesInput = (raw: any): CustomRules => {
     ...rest
   } = raw || {};
   const merged = { ...DEFAULT_RULES, ...rest } as CustomRules;
-  merged.closedRooms = merged.closedRooms || [];
+  const rawClosedRooms = merged.closedRooms || [];
+  const legacyThreeRoomAllDay = ["月", "火", "水", "木", "金"].every(day =>
+    rawClosedRooms.some((r: any) => r?.room === "3号室" && r?.time === "全日" && r?.day === day)
+  );
+  merged.closedRooms = legacyThreeRoomAllDay
+    ? rawClosedRooms.filter((r: any) => !(r?.room === "3号室" && r?.time === "全日"))
+    : rawClosedRooms;
   return merged;
 };
 
