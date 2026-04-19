@@ -3,13 +3,13 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Meiryo", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Meiryo", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.02em; font-size: 16px; font-weight: 600; overflow-x: hidden; }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-  textarea, select, button, input { font: inherit; }
+  textarea, select, button, input { font: inherit; font-weight: 700; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
@@ -97,7 +97,8 @@ const globalStyle = `
       background: #fff !important;
       color: #000 !important;
       padding: 0.72mm 0.75mm !important;
-      font-size: 10.3pt !important;
+      font-size: 10.5pt !important;
+      font-weight: 700 !important;
       line-height: 1.12 !important;
       vertical-align: middle !important;
       white-space: normal !important;
@@ -107,8 +108,8 @@ const globalStyle = `
       overflow-wrap: anywhere !important;
     }
     .print-sheet-table th {
-      font-size: 10.7pt !important;
-      font-weight: 700 !important;
+      font-size: 10.9pt !important;
+      font-weight: 800 !important;
       text-align: center !important;
     }
     .print-sheet-table .p-sec {
@@ -130,7 +131,8 @@ const globalStyle = `
     .print-sheet-table .p-line {
       margin: 0 !important;
       padding: 0 !important;
-      font-size: 10.0pt !important;
+      font-size: 10.2pt !important;
+      font-weight: 700 !important;
       line-height: 1.12 !important;
       white-space: normal !important;
       overflow: visible !important;
@@ -390,7 +392,7 @@ export function isAllDayAbsenceEntry(entry: string) {
 // ===================== 🌟 UI Components =====================
 export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
 export const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "20px", boxShadow: "0 4px 14px -10px rgba(15,23,42,0.16)", width: "100%", boxSizing: "border-box" });
-export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 800 : 700, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 16 : 15, color: isHoliday && isHeader ? "#dc2626" : "#1e293b", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
+export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: isHeader ? 900 : 800, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 16 : 15, color: isHoliday && isHeader ? "#dc2626" : "#1e293b", verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
 
 export const Modal = ({ title, onClose, wide, children }: any) => ( <div className="modal-overlay" onClick={onClose}><div className={`modal-content modal-animate ${wide ? 'modal-wide' : ''}`} onClick={e => e.stopPropagation()}><div className="modal-header"><h3 className="modal-title">{title}</h3><button onClick={onClose} className="close-btn">✖</button></div>{children}<div style={{ textAlign: "center", marginTop: 32 }}><button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "16px" }}>閉じる</button></div></div></div> );
 export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any) => ( <div style={{ background: bg, padding: 24, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}><h5 style={{ margin: "0 0 12px 0", color, fontSize: 18, fontWeight: 800 }}>{icon} {title}</h5>{desc && <p style={{ fontSize: 15, color: "#166534", marginTop: 0, marginBottom: 16 }}>{desc}</p>}{children}</div> );
@@ -694,10 +696,17 @@ export class AutoAssigner {
     return true;
   }
 
-  private canUseEntryForPortable(core: string, entry: string, portableMembers: string[], currentIndex: number = -1, allowWeeklyRepeat: boolean = true): boolean {
+  private canUseEntryForPortable(
+    core: string,
+    entry: string,
+    portableMembers: string[],
+    currentIndex: number = -1,
+    allowWeeklyRepeat: boolean = true,
+    allowConsecutive: boolean = false
+  ): boolean {
     if (!this.canPlaceEntryInRoomStrict(core, entry, "ポータブル", portableMembers.filter((_, idx) => idx !== currentIndex))) return false;
-    // 連日はフェーズ4以降も一発アウト。週内2回目は最後の妥協候補としてだけ許可する。
-    if (this.shouldAvoidConsecutive(core, "ポータブル")) return false;
+    // ポータブルは「連日なし・週1」を強く優先。ただし少人数日の最終救済では候補部屋内に限って緩和する。
+    if (!allowConsecutive && this.shouldAvoidConsecutive(core, "ポータブル")) return false;
     if (!allowWeeklyRepeat && this.shouldAvoidWeeklyRepeat(core, "ポータブル")) return false;
     const otherPortableCores = portableMembers
       .filter((_, idx) => idx !== currentIndex)
@@ -750,9 +759,10 @@ export class AutoAssigner {
   private findPortableStrictSourceCandidate(
     portableMembers: string[],
     currentIndex: number,
-    options: { allowWeeklyRepeat?: boolean; maxSourceIndex?: number } = {}
+    options: { allowWeeklyRepeat?: boolean; allowConsecutive?: boolean; maxSourceIndex?: number } = {}
   ): { entry: string; sourceRoom: string; sourceIndex: number; staff: string } | null {
     const allowWeeklyRepeat = options.allowWeeklyRepeat ?? true;
+    const allowConsecutive = options.allowConsecutive ?? false;
     const maxSourceIndex = options.maxSourceIndex ?? Infinity;
     const sources = this.getPortableSourceConds();
     const candidates: { entry: string; sourceRoom: string; sourceIndex: number; staff: string }[] = [];
@@ -766,7 +776,7 @@ export class AutoAssigner {
         // MRI/治療/RIなどの専従・月間主担当が別途候補部屋に紛れ込んでいても、ポータブル直行にはしない。
         // ただし CT(4) は明示された候補元なので、4人体制を満たす場合だけ候補として残す。
         if (cond.r !== "CT" && this.isProtectedInCurrentModality(staff)) return;
-        if (!this.canUseEntryForPortable(staff, entry, portableMembers, currentIndex, allowWeeklyRepeat)) return;
+        if (!this.canUseEntryForPortable(staff, entry, portableMembers, currentIndex, allowWeeklyRepeat, allowConsecutive)) return;
         candidates.push({ entry, sourceRoom: cond.r, sourceIndex, staff });
       });
     });
@@ -786,9 +796,10 @@ export class AutoAssigner {
   private tryPortableModalitySourceSwap(
     portableMembers: string[],
     currentIndex: number,
-    options: { allowWeeklyRepeat?: boolean; maxSourceIndex?: number } = {}
+    options: { allowWeeklyRepeat?: boolean; allowConsecutive?: boolean; maxSourceIndex?: number } = {}
   ): { entry: string; sourceRoom: string; sourceIndex: number; modalityRoom: string; modalityStaff: string; sourceStaff: string } | null {
     const allowWeeklyRepeat = options.allowWeeklyRepeat ?? true;
+    const allowConsecutive = options.allowConsecutive ?? false;
     const maxSourceIndex = options.maxSourceIndex ?? Infinity;
     const sources = this.getPortableSourceConds();
     const modalityRooms = ["MRI", "CT"].filter(room => !this.skipSections.includes(room) && !this.shouldSkipAutoAssignRoom(room));
@@ -819,7 +830,7 @@ export class AutoAssigner {
 
             if (!this.canPlaceEntryInRoomStrict(sourceStaff, movedSourceToModality, modalityRoom, nextModalityMembers)) continue;
             if (!this.canPlaceEntryInRoomStrict(modalityStaff, movedModalityToSource, cond.r, nextSourceMembers)) continue;
-            if (!this.canUseEntryForPortable(modalityStaff, movedModalityToSource, portableMembers, currentIndex, allowWeeklyRepeat)) continue;
+            if (!this.canUseEntryForPortable(modalityStaff, movedModalityToSource, portableMembers, currentIndex, allowWeeklyRepeat, allowConsecutive)) continue;
             if (!this.canSwapKeepKenmuLimit(sourceStaff, modalityRoom, cond.r, sourceEntry, movedSourceToModality)) continue;
             if (!this.canSwapKeepKenmuLimit(modalityStaff, cond.r, modalityRoom, modalityEntry, movedModalityToSource)) continue;
 
@@ -902,11 +913,32 @@ export class AutoAssigner {
         continue;
       }
 
+      // 第4候補：それでも人がいない場合のみ、候補部屋内に限って連日ポータブルを最終救済で許容する。
+      const directConsecutive = this.findPortableStrictSourceCandidate(portableMembers, i, { allowWeeklyRepeat: true, allowConsecutive: true });
+      if (directConsecutive) {
+        portableMembers[i] = directConsecutive.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`⚠️ [ポータブル最終救済] 候補部屋内で他に解がないため、${directConsecutive.sourceRoom} 由来の ${directConsecutive.entry} を連日/週内再担当も含めて許容しました`);
+        changed = true;
+        continue;
+      }
+
+      const swappedConsecutive = this.tryPortableModalitySourceSwap(portableMembers, i, { allowWeeklyRepeat: true, allowConsecutive: true });
+      if (swappedConsecutive) {
+        portableMembers[i] = swappedConsecutive.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`⚠️ [ポータブル最終救済交換] 候補部屋内で他に解がないため、${swappedConsecutive.sourceRoom} と ${swappedConsecutive.modalityRoom} を交換して ${swappedConsecutive.entry} を配置しました`);
+        changed = true;
+        continue;
+      }
+
       portableMembers.splice(i, 1);
       i--;
       this.dayCells["ポータブル"] = join(portableMembers);
       this.refreshAssignmentState();
-      this.log(`🚫 [ポータブル閉域] ${entry} は候補部屋由来にできず、連日回避も満たせないため、無理にMRI/CT等から補充せずポータブルから外しました`);
+      this.log(`🚫 [ポータブル閉域] ${entry} は候補部屋由来にできず、MRI/CT直取りや禁止者配置を避けるためポータブルから外しました`);
       changed = true;
     }
 
@@ -1213,6 +1245,88 @@ export class AutoAssigner {
     }
   }
 
+  private getPortableSourceRank(room: string): number {
+    const sources = this.getPortableSourceConds();
+    const idx = sources.findIndex(cond => cond.r === room);
+    if (idx >= 0) return idx;
+    const fallback: Record<string, number> = { "3号室": 0, "CT": 1, "2号室": 2, "1号室": 3, "5号室": 4 };
+    return fallback[room] ?? 99;
+  }
+
+  private canMoveEntryBetweenRooms(core: string, entry: string, fromRoom: string, toRoom: string, toMembers: string[]): boolean {
+    if (!this.canPlaceEntryInRoomStrict(core, entry, toRoom, toMembers)) return false;
+    if (!this.canSwapKeepKenmuLimit(core, toRoom, fromRoom, entry, entry)) return false;
+    return true;
+  }
+
+  private getRoomLoadFromMembers(members: string[]): number {
+    return members.reduce((sum, m) => sum + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
+  }
+
+  private tryProtectOneRoomForPortable(): boolean {
+    if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return false;
+    let portableMembers = split(this.dayCells["ポータブル"] || "");
+    if (portableMembers.length === 0) return false;
+
+    for (let targetIndex = 0; targetIndex < portableMembers.length; targetIndex++) {
+      const portableEntry = portableMembers[targetIndex];
+      const portableCore = extractStaffName(portableEntry);
+      if (!portableCore || ROLE_PLACEHOLDERS.includes(portableCore) || this.isLateOrNightEntry(portableEntry)) continue;
+
+      const currentSource = this.getPortableSourceInfo(portableCore, true);
+      if (!currentSource || currentSource.room !== "1号室") continue;
+      if (!this.canUseEntryForPortable(portableCore, portableEntry, portableMembers, targetIndex, true, true)) continue;
+
+      const oneMembers = split(this.dayCells["1号室"] || "");
+      const portableSourceIndex = oneMembers.findIndex(m => m === currentSource.entry);
+      if (portableSourceIndex === -1) continue;
+      const sourceTag = this.getMemberTimeTag(currentSource.entry);
+
+      const swapRooms = ["2号室", "3号室", "5号室"].filter(room => room !== "1号室");
+      for (const room of swapRooms) {
+        if (this.shouldSkipAutoAssignRoom(room)) continue;
+        const roomMembers = split(this.dayCells[room] || "");
+        const candidates = roomMembers
+          .map((entry, index) => ({ entry, index, core: extractStaffName(entry), tag: this.getMemberTimeTag(entry) }))
+          .filter(x =>
+            x.core &&
+            !ROLE_PLACEHOLDERS.includes(x.core) &&
+            x.core !== portableCore &&
+            !this.isLateOrNightEntry(x.entry) &&
+            x.tag === sourceTag
+          )
+          .sort((a, b) =>
+            // ポータブル禁止者・対応可能部屋が少ない人は1号室側に固定されやすくする。
+            (this.isForbidden(a.core, "ポータブル") ? -200 : 0) - (this.isForbidden(b.core, "ポータブル") ? -200 : 0) ||
+            this.getTodayRoomLoad(a.core) - this.getTodayRoomLoad(b.core) ||
+            a.core.localeCompare(b.core, "ja")
+          );
+
+        for (const candidate of candidates) {
+          const movedPortableToRoom = `${portableCore}${candidate.tag}`;
+          const movedCandidateToOne = `${candidate.core}${sourceTag}`;
+          const nextOneMembers = oneMembers.map((m, idx) => idx === portableSourceIndex ? movedCandidateToOne : m);
+          const nextRoomMembers = roomMembers.map((m, idx) => idx === candidate.index ? movedPortableToRoom : m);
+
+          if (!this.canPlaceEntryInRoomStrict(candidate.core, movedCandidateToOne, "1号室", nextOneMembers)) continue;
+          if (!this.canPlaceEntryInRoomStrict(portableCore, movedPortableToRoom, room, nextRoomMembers)) continue;
+          if (!this.canUseEntryForPortable(portableCore, movedPortableToRoom, portableMembers, targetIndex, true, true)) continue;
+          if (!this.canSwapKeepKenmuLimit(candidate.core, "1号室", room, candidate.entry, movedCandidateToOne)) continue;
+          if (!this.canSwapKeepKenmuLimit(portableCore, room, "1号室", currentSource.entry, movedPortableToRoom)) continue;
+
+          this.dayCells["1号室"] = join(nextOneMembers);
+          this.dayCells[room] = join(nextRoomMembers);
+          portableMembers[targetIndex] = movedPortableToRoom;
+          this.dayCells["ポータブル"] = join(portableMembers);
+          this.refreshAssignmentState();
+          this.log(`🧭 [ポータブル配置構造] 1号室を空洞化させないため、1号室の ${currentSource.entry} と ${room} の ${candidate.entry} を交換し、${portableCore} を${room}由来のポータブルに寄せました`);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   private enforcePortableSourcePriority() {
     if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
     let portableMembers = split(this.dayCells["ポータブル"] || "");
@@ -1307,6 +1421,22 @@ export class AutoAssigner {
       const threeLoad = threeMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
       const threeCap = threeEff.cap ?? 1;
       if (threeLoad < threeCap) {
+        const movedPortableToThree = `${currentCore}${sourceTag}`;
+        const sourceAfterMove = sourceMembers.filter((_, idx) => idx !== sourceIndex);
+        const sourceWouldBeEmpty = this.getRoomLoadFromMembers(sourceAfterMove) <= 0;
+        // 3号室＋ポータブルを基本形にする。ただし1号室を空洞化させる移動は先に1号室保護交換へ回す。
+        if (currentSource.room !== "1号室" || !sourceWouldBeEmpty) {
+          if (this.canMoveEntryBetweenRooms(currentCore, movedPortableToThree, currentSource.room, "3号室", threeMembers)) {
+            this.dayCells[currentSource.room] = join(sourceAfterMove);
+            this.dayCells["3号室"] = join([...threeMembers, movedPortableToThree]);
+            portableMembers[targetIndex] = movedPortableToThree;
+            this.dayCells["ポータブル"] = join(portableMembers);
+            this.refreshAssignmentState();
+            this.log(`🔗 [ポータブル3号室原則] ${currentSource.room} の ${currentEntry} を3号室へ移し、3号室＋ポータブルの基本形に寄せました`);
+            return;
+          }
+        }
+
         if (!this.canPlaceEntryInRoomStrict(currentCore, currentEntry, "3号室", threeMembers)) continue;
         if (!this.canAddKenmu(currentCore, "3号室", true)) continue;
         this.dayCells["3号室"] = join([...threeMembers, currentEntry]);
@@ -1343,6 +1473,96 @@ export class AutoAssigner {
         this.refreshAssignmentState();
         this.log(`🔁 [ポータブル3号室原則] ${currentSource.room} の ${currentEntry} と3号室の ${three.entry} を交換し、ポータブルを3号室兼務へ寄せました`);
         return;
+      }
+    }
+  }
+
+
+  private enforcePortableSourceRoomSwapPreference() {
+    if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
+    let portableMembers = split(this.dayCells["ポータブル"] || "");
+    if (portableMembers.length === 0) return;
+
+    const sources = this.getPortableSourceConds();
+    const portableRoomPriority = (room: string) => {
+      if (room === "3号室") return 0;
+      if (room === "2号室") return 1;
+      if (room === "5号室") return 2;
+      if (room === "1号室") return 3;
+      return 9;
+    };
+
+    for (let targetIndex = 0; targetIndex < portableMembers.length; targetIndex++) {
+      const portableEntry = portableMembers[targetIndex];
+      const portableCore = extractStaffName(portableEntry);
+      if (!portableCore || ROLE_PLACEHOLDERS.includes(portableCore) || this.isLateOrNightEntry(portableEntry)) continue;
+      if (!this.canUseEntryForPortable(portableCore, portableEntry, portableMembers, targetIndex, true)) continue;
+
+      const currentSource = this.getPortableSourceInfo(portableCore, true);
+      if (!currentSource) continue;
+      if (!["1号室", "5号室", "2号室"].includes(currentSource.room)) continue;
+
+      const currentRank = portableRoomPriority(currentSource.room);
+      if (currentRank <= 0 || currentRank >= 9) continue;
+      const currentEntry = currentSource.entry;
+      const currentTag = this.getMemberTimeTag(currentEntry);
+      if (currentTag !== this.getMemberTimeTag(portableEntry)) continue;
+
+      const betterSources = sources
+        .map((cond, sourceIndex) => ({ ...cond, sourceIndex, rank: portableRoomPriority(cond.r) }))
+        .filter(cond =>
+          cond.rank < currentRank &&
+          cond.rank < 9 &&
+          cond.r !== currentSource.room &&
+          cond.r !== "CT" &&
+          !this.skipSections.includes(cond.r) &&
+          !this.shouldSkipAutoAssignRoom(cond.r) &&
+          this.isPortableSourceAvailable(cond, cond.r === "3号室") &&
+          split(this.dayCells[cond.r] || "").length > 0
+        )
+        .sort((a, b) => a.rank - b.rank || a.sourceIndex - b.sourceIndex);
+
+      for (const better of betterSources) {
+        const betterMembers = split(this.dayCells[better.r] || "");
+        const currentSourceMembers = split(this.dayCells[currentSource.room] || "");
+        const currentSourceIndex = currentSourceMembers.findIndex(m => m === currentEntry);
+        if (currentSourceIndex === -1) continue;
+
+        const betterCandidates = betterMembers
+          .map((entry, index) => ({ entry, index, core: extractStaffName(entry), tag: this.getMemberTimeTag(entry) }))
+          .filter(x =>
+            x.core &&
+            !ROLE_PLACEHOLDERS.includes(x.core) &&
+            x.core !== portableCore &&
+            !this.isLateOrNightEntry(x.entry) &&
+            x.tag === currentTag
+          )
+          .sort((a, b) =>
+            this.getTodayRoomLoad(a.core) - this.getTodayRoomLoad(b.core) ||
+            this.getPastRoomCount(a.core, currentSource.room) - this.getPastRoomCount(b.core, currentSource.room) ||
+            a.core.localeCompare(b.core, "ja")
+          );
+
+        for (const betterCandidate of betterCandidates) {
+          const movedPortableToBetter = `${portableCore}${betterCandidate.tag}`;
+          const movedBetterToCurrent = `${betterCandidate.core}${currentTag}`;
+          const nextBetterMembers = betterMembers.map((m, idx) => idx === betterCandidate.index ? movedPortableToBetter : m);
+          const nextCurrentSourceMembers = currentSourceMembers.map((m, idx) => idx === currentSourceIndex ? movedBetterToCurrent : m);
+
+          if (!this.canPlaceEntryInRoomStrict(portableCore, movedPortableToBetter, better.r, nextBetterMembers)) continue;
+          if (!this.canPlaceEntryInRoomStrict(betterCandidate.core, movedBetterToCurrent, currentSource.room, nextCurrentSourceMembers)) continue;
+          if (!this.canUseEntryForPortable(portableCore, movedPortableToBetter, portableMembers, targetIndex, true)) continue;
+          if (!this.canSwapKeepKenmuLimit(portableCore, better.r, currentSource.room, currentEntry, movedPortableToBetter)) continue;
+          if (!this.canSwapKeepKenmuLimit(betterCandidate.core, currentSource.room, better.r, betterCandidate.entry, movedBetterToCurrent)) continue;
+
+          this.dayCells[better.r] = join(nextBetterMembers);
+          this.dayCells[currentSource.room] = join(nextCurrentSourceMembers);
+          portableMembers[targetIndex] = movedPortableToBetter;
+          this.dayCells["ポータブル"] = join(portableMembers);
+          this.refreshAssignmentState();
+          this.log(`🔁 [ポータブル候補部屋内交換] ${currentSource.room} の ${portableEntry} と ${better.r} の ${betterCandidate.entry} を交換し、ポータブル由来をより優先度の高い ${better.r} に寄せました`);
+          return;
+        }
       }
     }
   }
@@ -2050,7 +2270,11 @@ export class AutoAssigner {
     this.sharePartialHelpersWithLinkedTargets();
     this.rebalanceNoConsecutiveRooms();
     this.enforcePortableClosedSourcePolicy();
+    this.tryProtectOneRoomForPortable();
     this.enforcePortableSourcePriority();
+    this.enforcePortableThreeRoomPairing();
+    this.enforcePortableSourceRoomSwapPreference();
+    this.tryProtectOneRoomForPortable();
     this.enforcePortableThreeRoomPairing();
     this.enforcePortableClosedSourcePolicy();
     this.refreshAssignmentState();
@@ -2574,7 +2798,7 @@ export default function App(): any {
       <style>{globalStyle}</style>
       
       <div className="no-print" style={{ ...panelStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, padding: "20px 32px", background: "linear-gradient(to right, #ffffff, #f8fafc)" }}>
-        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 26, fontWeight: 900 }}>勤務割付システム Ver 2.98</h2>
+        <h2 style={{ margin: 0, color: "#0f172a", fontSize: 26, fontWeight: 900 }}>勤務割付システム Ver 2.99</h2>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {(highlightedStaff || hoveredStaff) && (
             <div style={{ background: "#2563eb", color: "#fff", padding: "6px 16px", borderRadius: "20px", fontWeight: 800, fontSize: "15px", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 6px rgba(37,99,235,0.3)", animation: "fadeIn 0.3s ease" }}>
