@@ -395,6 +395,9 @@ export function getStaffAmount(name: string) {
 export function isAllDayAbsenceEntry(entry: string) {
   return !!entry && !entry.includes("(AM)") && !entry.includes("(PM)") && !entry.includes("〜");
 }
+export function isLateStartEntry(entry: string) {
+  return /\((?:17|18|19|20|21|22):\d{2}〜/.test(entry || "");
+}
 
 // ===================== 🌟 UI Components =====================
 export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 900, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
@@ -556,9 +559,9 @@ export class AutoAssigner {
   private logPhase(phaseName: string) { this.logInfo.push(`・■${phaseName}`); }
   
   getPastRoomCount(s: string, r: string) { const isM = ["CT", "MRI", "MMG"].includes(r); const pds = isM ? this.pastDaysInMonth : this.pastDaysInWeek; return pds.filter(pd => split(pd.cells[r] || "").map(extractStaffName).includes(s)).length; }
-  getPastLateShiftCount(s: string) { let c = 0; this.pastDaysInMonth.forEach(pd => { Object.values(pd.cells).forEach(val => { split(val as string).forEach(m => { if (extractStaffName(m) === s && (m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:"))) c++; }); }); }); return c; }
-  getTodayRoomCount(s: string) { let c = 0; Object.keys(this.dayCells).forEach(sec => { if (this.isMetadataKey(sec) || REST_SECTIONS.includes(sec) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(sec)) return; split(this.dayCells[sec]).forEach(m => { if (extractStaffName(m) === s && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:")) c++; }); }); return c; }
-  getTodayRoomLoad(s: string) { let c = 0; Object.keys(this.dayCells).forEach(sec => { if (this.isMetadataKey(sec) || REST_SECTIONS.includes(sec) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(sec)) return; split(this.dayCells[sec]).forEach(m => { if (extractStaffName(m) === s && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:")) c += getStaffAmount(m); }); }); return c; }
+  getPastLateShiftCount(s: string) { let c = 0; this.pastDaysInMonth.forEach(pd => { Object.values(pd.cells).forEach(val => { split(val as string).forEach(m => { if (extractStaffName(m) === s && isLateStartEntry(m)) c++; }); }); }); return c; }
+  getTodayRoomCount(s: string) { let c = 0; Object.keys(this.dayCells).forEach(sec => { if (this.isMetadataKey(sec) || REST_SECTIONS.includes(sec) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(sec)) return; split(this.dayCells[sec]).forEach(m => { if (extractStaffName(m) === s && !isLateStartEntry(m)) c++; }); }); return c; }
+  getTodayRoomLoad(s: string) { let c = 0; Object.keys(this.dayCells).forEach(sec => { if (this.isMetadataKey(sec) || REST_SECTIONS.includes(sec) || ["待機", "昼当番", "受付", "受付ヘルプ"].includes(sec)) return; split(this.dayCells[sec]).forEach(m => { if (extractStaffName(m) === s && !isLateStartEntry(m)) c += getStaffAmount(m); }); }); return c; }
   getStaffTimeCounts(s: string) { let am = 0; let pm = 0; Object.keys(this.dayCells).forEach(sec => { if (this.isMetadataKey(sec) || ["待機","昼当番","受付","受付ヘルプ"].includes(sec) || REST_SECTIONS.includes(sec)) return; split(this.dayCells[sec]).forEach(m => { if (extractStaffName(m) === s) { if (m.includes("(AM)")) am++; else if (m.includes("(PM)")) pm++; else { am++; pm++; } } }); }); return { am, pm }; }
   private getAssignedUsage(staff: string): number { const counts = this.getStaffTimeCounts(staff); return (counts.am > 0 ? 0.5 : 0) + (counts.pm > 0 ? 0.5 : 0); }
   private isUnassignedForRelief(staff: string, tag: string): boolean { const counts = this.getStaffTimeCounts(staff); if (tag === "(AM)") return counts.am === 0; if (tag === "(PM)") return counts.pm === 0; return counts.am === 0 && counts.pm === 0; }
@@ -622,7 +625,7 @@ export class AutoAssigner {
     return this.getPreferredWorkTag(staff);
   }
   private isLateOrNightEntry(entry: string): boolean {
-    return entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:");
+    return isLateStartEntry(entry);
   }
 
   private normalizePortableSourceCond(src: string): { r: string; min: number } | null {
@@ -890,6 +893,51 @@ export class AutoAssigner {
     return null;
   }
 
+  private getDaytimeRoomsForStaff(core: string): string[] {
+    return ROOM_SECTIONS.filter(room =>
+      !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(room) &&
+      split(this.dayCells[room] || "").some(m => extractStaffName(m) === core && !this.isLateOrNightEntry(m))
+    );
+  }
+
+  private isPanoOnlyPortableCandidate(entry: string): boolean {
+    const core = extractStaffName(entry);
+    if (!core || ROLE_PLACEHOLDERS.includes(core)) return false;
+    if (this.isLateOrNightEntry(entry)) return false;
+    if (this.skipSections.includes("パノラマCT") || this.shouldSkipAutoAssignRoom("パノラマCT")) return false;
+    if (!split(this.dayCells["パノラマCT"] || "").some(m => extractStaffName(m) === core)) return false;
+    const rooms = this.getDaytimeRoomsForStaff(core);
+    return rooms.length === 1 && rooms[0] === "パノラマCT";
+  }
+
+  private findPanoOnlyPortableCandidate(
+    portableMembers: string[],
+    currentIndex: number,
+    options: { allowWeeklyRepeat?: boolean; allowConsecutive?: boolean } = {}
+  ): { entry: string; staff: string } | null {
+    const allowWeeklyRepeat = options.allowWeeklyRepeat ?? true;
+    const allowConsecutive = options.allowConsecutive ?? false;
+    const candidates = split(this.dayCells["パノラマCT"] || "")
+      .map(entry => ({ entry, staff: extractStaffName(entry) }))
+      .filter(item =>
+        this.isPanoOnlyPortableCandidate(item.entry) &&
+        this.canUseEntryForPortable(item.staff, item.entry, portableMembers, currentIndex, allowWeeklyRepeat, allowConsecutive)
+      );
+    candidates.sort((a, b) =>
+      this.getRepeatAvoidPenalty(a.staff, "ポータブル") - this.getRepeatAvoidPenalty(b.staff, "ポータブル") ||
+      this.getPastRoomCount(a.staff, "ポータブル") - this.getPastRoomCount(b.staff, "ポータブル") ||
+      a.staff.localeCompare(b.staff, "ja")
+    );
+    return candidates[0] || null;
+  }
+
+  private shouldPreferPanoOnlyPortableSource(sourceInfo: { room: string } | null): boolean {
+    if (!sourceInfo) return true;
+    // 3号室・CT(4)・2号室はポータブル母体として優先維持する。
+    // 5号室・1号室などを使うくらいなら、単独パノラマCT担当をポータブル兼務に回す。
+    return ["5号室", "1号室"].includes(sourceInfo.room);
+  }
+
   private enforcePortableClosedSourcePolicy() {
     if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
     let portableMembers = split(this.dayCells["ポータブル"] || "");
@@ -903,8 +951,24 @@ export class AutoAssigner {
 
       const sourceInfo = this.getPortableSourceInfo(core, true);
       const protectedModalityLeak = !!sourceInfo && sourceInfo.room !== "CT" && this.isProtectedInCurrentModality(core);
-      const isValidSourceMember = !!sourceInfo && !protectedModalityLeak && this.canUseEntryForPortable(core, entry, portableMembers, i, true);
-      if (isValidSourceMember) continue;
+      const isPanoOnlySourceMember = this.isPanoOnlyPortableCandidate(entry) && this.canUseEntryForPortable(core, entry, portableMembers, i, true, true);
+      const isValidSourceMember = (!!sourceInfo && !protectedModalityLeak && this.canUseEntryForPortable(core, entry, portableMembers, i, true)) || isPanoOnlySourceMember;
+      if (isValidSourceMember) {
+        const panoOnlyCandidate = !isPanoOnlySourceMember && this.shouldPreferPanoOnlyPortableSource(sourceInfo)
+          ? (this.findPanoOnlyPortableCandidate(portableMembers, i, { allowWeeklyRepeat: false })
+            || this.findPanoOnlyPortableCandidate(portableMembers, i, { allowWeeklyRepeat: true })
+            || this.findPanoOnlyPortableCandidate(portableMembers, i, { allowWeeklyRepeat: true, allowConsecutive: true }))
+          : null;
+        if (panoOnlyCandidate) {
+          portableMembers[i] = panoOnlyCandidate.entry;
+          this.dayCells["ポータブル"] = join(portableMembers);
+          this.refreshAssignmentState();
+          this.log(`🔗 [パノラマ単独活用] ${sourceInfo?.room || "候補外"} 由来の ${entry} より、パノラマCT単独の ${panoOnlyCandidate.entry} をポータブル兼務にしました`);
+          changed = true;
+          continue;
+        }
+        continue;
+      }
 
       const canUseCurrentForPortable = this.canUseEntryForPortable(core, entry, portableMembers, i, true);
       const attachedRoom = canUseCurrentForPortable ? this.tryAttachPortableOnlyToSource(core, entry) : null;
@@ -936,6 +1000,17 @@ export class AutoAssigner {
         continue;
       }
 
+      // 第2.5候補：3号室/CT(4)/2号室で無理なら、パノラマCTだけの人をもったいない単独配置にせずポータブル兼務へ回す。
+      const panoOnlyNonWeekly = this.findPanoOnlyPortableCandidate(portableMembers, i, { allowWeeklyRepeat: false });
+      if (panoOnlyNonWeekly) {
+        portableMembers[i] = panoOnlyNonWeekly.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`🔗 [パノラマ単独活用] パノラマCT単独の ${panoOnlyNonWeekly.entry} をポータブル兼務にしました`);
+        changed = true;
+        continue;
+      }
+
       // 第3候補：交換しても無理なら、連日だけは避けたうえで週内2回目を許容する。
       const directWeekly = this.findPortableStrictSourceCandidate(portableMembers, i, { allowWeeklyRepeat: true });
       if (directWeekly) {
@@ -953,6 +1028,16 @@ export class AutoAssigner {
         this.dayCells["ポータブル"] = join(portableMembers);
         this.refreshAssignmentState();
         this.log(`⚠️ [ポータブル週内再担当交換] 週内初回では埋まらないため、${swappedWeekly.sourceRoom} と ${swappedWeekly.modalityRoom} を交換して ${swappedWeekly.entry} を配置しました`);
+        changed = true;
+        continue;
+      }
+
+      const panoOnlyWeekly = this.findPanoOnlyPortableCandidate(portableMembers, i, { allowWeeklyRepeat: true });
+      if (panoOnlyWeekly) {
+        portableMembers[i] = panoOnlyWeekly.entry;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`⚠️ [パノラマ単独活用] 週内再担当を許容し、パノラマCT単独の ${panoOnlyWeekly.entry} をポータブル兼務にしました`);
         changed = true;
         continue;
       }
@@ -1207,7 +1292,7 @@ export class AutoAssigner {
     const linkedTargetSet = new Set(linkedTargets);
     if (!linkedTargets.length) return;
 
-    const isLateOrNightEntry = (entry: string) => entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:");
+    const isLateOrNightEntry = (entry: string) => isLateStartEntry(entry);
     const isSplitTargetEntry = (entry: string) => {
       const tag = this.getMemberTimeTag(entry);
       return tag.includes("(AM)") || tag.includes("(PM)") || tag.includes("〜");
@@ -2590,7 +2675,7 @@ export default function App(): any {
     const softNgPairs = (customRules.ngPairs || []).filter((p: any) => p.level === "soft"); 
     softNgPairs.forEach((ng: any) => { const s1 = extractStaffName(ng.s1); const s2 = extractStaffName(ng.s2); ROOM_SECTIONS.forEach(room => { const mems = split(cells[room]).map(extractStaffName); if (mems.includes(s1) && mems.includes(s2)) w.push({ level: 'yellow', title: '回避特例', room, msg: `なるべくNGペア（${s1} と ${s2}）が「${room}」で同室です` }); }); }); 
     const fluoroConflictSections = getFluoroAuxConflictSections(customRules.fluoroAuxConflictRooms); AUX_FOLLOWUP_SECTIONS.forEach(auxRoom => { split(cells[auxRoom] || "").map(extractStaffName).forEach(staff => { const conflictRoom = fluoroConflictSections.find(fRoom => split(cells[fRoom] || "").map(extractStaffName).includes(staff)); if (conflictRoom) w.push({ level: 'yellow', title: '併用注意', staff, room: auxRoom, msg: `${staff}さんが「${auxRoom}」と「${conflictRoom}」を兼ねています` }); }); }); 
-    Object.entries(staffMap).forEach(([staff, rms]) => { const limit = customRules.alertMaxKenmu || 3; const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !m.includes("17:") && !m.includes("18:") && !m.includes("19:") && !m.includes("22:"); }).length; if(dayCount > limit) w.push({ level: 'orange', title: '兼務超過', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); }); 
+    Object.entries(staffMap).forEach(([staff, rms]) => { const limit = customRules.alertMaxKenmu || 3; const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !isLateStartEntry(m); }).length; if(dayCount > limit) w.push({ level: 'orange', title: '兼務超過', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); }); 
     const targetEmptyRooms = split(customRules.alertEmptyRooms || "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"); 
     targetEmptyRooms.forEach(room => { if (split(cells[room]).length === 0) w.push({ level: 'yellow', title: '空室', room, msg: `「${room}」の担当者がいません` }); }); 
     const helpMap = parseLooseJsonMap(cells["__absenceHelp"]);
@@ -2663,7 +2748,7 @@ export default function App(): any {
     return w; 
   };
   
-  const monthlyMatrixStats = useMemo(() => { const stats: Record<string, Record<string, { total: number, late: number }>> = {}; activeGeneralStaff.forEach(s => { stats[s] = {}; ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); }); Object.entries(allDays).forEach(([dateStr, cells]) => { if (dateStr >= assignmentCycleInfo.startId && dateStr < assignmentCycleInfo.endExclusiveId) { ROOM_SECTIONS.forEach(room => { split(cells[room] || "").forEach(m => { const core = extractStaffName(m); if (stats[core]?.[room] !== undefined) { stats[core][room].total += 1; if (m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")) stats[core][room].late += 1; } }); }); } }); return stats; }, [assignmentCycleInfo, allDays, activeGeneralStaff]);
+  const monthlyMatrixStats = useMemo(() => { const stats: Record<string, Record<string, { total: number, late: number }>> = {}; activeGeneralStaff.forEach(s => { stats[s] = {}; ROOM_SECTIONS.forEach(r => stats[s][r] = { total: 0, late: 0 }); }); Object.entries(allDays).forEach(([dateStr, cells]) => { if (dateStr >= assignmentCycleInfo.startId && dateStr < assignmentCycleInfo.endExclusiveId) { ROOM_SECTIONS.forEach(room => { split(cells[room] || "").forEach(m => { const core = extractStaffName(m); if (stats[core]?.[room] !== undefined) { stats[core][room].total += 1; if (isLateStartEntry(m)) stats[core][room].late += 1; } }); }); } }); return stats; }, [assignmentCycleInfo, allDays, activeGeneralStaff]);
   const monthlyAssignmentSummary = useMemo(() => {
     return MONTHLY_CATEGORIES.map(({ key, label }) => ({
       key,
@@ -2852,7 +2937,7 @@ export default function App(): any {
         ROOM_SECTIONS.forEach(room => {
           if (["待機", "昼当番", "受付", "受付ヘルプ"].includes(room)) return;
           split(allDays[day.id]?.[room]).forEach(m => {
-            if (m.includes("17:") || m.includes("18:") || m.includes("19:") || m.includes("22:")) return;
+            if (isLateStartEntry(m)) return;
             const core = extractStaffName(m);
             if (!byStaff[core]) byStaff[core] = [];
             if (!byStaff[core].includes(room)) byStaff[core].push(room);
