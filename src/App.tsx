@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
+  body { background: #f4f7f9; color: #334155; -webkit-print-color-adjust: exact; font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Meiryo", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.02em; font-size: 16px; overflow-x: hidden; }
   * { box-sizing: border-box; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
@@ -909,6 +909,64 @@ export class AutoAssigner {
     }
   }
 
+  private enforcePortableSourcePriority() {
+    const rule = (this.ctx.customRules.linkedRooms || []).find((r: any) => r.target === "ポータブル");
+    if (!rule || this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
+    const sources = split(rule.sources || "").map((src: string) => parseRoomCond(src));
+    if (!sources.length) return;
+    let targetMembers = split(this.dayCells["ポータブル"] || "");
+    if (targetMembers.length === 0) return;
+    const sourceIndexOf = (core: string) => {
+      const idx = sources.findIndex(({ r, min }: any) => {
+        if (!r || r === "ポータブル" || this.skipSections.includes(r) || this.shouldSkipAutoAssignRoom(r)) return false;
+        const members = split(this.dayCells[r] || "");
+        if (min > 0 && members.reduce((s, m) => s + getStaffAmount(m), 0) < min) return false;
+        return members.some(m => extractStaffName(m) === core);
+      });
+      return idx === -1 ? 999 : idx;
+    };
+    for (let targetIndex = 0; targetIndex < targetMembers.length; targetIndex++) {
+      const currentEntry = targetMembers[targetIndex];
+      const currentCore = extractStaffName(currentEntry);
+      if (!currentCore || ROLE_PLACEHOLDERS.includes(currentCore)) continue;
+      const currentSourceIndex = sourceIndexOf(currentCore);
+      if (currentSourceIndex === 0) continue;
+      for (let sourceIndex = 0; sourceIndex < Math.min(currentSourceIndex, sources.length); sourceIndex++) {
+        const { r: sourceRoom, min } = sources[sourceIndex] as any;
+        if (!sourceRoom || sourceRoom === "ポータブル" || sourceRoom === "透析後胸部" || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
+        const sourceMembers = split(this.dayCells[sourceRoom] || "");
+        if (min > 0 && sourceMembers.reduce((s, m) => s + getStaffAmount(m), 0) < min) continue;
+        const otherTargetCores = targetMembers.filter((_, i) => i !== targetIndex).map(extractStaffName);
+        const candidates = sourceMembers
+          .filter(entry => {
+            const core = extractStaffName(entry);
+            if (!core || ROLE_PLACEHOLDERS.includes(core) || otherTargetCores.includes(core) || core === currentCore) return false;
+            if (entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:")) return false;
+            if (this.isForbidden(core, "ポータブル") || this.isHalfDayBlocked(core, "ポータブル").hard) return false;
+            if (this.hasNGPair(core, otherTargetCores, false)) return false;
+            if (this.isTimeTagBlockedByFullDayRule("ポータブル", entry)) return false;
+            return this.canAddKenmu(core, "ポータブル", true);
+          })
+          .sort((a, b) => {
+            const ca = extractStaffName(a), cb = extractStaffName(b);
+            return this.getRepeatAvoidPenalty(ca, "ポータブル") - this.getRepeatAvoidPenalty(cb, "ポータブル")
+              || this.getTodayRoomCount(ca) - this.getTodayRoomCount(cb)
+              || this.getPastRoomCount(ca, "ポータブル") - this.getPastRoomCount(cb, "ポータブル");
+          });
+        if (candidates.length === 0) continue;
+        const replacementCore = extractStaffName(candidates[0]);
+        const currentTag = this.getMemberTimeTag(currentEntry);
+        const candidateTag = this.getMemberTimeTag(candidates[0]);
+        const replacementEntry = currentTag && !candidateTag ? `${replacementCore}${currentTag}` : candidates[0];
+        targetMembers[targetIndex] = replacementEntry;
+        this.dayCells["ポータブル"] = join(targetMembers);
+        this.refreshAssignmentState();
+        this.log(`🔗 [基本兼務優先] ポータブルは設定順を優先し、${sourceRoom} の ${replacementEntry} に変更しました`);
+        return;
+      }
+    }
+  }
+
   private getNoConsecutiveSourceRooms(room: string): string[] {
     const rooms: string[] = [];
     (this.ctx.customRules.linkedRooms || []).filter((r: any) => r.target === room).forEach((r: any) => split(r.sources || "").forEach((src: string) => rooms.push(parseRoomCond(src).r)));
@@ -1492,7 +1550,13 @@ export class AutoAssigner {
         });
       });
       const narrowedLinkedCandidates = r.target === "ポータブル" ? this.preferNonRepeatCandidates(linkedCandidates, r.target, (item) => extractStaffName(item.member)) : linkedCandidates;
-      narrowedLinkedCandidates.sort((a, b) => this.getRepeatAvoidPenalty(extractStaffName(a.member), r.target) - this.getRepeatAvoidPenalty(extractStaffName(b.member), r.target) || this.getTodayRoomCount(extractStaffName(a.member)) - this.getTodayRoomCount(extractStaffName(b.member)) || this.getPastRoomCount(extractStaffName(a.member), r.target) - this.getPastRoomCount(extractStaffName(b.member), r.target) || a.sourceIndex - b.sourceIndex);
+      narrowedLinkedCandidates.sort((a, b) => {
+        const srcDiff = a.sourceIndex - b.sourceIndex;
+        const repeatDiff = this.getRepeatAvoidPenalty(extractStaffName(a.member), r.target) - this.getRepeatAvoidPenalty(extractStaffName(b.member), r.target);
+        const todayDiff = this.getTodayRoomCount(extractStaffName(a.member)) - this.getTodayRoomCount(extractStaffName(b.member));
+        const pastDiff = this.getPastRoomCount(extractStaffName(a.member), r.target) - this.getPastRoomCount(extractStaffName(b.member), r.target);
+        return r.target === "ポータブル" ? (srcDiff || repeatDiff || todayDiff || pastDiff) : (repeatDiff || todayDiff || pastDiff || srcDiff);
+      });
       for (const candidate of narrowedLinkedCandidates) { if (cA >= tC && cP >= tC) break; const sR = candidate.sourceRoom; const m = candidate.member; const c = extractStaffName(m); if (cM.map(extractStaffName).includes(c)) continue; let pS = m; if (r.target === "パノラマCT" && sR === "透視（6号）") { if (m.includes("(PM)")) continue; pS = `${c}(AM)`; } else { if (cA < tC && cP >= tC) { if (m.includes("(PM)")) continue; pS = `${c}(AM)`; } else if (cA >= tC && cP < tC) { if (m.includes("(AM)")) continue; pS = `${c}(PM)`; } else if (e.pmClosed) { if (m.includes("(PM)")) continue; pS = `${c}(AM)`; } else if (e.amClosed) { if (m.includes("(AM)")) continue; pS = `${c}(PM)`; } } cM.push(pS); if (pS.includes("(AM)")) cA++; else if (pS.includes("(PM)")) cP++; else { cA++; cP++; } this.addUsage(c, getStaffAmount(pS)); this.updateBlockMapAfterKenmu(c, pS); this.log(`🔗 [基本兼務] ${sR} の ${pS} を ${r.target} にセット配置しました`); }
       this.dayCells[r.target] = join(cM);
     });
@@ -1590,6 +1654,7 @@ export class AutoAssigner {
     this.trimOverloadedSupportPartners();
     this.sharePartialHelpersWithLinkedTargets();
     this.rebalanceNoConsecutiveRooms();
+    this.enforcePortableSourcePriority();
     this.refreshAssignmentState();
 
     this.logPhase("フェーズ5：仕上げ");
