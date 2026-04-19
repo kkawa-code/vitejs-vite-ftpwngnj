@@ -1271,6 +1271,82 @@ export class AutoAssigner {
     }
   }
 
+
+  private enforcePortableThreeRoomPairing() {
+    if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
+    let portableMembers = split(this.dayCells["ポータブル"] || "");
+    if (portableMembers.length === 0) return;
+
+    const threeCond = this.normalizePortableSourceCond("3号室");
+    if (!threeCond) return;
+    const threeEff = this.getEffectiveTarget("3号室", this.dynamicCapacity["3号室"] ?? 1);
+    if (threeEff.allClosed || this.shouldSkipAutoAssignRoom("3号室")) return;
+
+    for (let targetIndex = 0; targetIndex < portableMembers.length; targetIndex++) {
+      const currentEntry = portableMembers[targetIndex];
+      const currentCore = extractStaffName(currentEntry);
+      if (!currentCore || ROLE_PLACEHOLDERS.includes(currentCore)) continue;
+      if (!this.canUseEntryForPortable(currentCore, currentEntry, portableMembers, targetIndex, true)) continue;
+
+      const currentSource = this.getPortableSourceInfo(currentCore, true);
+      if (!currentSource || currentSource.room === "3号室") continue;
+      if (currentSource.room !== "CT" && this.isProtectedInCurrentModality(currentCore)) continue;
+
+      const threeMembers = split(this.dayCells["3号室"] || "");
+      if (threeMembers.some(m => extractStaffName(m) === currentCore)) continue;
+
+      const sourceMembers = split(this.dayCells[currentSource.room] || "");
+      const sourceEntry = currentSource.entry;
+      const sourceIndex = sourceMembers.findIndex(m => m === sourceEntry);
+      if (sourceIndex === -1) continue;
+
+      const currentTag = this.getMemberTimeTag(currentEntry);
+      const sourceTag = this.getMemberTimeTag(sourceEntry);
+      if (currentTag !== sourceTag) continue;
+
+      const threeLoad = threeMembers.reduce((sum, m) => sum + getStaffAmount(m), 0);
+      const threeCap = threeEff.cap ?? 1;
+      if (threeLoad < threeCap) {
+        if (!this.canPlaceEntryInRoomStrict(currentCore, currentEntry, "3号室", threeMembers)) continue;
+        if (!this.canAddKenmu(currentCore, "3号室", true)) continue;
+        this.dayCells["3号室"] = join([...threeMembers, currentEntry]);
+        this.refreshAssignmentState();
+        this.log(`🔗 [ポータブル3号室原則] ${currentEntry} を3号室にも入れ、ポータブルを3号室由来に寄せました`);
+        return;
+      }
+
+      const replaceableThree = threeMembers
+        .map((entry, index) => ({ entry, index, core: extractStaffName(entry), tag: this.getMemberTimeTag(entry) }))
+        .filter(x =>
+          x.core &&
+          !ROLE_PLACEHOLDERS.includes(x.core) &&
+          x.core !== currentCore &&
+          !this.isLateOrNightEntry(x.entry) &&
+          x.tag === sourceTag
+        );
+
+      for (const three of replaceableThree) {
+        const movedPortableToThree = `${currentCore}${three.tag}`;
+        const movedThreeToSource = `${three.core}${sourceTag}`;
+        const nextThreeMembers = threeMembers.map((m, idx) => idx === three.index ? movedPortableToThree : m);
+        const nextSourceMembers = sourceMembers.map((m, idx) => idx === sourceIndex ? movedThreeToSource : m);
+
+        if (!this.canPlaceEntryInRoomStrict(currentCore, movedPortableToThree, "3号室", nextThreeMembers)) continue;
+        if (!this.canPlaceEntryInRoomStrict(three.core, movedThreeToSource, currentSource.room, nextSourceMembers)) continue;
+        if (!this.canSwapKeepKenmuLimit(currentCore, "3号室", currentSource.room, sourceEntry, movedPortableToThree)) continue;
+        if (!this.canSwapKeepKenmuLimit(three.core, currentSource.room, "3号室", three.entry, movedThreeToSource)) continue;
+
+        this.dayCells["3号室"] = join(nextThreeMembers);
+        this.dayCells[currentSource.room] = join(nextSourceMembers);
+        portableMembers[targetIndex] = movedPortableToThree;
+        this.dayCells["ポータブル"] = join(portableMembers);
+        this.refreshAssignmentState();
+        this.log(`🔁 [ポータブル3号室原則] ${currentSource.room} の ${currentEntry} と3号室の ${three.entry} を交換し、ポータブルを3号室兼務へ寄せました`);
+        return;
+      }
+    }
+  }
+
   private getNoConsecutiveSourceRooms(room: string): string[] {
     const rooms: string[] = [];
     if (room === "ポータブル") {
@@ -1973,7 +2049,9 @@ export class AutoAssigner {
     this.trimOverloadedSupportPartners();
     this.sharePartialHelpersWithLinkedTargets();
     this.rebalanceNoConsecutiveRooms();
+    this.enforcePortableClosedSourcePolicy();
     this.enforcePortableSourcePriority();
+    this.enforcePortableThreeRoomPairing();
     this.enforcePortableClosedSourcePolicy();
     this.refreshAssignmentState();
 
@@ -3402,7 +3480,7 @@ export default function App(): any {
             <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
               <li style={{ marginBottom: 8 }}><strong>担当不可・NGペアの厳守:</strong> 「この部屋はまだ不可」「この2人は同室にしない」設定は必ず守ります。</li>
               <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点で⚠️注意が出ます。上限を超える自動配置はブロックされます。</li>
-              <li style={{ marginBottom: 8 }}><strong>連日禁止・週1回優先:</strong> ポータブルなど指定部屋は、連日担当をフェーズ4以降の強制除外として扱います。ポータブルは設定した候補部屋の優先順を守り、禁止・連日の場合はCT/MRIの非専従者との交換を先に試し、それでも無理な場合のみ週内2回目を許容します。</li>
+              <li style={{ marginBottom: 8 }}><strong>連日禁止・週1回優先:</strong> ポータブルなど指定部屋は、連日担当をフェーズ4以降の強制除外として扱います。ポータブルは設定した候補部屋の優先順を守り、原則として3号室兼務に寄せます。3号室担当が連日などで使えない場合は、ポータブル担当者を3号室へ入れる交換を先に試し、それでも無理な場合のみ週内2回目を許容します。</li>
               <li style={{ marginBottom: 8 }}><strong>半日不可部屋のブロック:</strong> 午前後休の人をDSA/MRI等にAM/PM配置しない設定です。兼務自体を禁止する設定ではありません。</li>
             </ul>
 
