@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 // ===================== 🌟 CSS & Styles =====================
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-  body { background: #f4f7f9; color: #0f172a; -webkit-print-color-adjust: exact; font-family: "Meiryo", "Yu Gothic UI", "Yu Gothic", "BIZ UDPGothic", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.005em; font-size: 18px; font-weight: 900; line-height: 1.5; overflow-x: hidden; text-rendering: optimizeLegibility; -webkit-font-smoothing: auto; }
+  body { background: #f4f7f9; color: #0f172a; -webkit-print-color-adjust: exact; font-family: "Meiryo", "Yu Gothic UI", "Yu Gothic", "BIZ UDPGothic", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.005em; font-size: 19px; font-weight: 900; line-height: 1.52; overflow-x: hidden; text-shadow: 0 0 0.01px currentColor; text-rendering: optimizeLegibility; -webkit-font-smoothing: auto; }
   * { box-sizing: border-box; }
   body, table, th, td, button, select, input, textarea { -webkit-font-smoothing: auto; text-rendering: geometricPrecision; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -13,11 +13,11 @@ const globalStyle = `
   textarea, select, button, input { font: inherit; font-weight: 900; color: #0f172a; }
   textarea:focus, select:focus, input:focus { outline: 3px solid #3b82f6; outline-offset: -1px; border-color: transparent !important; }
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
-  .scroll-container table, .scroll-container th, .scroll-container td { font-size: 17.5px !important; font-weight: 900 !important; color: #0f172a !important; line-height: 1.42 !important; }
+  .scroll-container table, .scroll-container th, .scroll-container td { font-size: 18.8px !important; font-weight: 900 !important; color: #020617 !important; line-height: 1.45 !important; text-shadow: 0 0 0.01px currentColor; }
   .print-sheet-table, .print-sheet-table th, .print-sheet-table td, .print-sheet-table .p-line { font-weight: 900 !important; }
-  [data-print-chip="1"] { border-width: 2px !important; font-size: 16px !important; font-weight: 900 !important; }
+  [data-print-chip="1"] { border-width: 3px !important; font-size: 18px !important; font-weight: 900 !important; }
   [data-print-name="1"] { font-weight: 900 !important; color: inherit !important; }
-  [data-print-badge="1"], [data-print-mod="1"] { font-weight: 900 !important; border-width: 2px !important; }
+  [data-print-badge="1"], [data-print-mod="1"] { font-weight: 900 !important; border-width: 3px !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
   details>summary:hover { color: #0d9488; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; }
@@ -402,7 +402,7 @@ export function isLateStartEntry(entry: string) {
 // ===================== 🌟 UI Components =====================
 export const btnStyle = (bg: string, color: string = "#fff", fontSize: number = 15): React.CSSProperties => ({ background: bg, color, border: "none", borderRadius: "6px", padding: "8px 12px", cursor: "pointer", fontWeight: 900, fontSize, whiteSpace: "nowrap", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 6 });
 export const panelStyle = (): React.CSSProperties => ({ background: "#fff", border: "1px solid #cbd5e1", borderRadius: "12px", padding: "20px", boxShadow: "0 4px 14px -10px rgba(15,23,42,0.16)", width: "100%", boxSizing: "border-box" });
-export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: 900, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 18 : 17, color: isHoliday && isHeader ? "#dc2626" : "#0f172a", lineHeight: 1.42, verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
+export const cellStyle = (isHeader = false, isHoliday = false, isSelected = false, isSticky = false, isZebra = false): React.CSSProperties => { let bg = isHeader ? "#f8fafc" : (isZebra ? "#fafbfc" : "#fff"); if (isHoliday) bg = isHeader ? "#f1f5f9" : "#fff1f2"; else if (isSelected) bg = isHeader ? "#eff6ff" : (isZebra ? "#e7f1ff" : "#f3f8ff"); return { border: "1px solid #cbd5e1", padding: "10px 12px", background: bg, fontWeight: 900, textAlign: isHeader ? "center" : "left", fontSize: isHeader ? 19 : 18, color: isHoliday && isHeader ? "#dc2626" : "#020617", lineHeight: 1.45, verticalAlign: "middle", position: isSticky ? "sticky" : "static", left: isSticky ? 0 : "auto", zIndex: isSticky ? 10 : 1, transition: "background-color 0.2s" }; };
 
 export const Modal = ({ title, onClose, wide, children }: any) => ( <div className="modal-overlay" onClick={onClose}><div className={`modal-content modal-animate ${wide ? 'modal-wide' : ''}`} onClick={e => e.stopPropagation()}><div className="modal-header"><h3 className="modal-title">{title}</h3><button onClick={onClose} className="close-btn">✖</button></div>{children}<div style={{ textAlign: "center", marginTop: 32 }}><button className="btn-hover" onClick={onClose} style={{ ...btnStyle("#2563eb", "#fff", 16), width: "100%", justifyContent: "center", padding: "16px" }}>閉じる</button></div></div></div> );
 export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any) => ( <div style={{ background: bg, padding: 24, borderRadius: 12, border: `2px solid ${border}`, marginBottom: 20 }}><h5 style={{ margin: "0 0 12px 0", color, fontSize: 18, fontWeight: 800 }}>{icon} {title}</h5>{desc && <p style={{ fontSize: 15, color: "#166534", marginTop: 0, marginBottom: 16 }}>{desc}</p>}{children}</div> );
@@ -909,6 +909,109 @@ export class AutoAssigner {
     return candidates[0] || null;
   }
 
+  private trySwapRepeatedPortableWithFreshSource(
+    portableMembers: string[],
+    currentIndex: number,
+    options: { allowConsecutive?: boolean } = {}
+  ): { entry: string; fromRoom: string; toRoom: string; sourceStaff: string; replacementStaff: string } | null {
+    const currentEntry = portableMembers[currentIndex];
+    const currentCore = extractStaffName(currentEntry);
+    if (!currentCore || ROLE_PLACEHOLDERS.includes(currentCore) || this.isLateOrNightEntry(currentEntry)) return null;
+    const isCurrentRepeat = this.shouldAvoidWeeklyRepeat(currentCore, "ポータブル") || this.shouldAvoidConsecutive(currentCore, "ポータブル");
+    if (!isCurrentRepeat) return null;
+
+    const currentSource = this.getPortableSourceInfo(currentCore, true);
+    if (!currentSource) return null;
+    if (this.clearSections.includes(currentSource.room)) return null;
+    if (currentSource.room !== "CT" && this.isProtectedInCurrentModality(currentCore)) return null;
+
+    const allowConsecutive = options.allowConsecutive ?? false;
+    const sources = this.getPortableSourceConds();
+    type FreshSwap = {
+      entry: string;
+      fromRoom: string;
+      toRoom: string;
+      sourceIndex: number;
+      sourceStaff: string;
+      replacementStaff: string;
+      nextCurrentSourceMembers: string[];
+      nextCandidateSourceMembers: string[];
+      repeatPenalty: number;
+    };
+    const candidates: FreshSwap[] = [];
+
+    sources.forEach((cond, sourceIndex) => {
+      if (cond.r === currentSource.room) return;
+      if (!this.isPortableSourceAvailable(cond, false)) return;
+      const candidateMembers = split(this.dayCells[cond.r] || "");
+      candidateMembers.forEach(candidateEntry => {
+        const candidateCore = extractStaffName(candidateEntry);
+        if (!candidateCore || ROLE_PLACEHOLDERS.includes(candidateCore) || candidateCore === currentCore || this.isLateOrNightEntry(candidateEntry)) return;
+        if (cond.r !== "CT" && this.isProtectedInCurrentModality(candidateCore)) return;
+        if (!allowConsecutive && this.shouldAvoidConsecutive(candidateCore, "ポータブル")) return;
+        if (this.shouldAvoidWeeklyRepeat(candidateCore, "ポータブル")) return;
+        if (hasFluoroAuxConflict(this.dayCells, candidateCore, "ポータブル", this.ctx.customRules.fluoroAuxConflictRooms)) return;
+
+        const currentSourceTag = this.getMemberTimeTag(currentSource.entry);
+        const candidateSourceTag = this.getMemberTimeTag(candidateEntry);
+        const movedCandidateToCurrentSource = `${candidateCore}${currentSourceTag}`;
+        const movedCurrentToCandidateSource = `${currentCore}${candidateSourceTag}`;
+        const nextCurrentSourceMembers = currentSource.members.map(m => m === currentSource.entry ? movedCandidateToCurrentSource : m);
+        const nextCandidateSourceMembers = candidateMembers.map(m => m === candidateEntry ? movedCurrentToCandidateSource : m);
+
+        if (!this.canPlaceEntryInRoomStrict(candidateCore, movedCandidateToCurrentSource, currentSource.room, nextCurrentSourceMembers)) return;
+        if (!this.canPlaceEntryInRoomStrict(currentCore, movedCurrentToCandidateSource, cond.r, nextCandidateSourceMembers)) return;
+        if (!this.canPlaceEntryInRoomStrict(candidateCore, movedCandidateToCurrentSource, "ポータブル", portableMembers.filter((_, idx) => idx !== currentIndex))) return;
+        if (this.hasNGPair(candidateCore, portableMembers.filter((_, idx) => idx !== currentIndex).map(extractStaffName), false)) return;
+        if (!this.canSwapKeepKenmuLimit(candidateCore, currentSource.room, cond.r, candidateEntry, movedCandidateToCurrentSource)) return;
+        if (!this.canSwapKeepKenmuLimit(currentCore, cond.r, currentSource.room, currentSource.entry, movedCurrentToCandidateSource)) return;
+
+        // 通常の canAddKenmu は3件兼務を抑制するが、ここは「週2ポータブルを避けるための候補部屋内交換」。
+        // 交換後の実負荷が上限内なら、未経験者を優先してポータブルへ回す。
+        const limit = this.ctx.customRules.alertMaxKenmu || 3;
+        const projectedCandidateLoad = this.getTodayRoomLoad(candidateCore)
+          - getStaffAmount(candidateEntry)
+          + getStaffAmount(movedCandidateToCurrentSource)
+          + getStaffAmount(movedCandidateToCurrentSource);
+        const projectedCurrentLoad = this.getTodayRoomLoad(currentCore)
+          - getStaffAmount(currentSource.entry)
+          - getStaffAmount(currentEntry)
+          + getStaffAmount(movedCurrentToCandidateSource);
+        if (projectedCandidateLoad > limit || projectedCurrentLoad > limit) return;
+
+        candidates.push({
+          entry: movedCandidateToCurrentSource,
+          fromRoom: cond.r,
+          toRoom: currentSource.room,
+          sourceIndex,
+          sourceStaff: currentCore,
+          replacementStaff: candidateCore,
+          nextCurrentSourceMembers,
+          nextCandidateSourceMembers,
+          repeatPenalty: this.getRepeatAvoidPenalty(candidateCore, "ポータブル")
+        });
+      });
+    });
+
+    candidates.sort((a, b) =>
+      a.repeatPenalty - b.repeatPenalty ||
+      a.sourceIndex - b.sourceIndex ||
+      this.getPastRoomCount(a.replacementStaff, "ポータブル") - this.getPastRoomCount(b.replacementStaff, "ポータブル") ||
+      this.getTodayRoomCount(a.replacementStaff) - this.getTodayRoomCount(b.replacementStaff) ||
+      a.replacementStaff.localeCompare(b.replacementStaff, "ja")
+    );
+
+    const best = candidates[0];
+    if (!best) return null;
+    this.dayCells[best.toRoom] = join(best.nextCurrentSourceMembers);
+    this.dayCells[best.fromRoom] = join(best.nextCandidateSourceMembers);
+    portableMembers[currentIndex] = best.entry;
+    this.dayCells["ポータブル"] = join(portableMembers);
+    this.refreshAssignmentState();
+    this.log(`♻️ [ポータブル週1優先交換] 週内再担当の ${currentEntry} を避け、${best.fromRoom} の ${best.replacementStaff} と ${best.toRoom} の ${best.sourceStaff} を交換して ${best.replacementStaff} を${best.toRoom}＋ポータブルにしました`);
+    return best;
+  }
+
   private tryPortableModalitySourceSwap(
     portableMembers: string[],
     currentIndex: number,
@@ -1023,6 +1126,13 @@ export class AutoAssigner {
       const isPanoOnlySourceMember = this.isPanoOnlyPortableCandidate(entry) && this.canUseEntryForPortable(core, entry, portableMembers, i, true, true);
       const isValidSourceMember = (!!sourceInfo && !protectedModalityLeak && this.canUseEntryForPortable(core, entry, portableMembers, i, true)) || isPanoOnlySourceMember;
       if (isValidSourceMember) {
+        const freshSwap = this.trySwapRepeatedPortableWithFreshSource(portableMembers, i);
+        if (freshSwap) {
+          portableMembers = split(this.dayCells["ポータブル"] || "");
+          changed = true;
+          continue;
+        }
+
         const panoOnlyCandidate = !isPanoOnlySourceMember && this.shouldPreferPanoOnlyPortableSource(sourceInfo)
           ? (this.findPanoOnlyPortableCandidate(portableMembers, i, { allowWeeklyRepeat: false })
             || this.findPanoOnlyPortableCandidate(portableMembers, i, { allowWeeklyRepeat: true })
@@ -3133,14 +3243,14 @@ export default function App(): any {
                                 let inlineStyle: React.CSSProperties = {
                                   background: tagBg,
                                   color: tagColor,
-                                  border: `2px solid ${tagBorder}`,
-                                  padding: showKenmuMeta ? "7px 10px 8px" : "7px 11px",
-                                  borderRadius: "9px",
+                                  border: `3px solid ${tagBorder}`,
+                                  padding: showKenmuMeta ? "8px 11px 9px" : "8px 12px",
+                                  borderRadius: "10px",
                                   display: "flex",
                                   alignItems: "stretch",
                                   flexDirection: "column",
                                   gap: "4px",
-                                  fontSize: "16px",
+                                  fontSize: "18px",
                                   fontWeight: 900,
                                   transition: "all 0.2s ease",
                                   boxShadow: "none",
@@ -3157,7 +3267,7 @@ export default function App(): any {
 
                                 const titleText = showKenmuMeta ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
-                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "13.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #bae6fd", fontWeight: 900 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "13.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #fbcfe8", fontWeight: 900 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "13.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #d1d5db", fontWeight: 900 }}>{mod.replace(/[()]/g, '')}</span>);
+                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "3px solid #7dd3fc", fontWeight: 900 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "3px solid #f9a8d4", fontWeight: 900 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "3px solid #9ca3af", fontWeight: 900 }}>{mod.replace(/[()]/g, '')}</span>);
 
                                 return (
                                   <div key={mIdx} className="btn-hover" data-print-chip="1" 
@@ -3183,9 +3293,9 @@ export default function App(): any {
                                           padding: roomCount >= 4 ? "1px 6px" : roomCount === 2 ? "2px 8px" : "1px 5px",
                                           background: isHighlighted ? "rgba(255,255,255,0.16)" : countBg,
                                           color: isHighlighted ? "#fff" : countColor,
-                                          border: isHighlighted ? "2px solid rgba(255,255,255,0.35)" : `2px solid ${metaBorder}`,
+                                          border: isHighlighted ? "3px solid rgba(255,255,255,0.45)" : `3px solid ${metaBorder}`,
                                           borderRadius: "999px",
-                                          fontSize: roomCount === 2 ? "12px" : "11px",
+                                          fontSize: roomCount === 2 ? "13.5px" : "13px",
                                           fontWeight: 900,
                                           letterSpacing: roomCount === 2 ? "0.01em" : 0,
                                           lineHeight: 1.2
@@ -3202,9 +3312,9 @@ export default function App(): any {
                                         padding: roomCount >= 3 ? "2px 7px" : "2px 6px",
                                         background: isHighlighted ? "rgba(255,255,255,0.16)" : metaBg,
                                         color: isHighlighted ? "#fff" : metaColor,
-                                        border: isHighlighted ? "2px solid rgba(255,255,255,0.35)" : `2px solid ${metaBorder}`,
+                                        border: isHighlighted ? "3px solid rgba(255,255,255,0.45)" : `3px solid ${metaBorder}`,
                                         borderRadius: "999px",
-                                        fontSize: roomCount >= 3 ? "11.5px" : "11.5px",
+                                        fontSize: roomCount >= 3 ? "13px" : "13px",
                                         fontWeight: 900,
                                         lineHeight: 1.1,
                                         whiteSpace: "nowrap",
@@ -3939,7 +4049,7 @@ export default function App(): any {
             <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
               <li style={{ marginBottom: 8 }}><strong>担当不可・NGペアの厳守:</strong> 「この部屋はまだ不可」「この2人は同室にしない」設定は必ず守ります。</li>
               <li style={{ marginBottom: 8 }}><strong>兼務上限（過労ストッパー）:</strong> 設定値（標準3）に達した時点で⚠️注意が出ます。上限を超える自動配置はブロックされます。</li>
-              <li style={{ marginBottom: 8 }}><strong>連日禁止・週1回優先:</strong> ポータブルなど指定部屋は、連日担当をフェーズ4以降の強制除外として扱います。ポータブルは設定した候補部屋の優先順を守り、原則として3号室兼務に寄せます。3号室担当が連日などで使えない場合は、ポータブル担当者を3号室へ入れる交換を先に試し、それでも無理な場合のみ週内2回目を許容します。</li>
+              <li style={{ marginBottom: 8 }}><strong>連日禁止・週1回優先:</strong> ポータブルなど指定部屋は、連日担当をフェーズ4以降の強制除外として扱います。ポータブルは設定した候補部屋の優先順を守り、原則として3号室兼務に寄せます。既に週内担当済みの人が入っている場合は、まだポータブルをしていない候補部屋の人と部屋ごと交換できるかを先に試し、それでも無理な場合のみ週内2回目を許容します。</li>
               <li style={{ marginBottom: 8 }}><strong>半日不可部屋のブロック:</strong> 午前後休の人をDSA/MRI等にAM/PM配置しない設定です。兼務自体を禁止する設定ではありません。</li>
             </ul>
 
