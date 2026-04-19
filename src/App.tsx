@@ -211,26 +211,18 @@ export const RENDER_GROUPS: RenderGroup[] = [
 export const FALLBACK_HOLIDAYS: Record<string, string> = { "2026-01-01": "元日", "2026-01-12": "成人の日", "2026-02-11": "建国記念の日", "2026-02-23": "天皇誕生日", "2026-03-20": "春分の日", "2026-04-29": "昭和の日", "2026-05-03": "憲法記念日", "2026-05-04": "みどりの日", "2026-05-05": "こどもの日", "2026-05-06": "振替休日" };
 
 export const DEFAULT_RULES: CustomRules = { 
-  staffList: "", receptionStaffList: "", femaleStaffList: "", supportStaffList: "浅野", supportTargetRooms: "2号室、3号室", customHolidays: "", 
+  staffList: "", receptionStaffList: "", femaleStaffList: "", supportStaffList: "", supportTargetRooms: "2号室、3号室", customHolidays: "", 
   capacity: { "CT": 4, "MRI": 3, "治療": 3, "RI": 1, "MMG": 1, "透視（6号）": 1, "透視（11号）": 1, "骨塩": 1, "1号室": 1, "5号室": 1, "パノラマCT": 2 }, 
   dailyAdditions: [], priorityRooms: ["治療","受付","MMG","RI","MRI","CT","透視（6号）","透視（11号）","骨塩","1号室","5号室","2号室","ポータブル","DSA","検像","パノラマCT","3号室","受付ヘルプ","透析後胸部"], 
   fullDayOnlyRooms: "DSA、CT、MRI", noConsecutiveRooms: "ポータブル", 
-  noLateShiftStaff: "浅野、木内康、髙橋、川崎、松平、阿部", noLateShiftRooms: "透視（11号）", lateShiftLowPriorityStaff: "木内康、石田、澤邊、依田", fluoroAuxConflictRooms: "透視（6号）、透視（11号）", 
+  noLateShiftStaff: "", noLateShiftRooms: "透視（11号）", lateShiftLowPriorityStaff: "", fluoroAuxConflictRooms: "透視（6号）、透視（11号）", 
   closedRooms: [{day:"月",room:"3号室",time:"全日"},{day:"火",room:"3号室",time:"全日"},{day:"水",room:"3号室",time:"全日"},{day:"木",room:"3号室",time:"全日"},{day:"金",room:"3号室",time:"全日"}], 
-  ngPairs: [{s1:"本郷",s2:"寺本",level:"hard"},{s1:"髙橋",s2:"寺本",level:"soft"}], 
-  fixed: [{staff:"川崎",section:"治療"},{staff:"阿部",section:"治療"},{staff:"髙橋",section:"MRI"},{staff:"松平",section:"CT"},{staff:"豊田",section:"CT"}], 
-  forbidden: [
-    {staff:"浅野",sections:"CT、ポータブル、MRI、1号室、MMG、骨塩、透析後胸部、DSA、残り・待機、受付、受付ヘルプ、パノラマCT、5号室、検像、治療、RI"},
-    {staff:"木内康",sections:"CT、MRI、RI、検像、受付、受付ヘルプ、骨塩"},
-    {staff:"石田",sections:"CT、MRI、RI、骨塩、ポータブル、DSA、受付、受付ヘルプ、検像"},
-    {staff:"依田",sections:"MRI、検像、骨塩"},
-    {staff:"工藤",sections:"CT、MRI、DSA、検像"},
-    {staff:"阿部",sections:"受付ヘルプ"},
-    {staff:"川崎",sections:"受付ヘルプ"}
-  ], 
-  substitutes: [{target:"髙橋",subs:"鈴木崇",section:"MRI"}], 
-  pushOuts: [{triggerStaff:"鈴木崇",triggerSection:"MRI",targetStaff:"髙橋",targetSections:"1号室、2号室、3号室、ポータブル"}], 
-  emergencies: [{ threshold: 19, type: "change_capacity", role: "", section: "CT", newCapacity: 3 }, { threshold: 17, type: "staff_assign", role: "", section: "2号室", staff: "浅野" }, { threshold: 18, type: "clear", role: "", section: "3号室" }], 
+  ngPairs: [], 
+  fixed: [], 
+  forbidden: [], 
+  substitutes: [], 
+  pushOuts: [], 
+  emergencies: [{ threshold: 19, type: "change_capacity", role: "", section: "CT", newCapacity: 3 }, { threshold: 18, type: "clear", role: "", section: "3号室" }], 
   swapRules: [
     { targetRoom: "パノラマCT", triggerRoom: "5号室", sourceRooms: "1号室、2号室、CT(4)" },
     { targetRoom: "ポータブル", triggerRoom: "3号室", sourceRooms: "2号室、CT(4)、1号室、5号室" },
@@ -666,7 +658,7 @@ export class AutoAssigner {
     const hasSupportRemaining = (members: string[]) => members.some(m => supportStaff.includes(extractStaffName(m)));
     let targetMembers = split(this.dayCells[targetRoom] || "");
 
-    // targetRoom が空いている場合は、支援部屋（例: 2号室=浅野＋誰か）から相方を「移動」して空室を先に埋める。
+    // targetRoom が空いている場合は、支援部屋（例: 支援スタッフ＋一般スタッフ）から相方を「移動」して空室を先に埋める。
     if (targetMembers.length === 0) {
       for (const sourceRoom of sourceRooms) {
         if (this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
@@ -689,7 +681,7 @@ export class AutoAssigner {
       }
     }
 
-    // 既に支援対象部屋の担当者を targetRoom に兼務追加してしまっている場合は、支援対象部屋側から外して「浅野だけ」に戻す。
+    // 既に支援対象部屋の担当者を targetRoom に兼務追加してしまっている場合は、支援対象部屋側から外して「支援スタッフだけ」に戻す。
     for (const sourceRoom of sourceRooms) {
       if (this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) continue;
       const sourceMembers = split(this.dayCells[sourceRoom] || "");
@@ -919,6 +911,7 @@ export class AutoAssigner {
           const roomMembers = split(this.dayCells[room]);
           if (roomMembers.map(extractStaffName).includes(s2)) {
             this.dayCells[tSec] = join(triggerMembers.filter(m => extractStaffName(m) !== s2));
+            this.refreshAssignmentState();
             this.log(`🎱 [玉突き] ${s1} と被ったため ${s2} を ${tSec} から外しました`);
             return true;
           }
@@ -1060,10 +1053,11 @@ export class AutoAssigner {
         if (this.isForbidden(core, room) || this.isHalfDayBlocked(core, room).hard || this.isTimeTagBlockedByFullDayRule(room, entry)) continue;
         if (room === "透視（11号）" && sourceRoom === "MMG" && !femaleList.includes(core) && !this.isMmgCapable(core)) continue;
         if (this.hasNGPair(core, [], false)) continue;
+        if (!this.canAddKenmu(core, room, true)) continue;
         this.dayCells[room] = entry;
         this.addUsage(core, getStaffAmount(entry));
         this.updateBlockMapAfterKenmu(core, entry);
-        this.log(`🧩 [透視補充] ${room} が空いたため ${sourceRoom} の ${core} を補充しました`);
+        this.log(`🧩 [透視補充] ${room} が空いたため ${sourceRoom} の担当者を兼務補充しました`);
         return true;
       }
     }
@@ -2384,9 +2378,9 @@ export default function App(): any {
           <h3 style={{ fontSize: 25, fontWeight: 900, marginBottom: 20, color: "#0f766e" }}>👥 スタッフ名簿</h3>
           <div style={{ background: "#f0fdf4", padding: "16px 20px", borderRadius: 12, border: "2px solid #bbf7d0", marginBottom: 24 }}><p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#166534", lineHeight: 1.6 }}>💡 順番を自動で「50音順」にするため、名前の後にカッコでふりがなをつけてください。</p></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24 }}>
-             <div><label style={{ fontSize: 19, fontWeight: 800, marginBottom: 10, display: "block" }}>一般スタッフ</label><textarea className="name-textarea" placeholder="例: 山田(やまだ)" value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} /></div>
-             <div><label style={{ fontSize: 19, fontWeight: 800, marginBottom: 10, display: "block" }}>受付スタッフ</label><textarea className="name-textarea" placeholder="例: 高橋(たかはし)" value={customRules.receptionStaffList} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} /></div>
-             <div><label style={{ fontSize: 19, fontWeight: 800, marginBottom: 10, display: "block" }}>一般スタッフのなかの女性</label><textarea className="name-textarea" placeholder="例: 佐藤、田中" value={customRules.femaleStaffList || ""} onChange={e => setCustomRules({...customRules, femaleStaffList: e.target.value})} /></div>
+             <div><label style={{ fontSize: 19, fontWeight: 800, marginBottom: 10, display: "block" }}>一般スタッフ</label><textarea className="name-textarea" placeholder="例: スタッフA(すたっふA)" value={customRules.staffList} onChange={e => setCustomRules({...customRules, staffList: e.target.value})} /></div>
+             <div><label style={{ fontSize: 19, fontWeight: 800, marginBottom: 10, display: "block" }}>受付スタッフ</label><textarea className="name-textarea" placeholder="例: スタッフA(すたっふA)" value={customRules.receptionStaffList} onChange={e => setCustomRules({...customRules, receptionStaffList: e.target.value})} /></div>
+             <div><label style={{ fontSize: 19, fontWeight: 800, marginBottom: 10, display: "block" }}>一般スタッフのなかの女性</label><textarea className="name-textarea" placeholder="例: スタッフA、スタッフB" value={customRules.femaleStaffList || ""} onChange={e => setCustomRules({...customRules, femaleStaffList: e.target.value})} /></div>
           </div>
         </div>
 
