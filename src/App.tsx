@@ -794,74 +794,82 @@ export class AutoAssigner {
     if (changed) this.refreshAssignmentState();
   }
 
-  private getLinkedRelatedRooms(room: string): string[] {
-    const related = new Set<string>();
-    (this.ctx.customRules.linkedRooms || []).forEach((rule: any) => {
-      const target = rule.target || "";
-      const sources = split(rule.sources || "").map((src: string) => parseRoomCond(src).r).filter(Boolean);
-      const group = [target, ...sources].filter(Boolean);
-      if (group.includes(room)) group.forEach(r => { if (r !== room) related.add(r); });
-    });
-    return Array.from(related);
-  }
-
-  private areLinkedRelatedRooms(a: string, b: string): boolean {
-    if (!a || !b) return false;
-    if (a === b) return true;
-    return this.getLinkedRelatedRooms(a).includes(b);
-  }
-
   private sharePartialHelpersWithLinkedTargets() {
     const linkedTargets = Array.from(new Set((this.ctx.customRules.linkedRooms || []).map((r: any) => r.target).filter(Boolean))) as string[];
+    const linkedTargetSet = new Set(linkedTargets);
     if (!linkedTargets.length) return;
-    const partials = split(this.dayCells["不在"] || "")
-      .map(entry => {
-        const staff = extractStaffName(entry);
-        const from = entry.match(/\((\d+:\d+)〜\)/)?.[1] || "";
-        return { staff, from };
-      })
-      .filter(x => x.staff && x.from);
-    for (const partial of partials) {
-      const helperEntry = `${partial.staff}(〜${partial.from})`;
-      const sourceRooms = ROOM_SECTIONS.filter(room => split(this.dayCells[room] || "").some(m => m === helperEntry));
-      for (const sourceRoom of sourceRooms) {
-        const candidates = linkedTargets
-          .filter(room => room !== sourceRoom && !this.skipSections.includes(room) && room !== "透析後胸部" && !this.shouldSkipAutoAssignRoom(room))
-          .map(room => {
-            const members = split(this.dayCells[room] || "");
-            const replaceable = members.filter(entry => {
-              const core = extractStaffName(entry);
-              if (!core || core === partial.staff || ROLE_PLACEHOLDERS.includes(core)) return false;
-              if (entry.includes("(") || entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:")) return false;
-              if (this.getTodayRoomLoad(core) < 2) return false;
-              const coreRooms = ROOM_SECTIONS.filter(r => r !== room && split(this.dayCells[r] || "").some(m => extractStaffName(m) === core));
-              const hasLinkedRoute = this.areLinkedRelatedRooms(sourceRoom, room) || coreRooms.some(r => this.areLinkedRelatedRooms(sourceRoom, r));
-              if (!hasLinkedRoute) return false;
-              const afterEntry = `${core}(${partial.from}〜)`;
-              if (this.isTimeTagBlockedByFullDayRule(room, afterEntry)) return false;
-              return true;
-            });
-            const maxLoad = replaceable.reduce((mx, entry) => Math.max(mx, this.getTodayRoomLoad(extractStaffName(entry))), 0);
-            return { room, members, replaceable, maxLoad };
-          })
-          .filter(x => x.replaceable.length > 0)
-          .sort((a, b) => b.maxLoad - a.maxLoad || this.getRepeatAvoidPenalty(extractStaffName(b.replaceable[0]), b.room) - this.getRepeatAvoidPenalty(extractStaffName(a.replaceable[0]), a.room));
-        for (const candidate of candidates) {
-          const room = candidate.room;
-          if (candidate.members.some(m => extractStaffName(m) === partial.staff)) continue;
-          if (room === "MMG" && !this.isMmgCapable(partial.staff)) continue;
-          if (this.isForbidden(partial.staff, room) || this.isHalfDayBlocked(partial.staff, room).hard) continue;
-          if (this.isTimeTagBlockedByFullDayRule(room, helperEntry)) continue;
-          if (this.hasNGPair(partial.staff, candidate.members.map(extractStaffName), false)) continue;
-          if (!this.canAddKenmu(partial.staff, room, true)) continue;
-          const targetEntry = candidate.replaceable[0];
-          const targetCore = extractStaffName(targetEntry);
-          const afterEntry = `${targetCore}(${partial.from}〜)`;
-          this.dayCells[room] = join(candidate.members.flatMap(m => m === targetEntry ? [helperEntry, afterEntry] : [m]));
-          this.log(`🪄 [半日負担軽減] ${sourceRoom} の ${helperEntry} を ${room} にも入れ、${targetCore} は ${partial.from} 以降にしました`);
-          this.refreshAssignmentState();
-          return;
-        }
+
+    const isLateOrNightEntry = (entry: string) => entry.includes("17:") || entry.includes("18:") || entry.includes("19:") || entry.includes("22:");
+    const isSplitTargetEntry = (entry: string) => {
+      const tag = this.getMemberTimeTag(entry);
+      return tag.includes("(AM)") || tag.includes("(PM)") || tag.includes("〜");
+    };
+    const getHelperSplit = (helperEntry: string, targetCore: string) => {
+      const helperCore = extractStaffName(helperEntry);
+      const tag = this.getMemberTimeTag(helperEntry);
+      if (tag.match(/^\(〜\d/)) {
+        const from = tag.match(/\(〜(\d+:\d+)\)/)?.[1] || "";
+        if (!from) return { helperForTarget: "", targetRemainder: "" };
+        return { helperForTarget: `${helperCore}(〜${from})`, targetRemainder: `${targetCore}(${from}〜)` };
+      }
+      if (tag === "(AM)") return { helperForTarget: `${helperCore}(AM)`, targetRemainder: `${targetCore}(PM)` };
+      if (tag === "(PM)") return { helperForTarget: `${helperCore}(PM)`, targetRemainder: `${targetCore}(AM)` };
+      return { helperForTarget: helperCore, targetRemainder: "" };
+    };
+    const helperRooms = linkedTargets
+      .filter(room => !this.skipSections.includes(room) && room !== "透析後胸部" && !this.shouldSkipAutoAssignRoom(room))
+      .map(room => ({ room, members: split(this.dayCells[room] || "") }))
+      .filter(x => x.members.length === 1)
+      .map(x => ({ ...x, helperEntry: x.members[0], helperCore: extractStaffName(x.members[0]) }))
+      .filter(x => {
+        if (!x.helperCore || ROLE_PLACEHOLDERS.includes(x.helperCore) || isLateOrNightEntry(x.helperEntry)) return false;
+        if (this.getTodayRoomLoad(x.helperCore) > 1) return false;
+        const otherRooms = ROOM_SECTIONS.filter(r => r !== x.room && split(this.dayCells[r] || "").some(m => extractStaffName(m) === x.helperCore));
+        return otherRooms.every(r => linkedTargetSet.has(r));
+      });
+
+    for (const helper of helperRooms) {
+      const candidates = linkedTargets
+        .filter(room => room !== helper.room && !this.skipSections.includes(room) && room !== "透析後胸部" && !this.shouldSkipAutoAssignRoom(room))
+        .map(room => {
+          const members = split(this.dayCells[room] || "");
+          if (members.length !== 1) return { room, members, replaceable: [] as string[], maxLoad: 0 };
+          const replaceable = members.filter(entry => {
+            const core = extractStaffName(entry);
+            if (!core || core === helper.helperCore || ROLE_PLACEHOLDERS.includes(core)) return false;
+            if (isLateOrNightEntry(entry) || isSplitTargetEntry(entry)) return false;
+            if (this.getTodayRoomLoad(core) < 2) return false;
+            const coreRooms = ROOM_SECTIONS.filter(r => r !== room && split(this.dayCells[r] || "").some(m => extractStaffName(m) === core));
+            const hasNonTargetLoad = coreRooms.some(r => !linkedTargetSet.has(r) && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(r));
+            if (!hasNonTargetLoad) return false;
+            const splitPlan = getHelperSplit(helper.helperEntry, core);
+            if (!splitPlan.helperForTarget) return false;
+            if (this.isTimeTagBlockedByFullDayRule(room, splitPlan.helperForTarget)) return false;
+            if (splitPlan.targetRemainder && this.isTimeTagBlockedByFullDayRule(room, splitPlan.targetRemainder)) return false;
+            return true;
+          });
+          const maxLoad = replaceable.reduce((mx, entry) => Math.max(mx, this.getTodayRoomLoad(extractStaffName(entry))), 0);
+          return { room, members, replaceable, maxLoad };
+        })
+        .filter(x => x.replaceable.length > 0)
+        .sort((a, b) => b.maxLoad - a.maxLoad || this.getRepeatAvoidPenalty(extractStaffName(b.replaceable[0]), b.room) - this.getRepeatAvoidPenalty(extractStaffName(a.replaceable[0]), a.room));
+
+      for (const candidate of candidates) {
+        const room = candidate.room;
+        if (candidate.members.some(m => extractStaffName(m) === helper.helperCore)) continue;
+        if (room === "MMG" && !this.isMmgCapable(helper.helperCore)) continue;
+        if (this.isForbidden(helper.helperCore, room) || this.isHalfDayBlocked(helper.helperCore, room).hard) continue;
+        if (this.hasNGPair(helper.helperCore, candidate.members.map(extractStaffName), false)) continue;
+        if (!this.canAddKenmu(helper.helperCore, room, true)) continue;
+        const targetEntry = candidate.replaceable[0];
+        const targetCore = extractStaffName(targetEntry);
+        const splitPlan = getHelperSplit(helper.helperEntry, targetCore);
+        if (!splitPlan.helperForTarget) continue;
+        const replacement = splitPlan.targetRemainder ? [splitPlan.helperForTarget, splitPlan.targetRemainder] : [splitPlan.helperForTarget];
+        this.dayCells[room] = join(candidate.members.flatMap(m => m === targetEntry ? replacement : [m]));
+        this.log(`🪄 [基本兼務負担軽減] ${helper.room} の ${helper.helperEntry} を ${room} にも入れ、${targetCore} の負担を減らしました`);
+        this.refreshAssignmentState();
+        return;
       }
     }
   }
