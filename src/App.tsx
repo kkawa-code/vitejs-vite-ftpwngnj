@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
   body { background: #f4f7f9; color: #0f172a; -webkit-print-color-adjust: exact; font-family: "Meiryo", "Yu Gothic UI", "Yu Gothic", "BIZ UDPGothic", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.005em; font-size: 19px; font-weight: 900; line-height: 1.52; overflow-x: hidden; text-shadow: 0 0 0.01px currentColor; text-rendering: optimizeLegibility; -webkit-font-smoothing: auto; }
+  #root, #root * { font-weight: 900 !important; }
+  input::placeholder, textarea::placeholder { font-weight: 900 !important; color: #64748b; }
   * { box-sizing: border-box; }
   body, table, th, td, button, select, input, textarea { -webkit-font-smoothing: auto; text-rendering: geometricPrecision; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -15,9 +17,9 @@ const globalStyle = `
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
   .scroll-container table, .scroll-container th, .scroll-container td { font-size: 18.8px !important; font-weight: 900 !important; color: #020617 !important; line-height: 1.45 !important; text-shadow: 0 0 0.01px currentColor; }
   .print-sheet-table, .print-sheet-table th, .print-sheet-table td, .print-sheet-table .p-line { font-weight: 900 !important; }
-  [data-print-chip="1"] { border-width: 3px !important; font-size: 18px !important; font-weight: 900 !important; }
+  [data-print-chip="1"] { border-width: 2px !important; font-size: 18px !important; font-weight: 900 !important; }
   [data-print-name="1"] { font-weight: 900 !important; color: inherit !important; }
-  [data-print-badge="1"], [data-print-mod="1"] { font-weight: 900 !important; border-width: 3px !important; }
+  [data-print-badge="1"], [data-print-mod="1"] { font-weight: 900 !important; border-width: 2px !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
   details>summary:hover { color: #0d9488; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; }
@@ -977,7 +979,8 @@ export class AutoAssigner {
           - getStaffAmount(currentSource.entry)
           - getStaffAmount(currentEntry)
           + getStaffAmount(movedCurrentToCandidateSource);
-        if (projectedCandidateLoad > limit || projectedCurrentLoad > limit) return;
+        const normalCap = Math.max(2, limit - 1);
+        if (projectedCandidateLoad > normalCap || projectedCurrentLoad > normalCap) return;
 
         candidates.push({
           entry: movedCandidateToCurrentSource,
@@ -1254,6 +1257,49 @@ export class AutoAssigner {
       this.dayCells["ポータブル"] = join(portableMembers);
       this.refreshAssignmentState();
     }
+  }
+
+  private enforceDsaFiveRoomPairing(): void {
+    if (this.skipSections.includes("DSA") || this.shouldSkipAutoAssignRoom("DSA")) return;
+    if (this.skipSections.includes("5号室") || this.shouldSkipAutoAssignRoom("5号室")) return;
+    const dsaMembers = split(this.dayCells["DSA"] || "");
+    const fiveMembers = split(this.dayCells["5号室"] || "");
+    if (fiveMembers.length === 0) return;
+    const dsaCores = dsaMembers.map(extractStaffName).filter(Boolean);
+    const fiveCores = fiveMembers.map(extractStaffName).filter(Boolean);
+    if (dsaCores.some(c => fiveCores.includes(c))) return;
+
+    const removableDsa = dsaMembers.every(entry => {
+      const core = extractStaffName(entry);
+      if (!core || ROLE_PLACEHOLDERS.includes(core)) return true;
+      return ROOM_SECTIONS.some(room => room !== "DSA" && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(room) && split(this.dayCells[room] || "").some(m => extractStaffName(m) === core && !this.isLateOrNightEntry(m)));
+    });
+    if (!removableDsa) return;
+
+    const candidates = fiveMembers
+      .map(entry => ({ entry, core: extractStaffName(entry) }))
+      .filter(item => {
+        if (!item.core || ROLE_PLACEHOLDERS.includes(item.core) || this.isLateOrNightEntry(item.entry)) return false;
+        if (!this.canPlaceEntryInRoomStrict(item.core, item.entry, "DSA", dsaMembers.filter(m => extractStaffName(m) !== item.core))) return false;
+        if (hasFluoroAuxConflict(this.dayCells, item.core, "DSA", this.ctx.customRules.fluoroAuxConflictRooms)) return false;
+        const limit = this.ctx.customRules.alertMaxKenmu || 3;
+        const normalCap = Math.max(2, limit - 1);
+        const alreadyInDsa = dsaCores.includes(item.core);
+        const projected = this.getTodayRoomLoad(item.core) + (alreadyInDsa ? 0 : getStaffAmount(item.entry));
+        return projected <= normalCap;
+      })
+      .sort((a, b) =>
+        this.getTodayRoomLoad(a.core) - this.getTodayRoomLoad(b.core) ||
+        this.getPastRoomCount(a.core, "DSA") - this.getPastRoomCount(b.core, "DSA") ||
+        a.core.localeCompare(b.core, "ja")
+      );
+
+    const picked = candidates[0];
+    if (!picked) return;
+    const before = this.dayCells["DSA"] || "";
+    this.dayCells["DSA"] = picked.entry;
+    this.refreshAssignmentState();
+    this.log(`🧩 [DSA基本5号室兼務] DSA は原則5号室由来とし、${before || "空欄"} から ${picked.entry} に正規化しました`);
   }
 
   private isMetadataKey(sec: string) { return sec.startsWith("__"); }
@@ -2614,11 +2660,13 @@ export class AutoAssigner {
     this.enforcePortableSourceRoomSwapPreference();
     this.tryProtectOneRoomForPortable();
     this.enforcePortableThreeRoomPairing();
+    this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.enforcePortableClosedSourcePolicy();
     this.enforceEmergencyClearedRoomsFinal();
     this.enforceEmergencyClearedRoomsFinal();
     this.rescueUnassignedStaffToPortable();
+    this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
 
@@ -2652,6 +2700,7 @@ export class AutoAssigner {
     this.releaseSupportPartnersForEmptyRooms();
     this.trimOverloadedSupportPartners();
     this.rescueUnassignedStaffToPortable();
+    this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
   }
@@ -2858,7 +2907,7 @@ export default function App(): any {
     const softNgPairs = (customRules.ngPairs || []).filter((p: any) => p.level === "soft"); 
     softNgPairs.forEach((ng: any) => { const s1 = extractStaffName(ng.s1); const s2 = extractStaffName(ng.s2); ROOM_SECTIONS.forEach(room => { const mems = split(cells[room]).map(extractStaffName); if (mems.includes(s1) && mems.includes(s2)) w.push({ level: 'yellow', title: '回避特例', room, msg: `なるべくNGペア（${s1} と ${s2}）が「${room}」で同室です` }); }); }); 
     const fluoroConflictSections = getFluoroAuxConflictSections(customRules.fluoroAuxConflictRooms); AUX_FOLLOWUP_SECTIONS.forEach(auxRoom => { split(cells[auxRoom] || "").map(extractStaffName).forEach(staff => { const conflictRoom = fluoroConflictSections.find(fRoom => split(cells[fRoom] || "").map(extractStaffName).includes(staff)); if (conflictRoom) w.push({ level: 'yellow', title: '併用注意', staff, room: auxRoom, msg: `${staff}さんが「${auxRoom}」と「${conflictRoom}」を兼ねています` }); }); }); 
-    Object.entries(staffMap).forEach(([staff, rms]) => { const limit = customRules.alertMaxKenmu || 3; const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !isLateStartEntry(m); }).length; if(dayCount > limit) w.push({ level: 'orange', title: '兼務超過', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); }); 
+    Object.entries(staffMap).forEach(([staff, rms]) => { const limit = customRules.alertMaxKenmu || 3; const dayCount = rms.filter(r => { const m = split(cells[r]).find(x => extractStaffName(x) === staff); return m && !isLateStartEntry(m); }).length; if(dayCount >= limit) w.push({ level: 'orange', title: '兼務注意', staff, msg: `${staff}さんが日中 ${dayCount}部屋を担当中` }); }); 
     const targetEmptyRooms = split(customRules.alertEmptyRooms || "CT,MRI,治療,RI,1号室,2号室,3号室,5号室,透視（6号）,透視（11号）,MMG,骨塩,パノラマCT,ポータブル,DSA,検像"); 
     targetEmptyRooms.forEach(room => { if (split(cells[room]).length === 0) w.push({ level: 'yellow', title: '空室', room, msg: `「${room}」の担当者がいません` }); }); 
     const helpMap = parseLooseJsonMap(cells["__absenceHelp"]);
@@ -3232,8 +3281,8 @@ export default function App(): any {
                                 let metaBg = "#f8fafc"; let metaColor = "#475569"; let metaBorder = "#cbd5e1";
                                 let countBg = "#e2e8f0"; let countColor = "#475569";
                                 let dangerDot: string | null = null;
-                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#f0fdf4"; tagColor = "#0f172a"; tagBorder = "#16a34a"; metaBg = "#dcfce7"; metaColor = "#166534"; metaBorder = "#22c55e"; countBg = "#fee2e2"; countColor = "#991b1b"; }
-                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#f0fdf4"; tagColor = "#0f172a"; tagBorder = "#16a34a"; metaBg = "#dcfce7"; metaColor = "#166534"; metaBorder = "#22c55e"; countBg = "#fed7aa"; countColor = "#9a3412"; }
+                                if (showKenmuMeta && roomCount >= 4) { tagBg = "#fef2f2"; tagColor = "#7f1d1d"; tagBorder = "#ef4444"; metaBg = "#fee2e2"; metaColor = "#991b1b"; metaBorder = "#fca5a5"; countBg = "#fecaca"; countColor = "#7f1d1d"; }
+                                else if (showKenmuMeta && roomCount === 3) { tagBg = "#fff7ed"; tagColor = "#7c2d12"; tagBorder = "#f97316"; metaBg = "#ffedd5"; metaColor = "#9a3412"; metaBorder = "#fb923c"; countBg = "#fed7aa"; countColor = "#7c2d12"; }
                                 else if (showKenmuMeta && roomCount === 2) { tagBg = "#f0fdf4"; tagColor = "#0f172a"; tagBorder = "#16a34a"; metaBg = "#dcfce7"; metaColor = "#166534"; metaBorder = "#22c55e"; countBg = "#bbf7d0"; countColor = "#14532d"; }
 
                                 if (hasRedWarning) { tagBg = "#fff7f7"; tagColor = "#b91c1c"; tagBorder = "#ef4444"; metaBg = "#fef2f2"; metaColor = "#b91c1c"; metaBorder = "#fecaca"; countBg = "#fee2e2"; countColor = "#b91c1c"; }
@@ -3243,7 +3292,7 @@ export default function App(): any {
                                 let inlineStyle: React.CSSProperties = {
                                   background: tagBg,
                                   color: tagColor,
-                                  border: `3px solid ${tagBorder}`,
+                                  border: `2px solid ${tagBorder}`,
                                   padding: showKenmuMeta ? "8px 11px 9px" : "8px 12px",
                                   borderRadius: "10px",
                                   display: "flex",
@@ -3267,7 +3316,7 @@ export default function App(): any {
 
                                 const titleText = showKenmuMeta ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
-                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "3px solid #7dd3fc", fontWeight: 900 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "3px solid #f9a8d4", fontWeight: 900 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "3px solid #9ca3af", fontWeight: 900 }}>{mod.replace(/[()]/g, '')}</span>);
+                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #7dd3fc", fontWeight: 900 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #f9a8d4", fontWeight: 900 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #9ca3af", fontWeight: 900 }}>{mod.replace(/[()]/g, '')}</span>);
 
                                 return (
                                   <div key={mIdx} className="btn-hover" data-print-chip="1" 
@@ -3293,7 +3342,7 @@ export default function App(): any {
                                           padding: roomCount >= 4 ? "1px 6px" : roomCount === 2 ? "2px 8px" : "1px 5px",
                                           background: isHighlighted ? "rgba(255,255,255,0.16)" : countBg,
                                           color: isHighlighted ? "#fff" : countColor,
-                                          border: isHighlighted ? "3px solid rgba(255,255,255,0.45)" : `3px solid ${metaBorder}`,
+                                          border: isHighlighted ? "2px solid rgba(255,255,255,0.45)" : `2px solid ${metaBorder}`,
                                           borderRadius: "999px",
                                           fontSize: roomCount === 2 ? "13.5px" : "13px",
                                           fontWeight: 900,
@@ -3312,7 +3361,7 @@ export default function App(): any {
                                         padding: roomCount >= 3 ? "2px 7px" : "2px 6px",
                                         background: isHighlighted ? "rgba(255,255,255,0.16)" : metaBg,
                                         color: isHighlighted ? "#fff" : metaColor,
-                                        border: isHighlighted ? "3px solid rgba(255,255,255,0.45)" : `3px solid ${metaBorder}`,
+                                        border: isHighlighted ? "2px solid rgba(255,255,255,0.45)" : `2px solid ${metaBorder}`,
                                         borderRadius: "999px",
                                         fontSize: roomCount >= 3 ? "13px" : "13px",
                                         fontWeight: 900,
