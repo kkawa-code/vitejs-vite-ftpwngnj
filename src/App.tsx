@@ -683,6 +683,53 @@ export class AutoAssigner {
     return split(this.dayCells[room] || "").reduce((sum, m) => sum + getStaffAmount(m), 0);
   }
 
+  private getStrictRoomCapacity(room: string): number | null {
+    const explicit = (this.dynamicCapacity as any)[room] ?? (this.ctx.customRules.capacity || {})[room];
+    if (explicit !== undefined && explicit !== null && explicit !== "") return Number(explicit);
+    if (["CT", "MRI", "治療"].includes(room)) return Number((this.dynamicCapacity as any)[room] ?? 3);
+    return null;
+  }
+
+  private entryCoversDayPeriod(entry: string, period: "AM" | "PM"): boolean {
+    if (!entry || this.isLateOrNightEntry(entry)) return false;
+    if (entry.includes("(AM)")) return period === "AM";
+    if (entry.includes("(PM)")) return period === "PM";
+    const until = entry.match(/(〜(d{1,2}):(d{2}))/);
+    if (until) {
+      const hour = Number(until[1]);
+      const minute = Number(until[2]);
+      const endMins = hour * 60 + minute;
+      // 13時以前までの時短はAMのみ、17時前後までなら日勤帯を占有として扱う。
+      return endMins <= 13 * 60 ? period === "AM" : true;
+    }
+    const from = entry.match(/((d{1,2}):(d{2})〜)/);
+    if (from) {
+      const hour = Number(from[1]);
+      const minute = Number(from[2]);
+      const startMins = hour * 60 + minute;
+      return startMins < 13 * 60 ? true : period === "PM";
+    }
+    return true;
+  }
+
+  private roomDayPeriodCount(room: string, period: "AM" | "PM"): number {
+    return split(this.dayCells[room] || "")
+      .filter(m => !ROLE_PLACEHOLDERS.includes(extractStaffName(m)))
+      .filter(m => this.entryCoversDayPeriod(m, period))
+      .length;
+  }
+
+  private canAddToRoomWithoutDaytimeOverfill(room: string, entry: string): boolean {
+    const cap = this.getStrictRoomCapacity(room);
+    if (cap === null || !Number.isFinite(cap)) return true;
+    if (cap <= 0) return false;
+    const checkAM = this.entryCoversDayPeriod(entry, "AM");
+    const checkPM = this.entryCoversDayPeriod(entry, "PM");
+    if (checkAM && this.roomDayPeriodCount(room, "AM") >= cap) return false;
+    if (checkPM && this.roomDayPeriodCount(room, "PM") >= cap) return false;
+    return true;
+  }
+
   private isPortableSourceAvailable(cond: { r: string; min: number }, allowClearedThree: boolean = false): boolean {
     if (!cond.r || cond.r === "ポータブル" || cond.r === "透析後胸部") return false;
     const emergencyCleared = this.clearSections.includes(cond.r);
@@ -2582,6 +2629,7 @@ export class AutoAssigner {
         if (room === "CT" && this.sourceAmount("CT") < 4) return false;
         if (this.isForbidden(core, room) || this.isHalfDayBlocked(core, room).hard) return false;
         if (this.isTimeTagBlockedByFullDayRule(room, tag)) return false;
+        if (!this.canAddToRoomWithoutDaytimeOverfill(room, `${core}${tag}`)) return false;
         const members = split(this.dayCells[room] || "");
         if (members.map(extractStaffName).includes(core)) return false;
         if (this.hasNGPair(core, members.map(extractStaffName), false)) return false;
@@ -2589,7 +2637,7 @@ export class AutoAssigner {
         return this.canAddKenmu(core, room, true);
       });
       if (!target) {
-        this.log(`↪️ [パノラマ単独確認] ${entry} はパノラマCT単独ですが、兼務先が見つかりませんでした`);
+        this.log(`↪️ [パノラマ単独確認] ${entry} はパノラマCT単独ですが、定員超過しない兼務先が見つかりませんでした`);
         continue;
       }
 
