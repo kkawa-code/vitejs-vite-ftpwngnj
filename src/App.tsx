@@ -748,6 +748,59 @@ export class AutoAssigner {
 
 
 
+  private normalizePortableSingleCoverage(): void {
+    if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
+    const eff = this.getEffectiveTarget("ポータブル", this.dynamicCapacity["ポータブル"] ?? 1);
+    if (eff.allClosed || eff.cap > 1) return;
+    const members = split(this.dayCells["ポータブル"] || "");
+    if (members.length <= 1) return;
+    const isFullDayPortable = (entry: string) => {
+      const tag = this.getMemberTimeTag(entry);
+      return !tag || tag === "";
+    };
+    const portableRank = (entry: string) => {
+      const core = extractStaffName(entry);
+      const src = this.getPortableSourceInfo(core, true);
+      return [
+        src ? src.idx : 999,
+        this.shouldAvoidConsecutive(core, "ポータブル") ? 50 : 0,
+        this.shouldAvoidWeeklyRepeat(core, "ポータブル") ? 20 : 0,
+        this.getPastRoomCount(core, "ポータブル"),
+        core
+      ] as const;
+    };
+    const compareEntry = (a: string, b: string) => {
+      const ra = portableRank(a); const rb = portableRank(b);
+      for (let i = 0; i < 4; i++) {
+        const da = ra[i] as number; const db = rb[i] as number;
+        if (da !== db) return da - db;
+      }
+      return String(ra[4]).localeCompare(String(rb[4]), "ja");
+    };
+    const fullDayMembers = members.filter(isFullDayPortable);
+    if (fullDayMembers.length > 0) {
+      const keep = [...fullDayMembers].sort(compareEntry)[0];
+      const removed = members.filter(m => m !== keep);
+      this.dayCells["ポータブル"] = keep;
+      if (removed.length) this.log(`🧹 [ポータブル整理] 終日担当 ${keep} がいるため、重複する ${join(removed)} をポータブルから外しました`);
+      return;
+    }
+    const amCandidates = members.filter(m => this.getMemberTimeTag(m).includes("AM") || !!this.getMemberTimeTag(m).match(/\(〜\d/));
+    const pmCandidates = members.filter(m => this.getMemberTimeTag(m).includes("PM") || !!this.getMemberTimeTag(m).match(/\(\d.*〜\)/));
+    const keep: string[] = [];
+    if (amCandidates.length > 0) keep.push([...amCandidates].sort(compareEntry)[0]);
+    if (pmCandidates.length > 0) {
+      const pm = [...pmCandidates].sort(compareEntry)[0];
+      if (!keep.includes(pm)) keep.push(pm);
+    }
+    if (keep.length === 0 && members.length > 0) keep.push([...members].sort(compareEntry)[0]);
+    const removed = members.filter(m => !keep.includes(m));
+    if (removed.length > 0) {
+      this.dayCells["ポータブル"] = join(keep);
+      this.log(`🧹 [ポータブル整理] 時間帯が重複する ${join(removed)} をポータブルから外しました`);
+    }
+  }
+
   private rescueUnassignedStaffToPortable(): void {
     if (this.skipSections.includes("ポータブル") || this.shouldSkipAutoAssignRoom("ポータブル")) return;
     const portableEff = this.getEffectiveTarget("ポータブル", this.dynamicCapacity["ポータブル"] ?? 1);
@@ -2733,9 +2786,11 @@ export class AutoAssigner {
     this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.enforcePortableClosedSourcePolicy();
+    this.normalizePortableSingleCoverage();
     this.enforceEmergencyClearedRoomsFinal();
     this.enforceEmergencyClearedRoomsFinal();
     this.rescueUnassignedStaffToPortable();
+    this.normalizePortableSingleCoverage();
     this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
@@ -2762,7 +2817,7 @@ export class AutoAssigner {
       (this.ctx.customRules.lunchRoleRules || []).forEach((r: any) => { if (r.day === "毎日" || r.day === dC) { const rS = split(this.ctx.monthlyAssign[r.role] || "").map(extractStaffName), tM = split(this.dayCells[r.role] || "").map(extractStaffName); let sl: string | null = null; for (const src of split(r.sourceRooms)) { const { r: sR, min } = parseRoomCond(src); const rM = split(this.dayCells[sR] || ""), rq = min > 0 ? min : (this.dynamicCapacity[sR] || 1); if (rM.reduce((su, m) => su + getStaffAmount(m), 0) >= rq) { sl = rM.map(extractStaffName).find(n => rS.includes(n) && !tM.includes(n) && canLunch(n)) || null; } if (sl) break; } if (!sl) sl = tM.find(n => canLunch(n)) || null; if (sl && !cL.includes(sl) && cL.length < lT) cL.push(sl); } });
       split(this.dayCells["RI"]).map(extractStaffName).forEach(n => { if (!cL.includes(n) && cL.length < lT && canLunch(n)) cL.push(n); });
       split(this.ctx.customRules.lunchPrioritySections ?? "RI,1号室,2号室,3号室,5号室,CT").forEach(sc => split(this.dayCells[sc]).forEach(n => { const c = extractStaffName(n); if (!cL.includes(c) && cL.length < lT && canLunch(c)) cL.push(c); }));
-      if (cL.length < lT) { (this.ctx.customRules.lunchConditional || []).forEach((co: any) => { const sM = split(this.dayCells[co.section]); if (sM.length >= Number(co.min)) { let p = 0; for (const n of sM) { if (p >= Number(co.out) || cL.length >= lT) break; const c = extractStaffName(n); if (!cL.includes(c) && canLunch(c)) { cL.push(c); p++; } } } }); }
+      if (cL.length < lT) { (this.ctx.customRules.lunchConditional || []).forEach((co: any) => { const sectionLabel = String(co.section || ""); const sM = split(this.dayCells[sectionLabel]); if (sM.length >= Number(co.min)) { let p = 0; for (const n of sM) { if (p >= Number(co.out) || cL.length >= lT) break; const c = extractStaffName(n); const label = sectionLabel || c; if (!cL.includes(label) && (label === sectionLabel || canLunch(c))) { cL.push(label); p++; } } } }); }
       if (cL.length < lT) { const lrM: string[] = []; split(this.ctx.customRules.lunchLastResortSections ?? "治療").forEach(sc => split(this.dayCells[sc]).forEach(n => lrM.push(extractStaffName(n)))); this.initialAvailGeneral.filter((n: string) => !lrM.includes(n) && !cL.includes(n) && canLunch(n)).forEach((n: string) => { if (cL.length < lT) cL.push(n); }); this.initialAvailGeneral.filter((n: string) => lrM.includes(n) && !cL.includes(n) && canLunch(n)).forEach((n: string) => { if (cL.length < lT) cL.push(n); }); }
       this.dayCells["昼当番"] = join(cL.slice(0, lT));
     }
@@ -2774,6 +2829,7 @@ export class AutoAssigner {
     this.releaseSupportPartnersForEmptyRooms();
     this.trimOverloadedSupportPartners();
     this.rescueUnassignedStaffToPortable();
+    this.normalizePortableSingleCoverage();
     this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
@@ -3107,7 +3163,7 @@ export default function App(): any {
   }, [activeGeneralStaff, monthlyAssign]);
   
   const setAllDaysWithHistory = (updater: any) => { setAllDays(prev => { const next = typeof updater === 'function' ? updater(prev) : updater; if (JSON.stringify(prev) !== JSON.stringify(next)) setHistory(h => [...h, prev].slice(-20)); return next; }); };
-  const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { let nextDayCells = { ...(prev[sel] || {}), [k]: v }; nextDayCells = applyFluoroAuxConflictRule(nextDayCells, k, customRules.fluoroAuxConflictRooms); const nextState = { ...prev, [sel]: nextDayCells }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const currentAke = split((prev[nextDayId] || {})["明け"]).filter(m => !split(v).includes(m)); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...currentAke, ...split(v)]) }; } } return nextState; }); };
+  const updateDay = (k: string, v: string) => { setAllDaysWithHistory((prev: any) => { let nextDayCells = { ...(prev[sel] || {}), [k]: v }; nextDayCells = applyFluoroAuxConflictRule(nextDayCells, k, customRules.fluoroAuxConflictRooms); const nextState = { ...prev, [sel]: nextDayCells }; if (k === "入り") { const idx = days.findIndex(d => d.id === sel); if (idx >= 0 && idx < days.length - 1) { const nextDayId = days[idx + 1].id; const oldIri = split((prev[sel] || {})["入り"] || ""); const newIri = split(v); const newIriCores = newIri.map(extractStaffName); const removeSet = new Set(oldIri.map(extractStaffName)); const keepAke = split((prev[nextDayId] || {})["明け"] || "").filter(m => !removeSet.has(extractStaffName(m)) && !newIriCores.includes(extractStaffName(m))); nextState[nextDayId] = { ...(prev[nextDayId] || {}), "明け": join([...keepAke, ...newIri]) }; } } return nextState; }); };
 
   const clearAbsenceHelp = (staffName: string) => {
     setAllDaysWithHistory((prev: any) => {
@@ -3509,18 +3565,20 @@ export default function App(): any {
         </div>
 
         <div className="no-print" style={{ ...panelStyle() }}>
-          <div className="scroll-container hide-scrollbar sticky-header-panel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #e2e8f0", paddingBottom: 16, marginBottom: 24 }}>
-             <div style={{ display: "flex", gap: 8 }}>
-                {days.map(d => <button key={d.id} onClick={() => setSel(d.id)} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: d.id === sel ? "#2563eb" : "#fff", color: d.id === sel ? "#fff" : "#64748b", fontWeight: 800, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>{d.label}</button>)}
+          <div className="scroll-container hide-scrollbar sticky-header-panel" style={{ display: "flex", flexDirection: "column", gap: 12, borderBottom: "2px solid #e2e8f0", paddingBottom: 16, marginBottom: 24 }}>
+             <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {days.map(d => <button key={d.id} onClick={() => setSel(d.id)} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: d.id === sel ? "#2563eb" : "#fff", color: d.id === sel ? "#fff" : "#64748b", fontWeight: 800, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>{d.label}</button>)}
+                </div>
+                <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{ ...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), minWidth: 120 }}>↩️ 戻る</button>
              </div>
-             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <button className="btn-hover" onClick={() => setShowRuleModal(true)} style={btnStyle("#f8fafc", "#475569")}>📖 システムのルール</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(false, false)} style={btnStyle("#10b981")}>✨ 1日自動割当</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(false, true)} style={btnStyle("#0ea5e9")}>⚡ 週間自動割当</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(true, false)} style={btnStyle("#f59e0b")}>🔄 欠員補充(1日)</button>
                 <button className="btn-hover" onClick={() => handleAutoAssign(true, true)} style={btnStyle("#d97706")}>🔄 欠員補充(週間)</button>
                 <button className="btn-hover" onClick={handleCopyYesterday} disabled={cur.isPublicHoliday} style={btnStyle("#f8fafc", "#475569")}>📋 昨日をコピー</button>
-                <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6")}>↩️ 戻る</button>
              </div>
           </div>
 
