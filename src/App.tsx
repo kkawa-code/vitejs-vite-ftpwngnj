@@ -2552,6 +2552,56 @@ export class AutoAssigner {
   cleanUpDayCells() { Object.keys(this.dayCells).forEach(sec => { if (this.isMetadataKey(sec) || ["明け","入り","不在","土日休日代休"].includes(sec)) return; if (this.skipSections.includes(sec)) { this.dayCells[sec] = ""; return; } let members = split(this.dayCells[sec]).map(m => { const core = extractStaffName(m); if (ROLE_PLACEHOLDERS.includes(core)) return m; const block = this.blockMap.get(core); const tt = this.timeTagMap.get(core); if (block === 'ALL') return null; if (tt && m.includes(tt)) return m; if (block === 'AM' && m.includes('(AM)')) return null; if (block === 'PM' && m.includes('(PM)')) return null; if (block === 'PM' && tt && m.includes('(AM)')) return `${core}${tt}`; if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) return `${core}(PM)`; if (block === 'PM' && !m.match(/\(.*\)/)) return `${core}${tt || '(AM)'}`; return m; }).filter(Boolean) as string[]; this.dayCells[sec] = join(members); }); }
   prepareAvailability() { const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName); this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => { if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0); return a.localeCompare(b, 'ja'); }); this.initialAvailSupport = this.initialAvailAll.filter(s => supportStaffList.includes(s)); this.initialAvailGeneral = this.initialAvailAll.filter(s => this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s)); this.initialAvailReception = this.initialAvailAll.filter(s => this.ctx.activeReceptionStaff.includes(s) || (this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s))); }
 
+
+  private getPanoBaseSourceRooms(): string[] {
+    const fromRules = (this.ctx.customRules.linkedRooms || [])
+      .filter((rule: any) => rule.target === "パノラマCT")
+      .flatMap((rule: any) => split(rule.sources || "").map((src: string) => parseRoomCond(src).r))
+      .filter((room: string) => room && ROOM_SECTIONS.includes(room) && room !== "パノラマCT" && room !== "透析後胸部");
+    const fallback = ["2号室", "透視（6号）", "1号室", "5号室", "CT"];
+    const merged = [...fromRules, ...fallback];
+    return Array.from(new Set(merged)).filter(room => !this.skipSections.includes(room) && !this.shouldSkipAutoAssignRoom(room));
+  }
+
+  private enforcePanoOnlyBasePairing(): void {
+    if (this.skipSections.includes("パノラマCT") || this.shouldSkipAutoAssignRoom("パノラマCT")) return;
+    const panoMembers = split(this.dayCells["パノラマCT"] || "");
+    if (!panoMembers.length) return;
+    const baseRooms = this.getPanoBaseSourceRooms();
+    if (!baseRooms.length) return;
+
+    let changed = false;
+    for (const entry of panoMembers) {
+      const core = extractStaffName(entry);
+      if (!core || ROLE_PLACEHOLDERS.includes(core) || this.isLateOrNightEntry(entry)) continue;
+      const rooms = this.getDaytimeRoomsForStaff(core);
+      if (!(rooms.length === 1 && rooms[0] === "パノラマCT")) continue;
+
+      const tag = this.getMemberTimeTag(entry);
+      const target = baseRooms.find(room => {
+        if (room === "CT" && this.sourceAmount("CT") < 4) return false;
+        if (this.isForbidden(core, room) || this.isHalfDayBlocked(core, room).hard) return false;
+        if (this.isTimeTagBlockedByFullDayRule(room, tag)) return false;
+        const members = split(this.dayCells[room] || "");
+        if (members.map(extractStaffName).includes(core)) return false;
+        if (this.hasNGPair(core, members.map(extractStaffName), false)) return false;
+        if (room === "MMG" && !this.isMmgCapable(core)) return false;
+        return this.canAddKenmu(core, room, true);
+      });
+      if (!target) {
+        this.log(`↪️ [パノラマ単独確認] ${entry} はパノラマCT単独ですが、兼務先が見つかりませんでした`);
+        continue;
+      }
+
+      this.dayCells[target] = join([...split(this.dayCells[target] || ""), `${core}${tag}`]);
+      this.addUsage(core, getStaffAmount(`${core}${tag}`));
+      this.updateBlockMapAfterKenmu(core, `${core}${tag}`);
+      this.log(`🔗 [パノラマ単独解消] パノラマCTだけの ${entry} を ${target} にも配置しました`);
+      changed = true;
+    }
+    if (changed) this.refreshAssignmentState();
+  }
+
   private applyCtPmGeneralHelpRules(): void {
     const rules = this.ctx.customRules.ctPmHelpRules || [];
     if (!rules.length) return;
@@ -2592,10 +2642,15 @@ export class AutoAssigner {
           return !eff.allClosed && !eff.pmClosed && !members.map(extractStaffName).includes(core) && !this.isForbidden(core, room) && !this.isHalfDayBlocked(core, room).hard && !this.hasNGPair(core, members.map(extractStaffName), false) && (room === "MMG" ? this.isMmgCapable(core) : true) && this.canAddKenmu(core, room, true) && !this.isTimeTagBlockedByFullDayRule(room, "(PM)");
         });
         if (!target) continue;
-        sourceMembers = sourceMembers.map(m => m === entry ? core + "(AM)" : m);
-        this.dayCells[sourceRoom] = join(sourceMembers);
-        this.dayCells[target] = join([...split(this.dayCells[target] || ""), core + "(PM)"]);
-        this.log("🩻 [CT午後ヘルプ] " + sourceRoom + " が" + min + "人体制のため " + core + " を " + sourceRoom + "(AM)＋" + target + "(PM) にしました");
+        const roleLabel = `${sourceRoom}(PM)`;
+        const targetMembers = split(this.dayCells[target] || "");
+        if (!targetMembers.includes(roleLabel)) {
+          this.dayCells[target] = join([...targetMembers, roleLabel]);
+        }
+        // CT午後ヘルプは「CTの誰かがPMに一般撮影へ出る」という扱いにする。
+        // 個人名をPM側へ分割すると、見た目もロジックもその人がCTを抜けたように見えるため、
+        // CT側の個人配置は終日維持し、ヘルプ先には CT(PM) の役割表示だけを置く。
+        this.log("🩻 [CT午後ヘルプ] " + sourceRoom + " が" + min + "人体制のため " + target + "(PM) に " + sourceRoom + " ヘルプを表示しました");
         moved++;
         this.refreshAssignmentState();
       }
@@ -2924,6 +2979,7 @@ export class AutoAssigner {
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
     this.applyCtPmGeneralHelpRules();
+    this.enforcePanoOnlyBasePairing();
     this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
@@ -3695,11 +3751,11 @@ export default function App(): any {
 
         <div className="no-print" style={{ ...panelStyle() }}>
           <div className="scroll-container hide-scrollbar sticky-header-panel" style={{ display: "flex", flexDirection: "column", gap: 12, borderBottom: "2px solid #e2e8f0", paddingBottom: 16, marginBottom: 24 }}>
-             <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {days.map(d => <button key={d.id} onClick={() => setSel(d.id)} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: d.id === sel ? "#2563eb" : "#fff", color: d.id === sel ? "#fff" : "#64748b", fontWeight: 800, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>{d.label}</button>)}
+             <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "nowrap" }}>
+                <div className="hide-scrollbar" style={{ display: "flex", gap: 8, flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, paddingBottom: 4 }}>
+                  {days.map(d => <button key={d.id} onClick={() => setSel(d.id)} style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: d.id === sel ? "#2563eb" : "#fff", color: d.id === sel ? "#fff" : "#64748b", fontWeight: 800, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", flex: "0 0 auto" }}>{d.label}</button>)}
                 </div>
-                <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{ ...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), minWidth: 120 }}>↩️ 戻る</button>
+                <button className="btn-hover" onClick={handleUndo} disabled={history.length === 0} style={{ ...btnStyle(history.length === 0 ? "#cbd5e1" : "#8b5cf6"), minWidth: 120, flex: "0 0 auto" }}>↩️ 戻る</button>
              </div>
              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <button className="btn-hover" onClick={() => setShowRuleModal(true)} style={btnStyle("#f8fafc", "#475569")}>📖 システムのルール</button>
