@@ -980,6 +980,96 @@ export class AutoAssigner {
     return candidates[0] || null;
   }
 
+
+  private getDaytimeEntriesForStaff(core: string): { room: string; entry: string; members: string[] }[] {
+    return ROOM_SECTIONS
+      .filter(room => !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(room))
+      .flatMap(room => {
+        const members = split(this.dayCells[room] || "");
+        return members
+          .filter(entry => extractStaffName(entry) === core && !this.isLateOrNightEntry(entry))
+          .map(entry => ({ room, entry, members }));
+      });
+  }
+
+  private isPortableSetExchangeSourceRoom(room: string): boolean {
+    if (!room || REST_SECTIONS.includes(room) || ["CT", "MRI", "治療", "RI", "受付", "受付ヘルプ", "待機", "昼当番", "ポータブル", "DSA", "透析後胸部"].includes(room)) return false;
+    if (this.skipSections.includes(room) || this.shouldSkipAutoAssignRoom(room)) return false;
+    return true;
+  }
+
+  private trySwapRepeatedPortableWithExchangeSet(
+    portableMembers: string[],
+    currentIndex: number,
+    options: { allowConsecutive?: boolean } = {}
+  ): { entry: string; fromRooms: string[]; toRoom: string; sourceStaff: string; replacementStaff: string } | null {
+    const currentEntry = portableMembers[currentIndex];
+    const currentCore = extractStaffName(currentEntry);
+    if (!currentCore || ROLE_PLACEHOLDERS.includes(currentCore) || this.isLateOrNightEntry(currentEntry)) return null;
+    const isCurrentRepeat = this.shouldAvoidWeeklyRepeat(currentCore, "ポータブル") || this.shouldAvoidConsecutive(currentCore, "ポータブル");
+    if (!isCurrentRepeat) return null;
+
+    const currentSource = this.getPortableSourceInfo(currentCore, true);
+    if (!currentSource) return null;
+    if (this.clearSections.includes(currentSource.room)) return null;
+    if (currentSource.room === "CT") return null;
+    if (this.isProtectedInCurrentModality(currentCore)) return null;
+
+    const allowConsecutive = options.allowConsecutive ?? false;
+    type SetSwap = { entry: string; fromRooms: string[]; toRoom: string; sourceStaff: string; replacementStaff: string; nextCurrentSourceMembers: string[]; nextRoomMembers: Record<string, string[]>; roomCount: number };
+    const candidates: SetSwap[] = [];
+
+    this.ctx.allStaff.forEach(candidateCore => {
+      if (!candidateCore || candidateCore === currentCore || ROLE_PLACEHOLDERS.includes(candidateCore)) return;
+      if (this.isProtectedInCurrentModality(candidateCore)) return;
+      if (!allowConsecutive && this.shouldAvoidConsecutive(candidateCore, "ポータブル")) return;
+      if (this.shouldAvoidWeeklyRepeat(candidateCore, "ポータブル")) return;
+      if (hasFluoroAuxConflict(this.dayCells, candidateCore, "ポータブル", this.ctx.customRules.fluoroAuxConflictRooms)) return;
+      if (this.isForbidden(candidateCore, "ポータブル") || this.isHalfDayBlocked(candidateCore, "ポータブル").hard) return;
+      const candidateEntries = this.getDaytimeEntriesForStaff(candidateCore).filter(item => this.isPortableSetExchangeSourceRoom(item.room));
+      if (candidateEntries.length === 0) return;
+      const fromRooms = Array.from(new Set(candidateEntries.map(item => item.room)));
+      if (fromRooms.length < 2 && ["1号室", "2号室", "3号室", "5号室", "パノラマCT"].includes(fromRooms[0])) return;
+      const currentSourceTag = this.getMemberTimeTag(currentSource.entry);
+      const movedCandidateToCurrentSource = `${candidateCore}${currentSourceTag}`;
+      const nextCurrentSourceMembers = currentSource.members.map(m => m === currentSource.entry ? movedCandidateToCurrentSource : m);
+      if (!this.canPlaceEntryInRoomStrict(candidateCore, movedCandidateToCurrentSource, currentSource.room, nextCurrentSourceMembers)) return;
+      if (!this.canPlaceEntryInRoomStrict(candidateCore, movedCandidateToCurrentSource, "ポータブル", portableMembers.filter((_, idx) => idx !== currentIndex))) return;
+      if (this.hasNGPair(candidateCore, portableMembers.filter((_, idx) => idx !== currentIndex).map(extractStaffName), false)) return;
+      const nextRoomMembers: Record<string, string[]> = {};
+      for (const room of fromRooms) {
+        const roomEntries = candidateEntries.filter(item => item.room === room);
+        const baseMembers = split(this.dayCells[room] || "");
+        let nextMembers = [...baseMembers];
+        for (const item of roomEntries) {
+          const tag = this.getMemberTimeTag(item.entry);
+          const movedCurrent = `${currentCore}${tag}`;
+          nextMembers = nextMembers.map(m => m === item.entry ? movedCurrent : m);
+          if (!this.canPlaceEntryInRoomStrict(currentCore, movedCurrent, room, nextMembers)) return;
+        }
+        if (hasFluoroAuxConflict({ ...this.dayCells, [room]: join(nextMembers) }, currentCore, room, this.ctx.customRules.fluoroAuxConflictRooms)) return;
+        nextRoomMembers[room] = nextMembers;
+      }
+      const amountToCurrentSource = getStaffAmount(movedCandidateToCurrentSource);
+      const projectedCandidateLoad = this.getTodayRoomLoad(candidateCore) - candidateEntries.reduce((sum, item) => sum + getStaffAmount(item.entry), 0) + amountToCurrentSource + amountToCurrentSource;
+      const projectedCurrentLoad = this.getTodayRoomLoad(currentCore) - getStaffAmount(currentSource.entry) - getStaffAmount(currentEntry) + candidateEntries.reduce((sum, item) => sum + getStaffAmount(item.entry), 0);
+      const limit = this.ctx.customRules.alertMaxKenmu || 3;
+      const normalCap = Math.max(2, limit - 1);
+      if (projectedCandidateLoad > normalCap || projectedCurrentLoad > normalCap) return;
+      candidates.push({ entry: movedCandidateToCurrentSource, fromRooms, toRoom: currentSource.room, sourceStaff: currentCore, replacementStaff: candidateCore, nextCurrentSourceMembers, nextRoomMembers, roomCount: fromRooms.length });
+    });
+    candidates.sort((a, b) => a.roomCount - b.roomCount || this.getPastRoomCount(a.replacementStaff, "ポータブル") - this.getPastRoomCount(b.replacementStaff, "ポータブル") || this.getTodayRoomCount(a.replacementStaff) - this.getTodayRoomCount(b.replacementStaff) || a.replacementStaff.localeCompare(b.replacementStaff, "ja"));
+    const best = candidates[0];
+    if (!best) return null;
+    this.dayCells[best.toRoom] = join(best.nextCurrentSourceMembers);
+    Object.entries(best.nextRoomMembers).forEach(([room, members]) => { this.dayCells[room] = join(members); });
+    portableMembers[currentIndex] = best.entry;
+    this.dayCells["ポータブル"] = join(portableMembers);
+    this.refreshAssignmentState();
+    this.log(`♻️ [ポータブルセット交換] 連日/週内再担当の ${currentEntry} を避け、${best.replacementStaff} の ${join(best.fromRooms)} セットと ${best.sourceStaff} の ${best.toRoom} を交換し、${best.replacementStaff} を${best.toRoom}＋ポータブルにしました`);
+    return best;
+  }
+
   private trySwapRepeatedPortableWithFreshSource(
     portableMembers: string[],
     currentIndex: number,
@@ -1198,6 +1288,12 @@ export class AutoAssigner {
       const isPanoOnlySourceMember = this.isPanoOnlyPortableCandidate(entry) && this.canUseEntryForPortable(core, entry, portableMembers, i, true, true);
       const isValidSourceMember = (!!sourceInfo && !protectedModalityLeak && this.canUseEntryForPortable(core, entry, portableMembers, i, true)) || isPanoOnlySourceMember;
       if (isValidSourceMember) {
+        const setSwap = this.trySwapRepeatedPortableWithExchangeSet(portableMembers, i);
+        if (setSwap) {
+          portableMembers = split(this.dayCells["ポータブル"] || "");
+          changed = true;
+          continue;
+        }
         const freshSwap = this.trySwapRepeatedPortableWithFreshSource(portableMembers, i);
         if (freshSwap) {
           portableMembers = split(this.dayCells["ポータブル"] || "");
@@ -1328,47 +1424,80 @@ export class AutoAssigner {
     }
   }
 
+  private getDsaSourceConds(): { r: string; min: number }[] {
+    const raw: string[] = [];
+    (this.ctx.customRules.linkedRooms || []).filter((rule: any) => rule.target === "DSA").forEach((rule: any) => split(rule.sources || "").forEach((src: string) => raw.push(src)));
+    (this.ctx.customRules.rescueRules || []).filter((rule: any) => rule.targetRoom === "DSA").forEach((rule: any) => split(rule.sourceRooms || "").forEach((src: string) => raw.push(src)));
+    (this.ctx.customRules.swapRules || []).filter((rule: any) => rule.targetRoom === "DSA").forEach((rule: any) => split(rule.sourceRooms || "").forEach((src: string) => raw.push(src)));
+    if (raw.length === 0) raw.push("5号室", "2号室", "CT(4)");
+    const result: { r: string; min: number }[] = [];
+    const seen = new Set<string>();
+    raw.forEach(src => {
+      const cond = parseRoomCond(src);
+      if (!cond.r || cond.r === "DSA" || cond.r === "ポータブル" || cond.r === "透析後胸部") return;
+      if (["MRI", "治療", "RI", "受付", "受付ヘルプ", "待機", "昼当番"].includes(cond.r)) return;
+      if (cond.r === "CT" && cond.min < 4) cond.min = 4;
+      const key = `${cond.r}:${cond.min}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(cond);
+    });
+    return result;
+  }
+
+  private isDsaSourceAvailable(cond: { r: string; min: number }): boolean {
+    if (!cond.r || this.skipSections.includes(cond.r) || this.shouldSkipAutoAssignRoom(cond.r)) return false;
+    if (cond.r === "CT" && this.sourceAmount("CT") < Math.max(cond.min, 4)) return false;
+    if (cond.min > 0 && this.sourceAmount(cond.r) < cond.min) return false;
+    return true;
+  }
+
   private enforceDsaFiveRoomPairing(): void {
     if (this.skipSections.includes("DSA") || this.shouldSkipAutoAssignRoom("DSA")) return;
-    if (this.skipSections.includes("5号室") || this.shouldSkipAutoAssignRoom("5号室")) return;
     const dsaMembers = split(this.dayCells["DSA"] || "");
-    const fiveMembers = split(this.dayCells["5号室"] || "");
-    if (fiveMembers.length === 0) return;
     const dsaCores = dsaMembers.map(extractStaffName).filter(Boolean);
-    const fiveCores = fiveMembers.map(extractStaffName).filter(Boolean);
-    if (dsaCores.some(c => fiveCores.includes(c))) return;
-
+    const isBadDsa = (core: string) => {
+      const rooms = this.getRoomsForStaff(core).filter(r => r !== "DSA");
+      return rooms.some(r => ["MRI", "治療", "RI"].includes(r) || this.isProtectedModalityStaff(core, r));
+    };
     const removableDsa = dsaMembers.every(entry => {
       const core = extractStaffName(entry);
       if (!core || ROLE_PLACEHOLDERS.includes(core)) return true;
+      if (isBadDsa(core)) return true;
       return ROOM_SECTIONS.some(room => room !== "DSA" && !["待機", "昼当番", "受付", "受付ヘルプ", "透析後胸部"].includes(room) && split(this.dayCells[room] || "").some(m => extractStaffName(m) === core && !this.isLateOrNightEntry(m)));
     });
     if (!removableDsa) return;
-
-    const candidates = fiveMembers
-      .map(entry => ({ entry, core: extractStaffName(entry) }))
-      .filter(item => {
-        if (!item.core || ROLE_PLACEHOLDERS.includes(item.core) || this.isLateOrNightEntry(item.entry)) return false;
-        if (!this.canPlaceEntryInRoomStrict(item.core, item.entry, "DSA", dsaMembers.filter(m => extractStaffName(m) !== item.core))) return false;
-        if (hasFluoroAuxConflict(this.dayCells, item.core, "DSA", this.ctx.customRules.fluoroAuxConflictRooms)) return false;
-        const limit = this.ctx.customRules.alertMaxKenmu || 3;
-        const normalCap = Math.max(2, limit - 1);
-        const alreadyInDsa = dsaCores.includes(item.core);
-        const projected = this.getTodayRoomLoad(item.core) + (alreadyInDsa ? 0 : getStaffAmount(item.entry));
-        return projected <= normalCap;
-      })
-      .sort((a, b) =>
-        this.getTodayRoomLoad(a.core) - this.getTodayRoomLoad(b.core) ||
-        this.getPastRoomCount(a.core, "DSA") - this.getPastRoomCount(b.core, "DSA") ||
-        a.core.localeCompare(b.core, "ja")
-      );
-
+    type DsaCandidate = { entry: string; core: string; sourceRoom: string; sourceIndex: number; projected: number };
+    const collect = (maxProjectedLoad: number): DsaCandidate[] => {
+      const list: DsaCandidate[] = [];
+      this.getDsaSourceConds().forEach((cond, sourceIndex) => {
+        if (!this.isDsaSourceAvailable(cond)) return;
+        const sourceMembers = split(this.dayCells[cond.r] || "");
+        sourceMembers.forEach(entry => {
+          const core = extractStaffName(entry);
+          if (!core || ROLE_PLACEHOLDERS.includes(core) || this.isLateOrNightEntry(entry)) return;
+          if (isBadDsa(core)) return;
+          if (!this.canPlaceEntryInRoomStrict(core, entry, "DSA", dsaMembers.filter(m => extractStaffName(m) !== core))) return;
+          if (hasFluoroAuxConflict(this.dayCells, core, "DSA", this.ctx.customRules.fluoroAuxConflictRooms)) return;
+          const alreadyInDsa = dsaCores.includes(core);
+          const projected = this.getTodayRoomLoad(core) + (alreadyInDsa ? 0 : getStaffAmount(entry));
+          if (projected > maxProjectedLoad) return;
+          list.push({ entry, core, sourceRoom: cond.r, sourceIndex, projected });
+        });
+      });
+      return list;
+    };
+    const limit = this.ctx.customRules.alertMaxKenmu || 3;
+    const normalCap = Math.max(2, limit - 1);
+    let candidates = collect(normalCap);
+    if (candidates.length === 0 && dsaCores.some(isBadDsa)) candidates = collect(limit);
+    candidates.sort((a, b) => a.sourceIndex - b.sourceIndex || a.projected - b.projected || this.getPastRoomCount(a.core, "DSA") - this.getPastRoomCount(b.core, "DSA") || a.core.localeCompare(b.core, "ja"));
     const picked = candidates[0];
     if (!picked) return;
     const before = this.dayCells["DSA"] || "";
     this.dayCells["DSA"] = picked.entry;
     this.refreshAssignmentState();
-    this.log(`🧩 [DSA基本5号室兼務] DSA は原則5号室由来とし、${before || "空欄"} から ${picked.entry} に正規化しました`);
+    this.log(`🧩 [DSA候補元正規化] DSA はMRI等との兼務を避け、${before || "空欄"} から ${picked.sourceRoom} 由来の ${picked.entry} に正規化しました`);
   }
 
   private isMetadataKey(sec: string) { return sec.startsWith("__"); }
