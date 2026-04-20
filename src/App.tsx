@@ -34,7 +34,8 @@ const globalStyle = `
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
   .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; width: 100%; }
   .rule-sel, .rule-num { padding: 9px 12px; border-radius: 6px; border: 2px solid #64748b; font-weight: 900; font-size: 17px; transition: border-color 0.2s; color: #111827; }
-  .rule-num { width: 60px; text-align: center; flex-shrink: 0; }
+  .rule-num { width: 86px; min-width: 86px; text-align: center; flex: 0 0 86px; padding: 8px 10px !important; font-size: 19px !important; line-height: 1.2 !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  input[type=number].rule-num::-webkit-inner-spin-button, input[type=number].rule-num::-webkit-outer-spin-button { margin: 0; }
   .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 24px; flex-shrink: 0; padding: 0 8px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
   .rule-add { background: #fff; color: #4f46e5; border: 2px dashed #a5b4fc; padding: 10px 16px; font-size: 16px; width: 100%; display: flex; justify-content: center; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px; transition: 0.2s; }
@@ -413,7 +414,7 @@ export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any
 export const MultiPicker = ({ selected, onChange, options, placeholder }: any) => { const current = split(selected); const handleAdd = (val: string) => { if (val && !current.includes(val)) onChange(join([...current, val])); }; const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); }; return ( <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, marginBottom: 8 }}>{current.map((item, i) => ( <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 16, padding: "6px 12px", fontSize: 15, fontWeight: 700, border: "1px solid #bae6fd", display: "flex", alignItems: "center", gap: 6 }}><span>{item}</span><span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span></div> ))} <select className="rule-sel" onChange={(e: any) => { handleAdd(e.target.value); e.target.value = ""; }} value=""><option value="">{placeholder || "＋追加"}</option>{options.filter((s: string) => !current.includes(s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</select></div> ); };
 
 export const DelBtn = ({onClick}:any) => <button onClick={onClick} className="rule-del">✖</button>;
-export const NumInp = ({v, onChange, w}:any) => <input type="number" value={v} onChange={e=>onChange(Number(e.target.value))} className="rule-num" style={{width:w}} />;
+export const NumInp = ({v, onChange, w}:any) => { const ww = w || 86; return <input type="number" value={v} onChange={e=>onChange(Number(e.target.value))} className="rule-num" style={{width: ww, minWidth: ww, flex: `0 0 ${typeof ww === "number" ? `${ww}px` : ww}`}} />; };
 export const Row = ({children}:any) => <div className="rule-row">{children}</div>;
 export const StaffSel = ({v, onChange, list, ph="スタッフ", w}:any) => <select value={v} onChange={e=>onChange(e.target.value)} className="rule-sel" style={{width:w, flex:"0 0 auto"}}><option value="">{ph}</option>{list.map((s:any)=><option key={s} value={s}>{s}</option>)}</select>;
 export const RoomSel = ({v, onChange, list, ph="場所", w}:any) => <select value={v} onChange={e=>onChange(e.target.value)} className="rule-sel" style={{width:w, flex:"0 0 auto"}}><option value="">{ph}</option>{list.map((s:any)=><option key={s} value={s}>{s}</option>)}</select>;
@@ -4242,6 +4243,5 @@ const formatPrintMember = (m: string) => m
   .replace("(16:00〜)", " 16:00〜")
   .replace("(12:15〜13:00)", " 12:15〜13:00")
   .trim();
-
 
 
