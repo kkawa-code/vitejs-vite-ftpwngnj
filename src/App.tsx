@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 const globalStyle = `
   html, body, #root { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
   body { background: #f4f7f9; color: #0f172a; -webkit-print-color-adjust: exact; font-family: "Meiryo", "Yu Gothic UI", "Yu Gothic", "BIZ UDPGothic", "Hiragino Sans", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; letter-spacing: 0.005em; font-size: 19px; font-weight: 900; line-height: 1.52; overflow-x: hidden; text-shadow: 0 0 0.01px currentColor; text-rendering: optimizeLegibility; -webkit-font-smoothing: auto; }
-  #root, #root * { font-weight: 900 !important; }
+  #root, #root * { font-family: "Meiryo", "Yu Gothic UI", "Yu Gothic", "BIZ UDPGothic", "Hiragino Sans", "Segoe UI", system-ui, sans-serif !important; font-weight: 950 !important; }
+  h1, h2, h3, h4, h5, h6, p, div, span, label, button, select, input, textarea, th, td, summary, option { font-weight: 950 !important; }
   input::placeholder, textarea::placeholder { font-weight: 900 !important; color: #64748b; }
   * { box-sizing: border-box; }
   body, table, th, td, button, select, input, textarea { -webkit-font-smoothing: auto; text-rendering: geometricPrecision; }
@@ -17,9 +18,9 @@ const globalStyle = `
   select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 1.2em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; padding-right: 32px !important; }
   .scroll-container table, .scroll-container th, .scroll-container td { font-size: 18.8px !important; font-weight: 900 !important; color: #020617 !important; line-height: 1.45 !important; text-shadow: 0 0 0.01px currentColor; }
   .print-sheet-table, .print-sheet-table th, .print-sheet-table td, .print-sheet-table .p-line { font-weight: 900 !important; }
-  [data-print-chip="1"] { border-width: 2px !important; font-size: 18px !important; font-weight: 900 !important; }
+  [data-print-chip="1"] { border-width: 1.5px !important; font-size: 18.5px !important; font-weight: 950 !important; }
   [data-print-name="1"] { font-weight: 900 !important; color: inherit !important; }
-  [data-print-badge="1"], [data-print-mod="1"] { font-weight: 900 !important; border-width: 2px !important; }
+  [data-print-badge="1"], [data-print-mod="1"] { font-weight: 950 !important; border-width: 1.5px !important; }
   details>summary { list-style: none; cursor: pointer; outline: none; transition: color 0.2s; }
   details>summary:hover { color: #0d9488; }
   .scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; }
@@ -191,7 +192,7 @@ export interface CustomRules {
   fluoroAuxConflictRooms: string;
   closedRooms: any[]; ngPairs: any[]; fixed: any[]; forbidden: any[]; substitutes: any[]; pushOuts: any[]; emergencies: any[]; 
   swapRules: any[]; kenmuPairs: any[]; rescueRules: any[]; lateShifts: any[]; lunchBaseCount: number; lunchSpecialDays: any[]; 
-  lunchConditional: any[]; lunchRoleRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[];
+  lunchConditional: any[]; lunchRoleRules: any[]; ctPmHelpRules: any[]; lunchPrioritySections: string; lunchLastResortSections: string; linkedRooms: any[];
   alertMaxKenmu: number; alertEmptyRooms: string;
 }
 export type AutoAssignContext = { allStaff: string[]; activeGeneralStaff: string[]; activeReceptionStaff: string[]; monthlyAssign: Record<string, string>; customRules: CustomRules; };
@@ -258,6 +259,7 @@ export const DEFAULT_RULES: CustomRules = {
   lateShifts: [{ section: "透視（6号）", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)", fromSecondUseInWeek: true }], 
   lunchBaseCount: 3, lunchSpecialDays: [{ day: "火", count: 4 }], lunchConditional: [{ section: "CT", min: 4, out: 1 }], 
   lunchRoleRules: [{ day: "火", role: "MMG", sourceRooms: "CT(4)、1号室、2号室、3号室、5号室" }], 
+  ctPmHelpRules: [{ section: "CT", min: 4, out: 1, targetRooms: "1号室、2号室、5号室、パノラマCT" }], 
   lunchPrioritySections: "RI、1号室、2号室、3号室、5号室", lunchLastResortSections: "治療", 
   linkedRooms: [
     { target: "ポータブル", sources: "3号室(1)、2号室、1号室、5号室、CT(4)" },
@@ -2327,7 +2329,11 @@ export class AutoAssigner {
     const tempAvailCount = this.ctx.activeGeneralStaff.filter(s => this.blockMap.get(s) !== 'ALL').length;
     (this.ctx.customRules.emergencies || []).forEach((em: any) => {
       if (em.type === "empty_room_swap") return;
-      if (tempAvailCount > Number(em.threshold)) return;
+      const threshold = Number(em.threshold);
+      if (em.type === "change_capacity") {
+        // 定員変更は「指定未満」で発動。境界人数では通常定員を維持する。
+        if (tempAvailCount >= threshold) return;
+      } else if (tempAvailCount > threshold) return;
       if (em.type === "role_assign" && em.role && em.section) {
         this.roleAssignments[em.role] = em;
         this.log(`🚨 [緊急ルール] 稼働可能${tempAvailCount}人以下のため ${em.role} を ${em.section} に優先配置`);
@@ -2349,6 +2355,56 @@ export class AutoAssigner {
   }
   cleanUpDayCells() { Object.keys(this.dayCells).forEach(sec => { if (this.isMetadataKey(sec) || ["明け","入り","不在","土日休日代休"].includes(sec)) return; if (this.skipSections.includes(sec)) { this.dayCells[sec] = ""; return; } let members = split(this.dayCells[sec]).map(m => { const core = extractStaffName(m); if (ROLE_PLACEHOLDERS.includes(core)) return m; const block = this.blockMap.get(core); const tt = this.timeTagMap.get(core); if (block === 'ALL') return null; if (tt && m.includes(tt)) return m; if (block === 'AM' && m.includes('(AM)')) return null; if (block === 'PM' && m.includes('(PM)')) return null; if (block === 'PM' && tt && m.includes('(AM)')) return `${core}${tt}`; if (block === 'AM' && !m.includes('(PM)') && !m.match(/\(.*\)/)) return `${core}(PM)`; if (block === 'PM' && !m.match(/\(.*\)/)) return `${core}${tt || '(AM)'}`; return m; }).filter(Boolean) as string[]; this.dayCells[sec] = join(members); }); }
   prepareAvailability() { const supportStaffList = split(this.ctx.customRules.supportStaffList || "").map(extractStaffName); this.initialAvailAll = this.ctx.allStaff.filter(s => this.blockMap.get(s) !== 'ALL').sort((a, b) => { if ((this.counts[a] || 0) !== (this.counts[b] || 0)) return (this.counts[a] || 0) - (this.counts[b] || 0); return a.localeCompare(b, 'ja'); }); this.initialAvailSupport = this.initialAvailAll.filter(s => supportStaffList.includes(s)); this.initialAvailGeneral = this.initialAvailAll.filter(s => this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s)); this.initialAvailReception = this.initialAvailAll.filter(s => this.ctx.activeReceptionStaff.includes(s) || (this.ctx.activeGeneralStaff.includes(s) && !supportStaffList.includes(s))); }
+
+  private applyCtPmGeneralHelpRules(): void {
+    const rules = this.ctx.customRules.ctPmHelpRules || [];
+    if (!rules.length) return;
+    rules.forEach((rule: any) => {
+      const sourceRoom = rule.section || "CT";
+      const min = Number(rule.min || 4);
+      const outCount = Number(rule.out || 1);
+      if (!sourceRoom || this.skipSections.includes(sourceRoom) || this.shouldSkipAutoAssignRoom(sourceRoom)) return;
+      const sourceCap = this.dynamicCapacity[sourceRoom] ?? (["CT", "MRI", "治療"].includes(sourceRoom) ? 3 : 1);
+      if (sourceCap < min) return;
+      let sourceMembers = split(this.dayCells[sourceRoom] || "");
+      const sourceLoad = sourceMembers.reduce((sum, m) => sum + (ROLE_PLACEHOLDERS.includes(extractStaffName(m)) ? 0 : getStaffAmount(m)), 0);
+      if (sourceLoad < min) return;
+      const fixedCores = new Set((this.ctx.customRules.fixed || []).filter((r: any) => r.section === sourceRoom).map((r: any) => extractStaffName(r.staff)));
+      const fullDayCandidates = sourceMembers
+        .filter(m => {
+          const core = extractStaffName(m);
+          return !ROLE_PLACEHOLDERS.includes(core) && !m.includes("(AM)") && !m.includes("(PM)") && !m.includes("〜") && !isLateStartEntry(m);
+        })
+        .sort((a, b) => {
+          const ca = extractStaffName(a); const cb = extractStaffName(b);
+          const fixedDiff = (fixedCores.has(ca) ? 1 : 0) - (fixedCores.has(cb) ? 1 : 0);
+          if (fixedDiff !== 0) return fixedDiff;
+          return (this.getPastRoomCount(cb, sourceRoom) - this.getPastRoomCount(ca, sourceRoom)) || ca.localeCompare(cb, 'ja');
+        });
+      if (!fullDayCandidates.length) return;
+      const targets = split(rule.targetRooms || rule.targets || "1号室、2号室、5号室、パノラマCT")
+        .filter(r => ROOM_SECTIONS.includes(r) && r !== sourceRoom && !this.skipSections.includes(r) && !this.shouldSkipAutoAssignRoom(r));
+      let moved = 0;
+      for (const entry of fullDayCandidates) {
+        if (moved >= outCount) break;
+        const core = extractStaffName(entry);
+        if (fixedCores.has(core) && fullDayCandidates.some(m => !fixedCores.has(extractStaffName(m)))) continue;
+        const target = targets.find(room => {
+          const baseCap = this.dynamicCapacity[room] ?? (["CT", "MRI", "治療"].includes(room) ? 3 : 1);
+          const eff = this.getEffectiveTarget(room, baseCap);
+          const members = split(this.dayCells[room] || "");
+          return !eff.allClosed && !eff.pmClosed && !members.map(extractStaffName).includes(core) && !this.isForbidden(core, room) && !this.isHalfDayBlocked(core, room).hard && !this.hasNGPair(core, members.map(extractStaffName), false) && (room === "MMG" ? this.isMmgCapable(core) : true) && this.canAddKenmu(core, room, true) && !this.isTimeTagBlockedByFullDayRule(room, "(PM)");
+        });
+        if (!target) continue;
+        sourceMembers = sourceMembers.map(m => m === entry ? core + "(AM)" : m);
+        this.dayCells[sourceRoom] = join(sourceMembers);
+        this.dayCells[target] = join([...split(this.dayCells[target] || ""), core + "(PM)"]);
+        this.log("🩻 [CT午後ヘルプ] " + sourceRoom + " が" + min + "人体制のため " + core + " を " + sourceRoom + "(AM)＋" + target + "(PM) にしました");
+        moved++;
+        this.refreshAssignmentState();
+      }
+    });
+  }
 
   execute(): DayData {
     this.logPhase("フェーズ1：前提処理"); this.initCounts();
@@ -2669,6 +2725,10 @@ export class AutoAssigner {
     this.enforceDsaFiveRoomPairing();
     this.enforceEmergencyClearedRoomsFinal();
     this.refreshAssignmentState();
+    this.applyCtPmGeneralHelpRules();
+    this.enforceDsaFiveRoomPairing();
+    this.enforceEmergencyClearedRoomsFinal();
+    this.refreshAssignmentState();
 
     this.logPhase("フェーズ5：仕上げ");
     if (!this.skipSections.includes("昼当番")) {
@@ -2839,14 +2899,16 @@ export default function App(): any {
     });
     const tempAvailCount = activeGeneralStaff.filter(s => blockMap.get(s) !== 'ALL').length;
     (customRules.emergencies || []).forEach((em: any) => {
-      if (em.type === "change_capacity" && em.section === room && tempAvailCount <= Number(em.threshold)) {
+      if (em.type === "change_capacity" && em.section === room && tempAvailCount < Number(em.threshold)) {
         cap = Number(em.newCapacity);
       }
     });
     return cap;
   };
   const getRoomRequiredCoverageAt = (dayId: string, room: string, minute: number) => {
-    const base = getTriggeredCapacityForWarning(dayId, room);
+    let base = getTriggeredCapacityForWarning(dayId, room);
+    const pmHelpRule = (customRules.ctPmHelpRules || []).find((r: any) => (r.section || "CT") === room && minute >= 13 * 60 && base >= Number(r.min || 4));
+    if (pmHelpRule) base = Math.max(0, base - Number(pmHelpRule.out || 1));
     const day = days.find(d => d.id === dayId);
     const dayChar = day?.label.match(/\((.*?)\)/)?.[1];
     if (!dayChar) return base;
@@ -3292,7 +3354,7 @@ export default function App(): any {
                                 let inlineStyle: React.CSSProperties = {
                                   background: tagBg,
                                   color: tagColor,
-                                  border: `2px solid ${tagBorder}`,
+                                  border: `1.5px solid ${tagBorder}`,
                                   padding: showKenmuMeta ? "8px 11px 9px" : "8px 12px",
                                   borderRadius: "10px",
                                   display: "flex",
@@ -3316,7 +3378,7 @@ export default function App(): any {
 
                                 const titleText = showKenmuMeta ? `兼務: ${sameDayRooms.join("、")}` : coreName;
 
-                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #7dd3fc", fontWeight: 900 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #f9a8d4", fontWeight: 900 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "2px solid #9ca3af", fontWeight: 900 }}>{mod.replace(/[()]/g, '')}</span>);
+                                const modNode = mod && (mod.includes("(AM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#bfdbfe" : "#e0f2fe", color: isHighlighted ? "#1e40af" : "#0369a1", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "1.5px solid #7dd3fc", fontWeight: 900 }}>AM</span> : mod.includes("(PM)") ? <span data-print-mod="1" style={{ background: isHighlighted ? "#fbcfe8" : "#fce7f3", color: isHighlighted ? "#9f1239" : "#be185d", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "1.5px solid #f9a8d4", fontWeight: 900 }}>PM</span> : <span data-print-mod="1" style={{ background: isHighlighted ? "#e2e8f0" : "#f3f4f6", color: isHighlighted ? "#334155" : "#4b5563", fontSize: "14.5px", padding: "2px 5px", borderRadius: "5px", border: "1.5px solid #9ca3af", fontWeight: 900 }}>{mod.replace(/[()]/g, '')}</span>);
 
                                 return (
                                   <div key={mIdx} className="btn-hover" data-print-chip="1" 
@@ -3342,7 +3404,7 @@ export default function App(): any {
                                           padding: roomCount >= 4 ? "1px 6px" : roomCount === 2 ? "2px 8px" : "1px 5px",
                                           background: isHighlighted ? "rgba(255,255,255,0.16)" : countBg,
                                           color: isHighlighted ? "#fff" : countColor,
-                                          border: isHighlighted ? "2px solid rgba(255,255,255,0.45)" : `2px solid ${metaBorder}`,
+                                          border: isHighlighted ? "1.5px solid rgba(255,255,255,0.45)" : `1.5px solid ${metaBorder}`,
                                           borderRadius: "999px",
                                           fontSize: roomCount === 2 ? "13.5px" : "13px",
                                           fontWeight: 900,
@@ -3361,7 +3423,7 @@ export default function App(): any {
                                         padding: roomCount >= 3 ? "2px 7px" : "2px 6px",
                                         background: isHighlighted ? "rgba(255,255,255,0.16)" : metaBg,
                                         color: isHighlighted ? "#fff" : metaColor,
-                                        border: isHighlighted ? "2px solid rgba(255,255,255,0.45)" : `2px solid ${metaBorder}`,
+                                        border: isHighlighted ? "1.5px solid rgba(255,255,255,0.45)" : `1.5px solid ${metaBorder}`,
                                         borderRadius: "999px",
                                         fontSize: roomCount >= 3 ? "13px" : "13px",
                                         fontWeight: 900,
@@ -3623,7 +3685,7 @@ export default function App(): any {
              <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleImport} />
              <div style={{ width: "2px", height: "32px", background: "#cbd5e1", margin: "0 8px" }}></div>
              <button className="btn-hover" onClick={handleCopyToClipboard} style={btnStyle("#db2777")}>📋 テキストコピー</button>
-             <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "10px 16px", fontSize: 17, borderRadius: 8, border: "2px solid #f9a8d4" }} />
+             <input type="text" value={importText} onChange={e => setImportText(e.target.value)} placeholder="貼り付けて復元" style={{ flex: 1, padding: "10px 16px", fontSize: 17, borderRadius: 8, border: "1.5px solid #f9a8d4" }} />
              <button className="btn-hover" onClick={handleTextImport} style={btnStyle("#be185d")}>✨ 復元</button>
           </div>
         </div>
@@ -3687,7 +3749,7 @@ export default function App(): any {
                       <select className="rule-sel" value={em.type} onChange={(e:any) => updateRule("emergencies", idx, "type", e.target.value)}>
                         <option value="change_capacity">出勤人数が指定以下の場合</option><option value="staff_assign">出勤人数が指定以下の場合（強制配置）</option><option value="role_assign">出勤人数が指定以下の場合（月間担当）</option><option value="clear">出勤人数が指定以下の場合（部屋閉鎖）</option><option value="empty_room_swap">指定の部屋が空室の場合</option>
                       </select>
-                      {em.type !== 'empty_room_swap' && <><NumInp v={em.threshold || 0} onChange={(v:any)=>updateRule("emergencies", idx, "threshold", v)} w={60} />人以下</>}
+                      {em.type !== 'empty_room_swap' && <><NumInp v={em.threshold || 0} onChange={(v:any)=>updateRule("emergencies", idx, "threshold", v)} w={60} />{em.type === 'change_capacity' ? '人未満' : '人以下'}</>}
                       {em.type === 'empty_room_swap' && <><RoomSel v={em.section} onChange={(v:any)=>updateRule("emergencies", idx, "section", v)} list={ROOM_SECTIONS} ph="監視する部屋" /> が空室</>}
                     </div>
                     <div style={{ flex: '1 1 400px', display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '8px' }}>
@@ -3884,6 +3946,23 @@ export default function App(): any {
                   </div>
               ))}
               <button className="rule-add" style={{color:"#6d28d9", borderColor:"#c4b5fd"}} onClick={() => addRule("lateShifts", { section: "", lateTime: "(17:00〜)", dayEndTime: "(〜17:00)", fromSecondUseInWeek: false })}>＋ 遅番ルールを追加</button>
+            </RuleCard>
+
+            <RuleCard bg="#eff6ff" border="#bfdbfe" color="#1d4ed8" icon="🩻" title="CT午後ヘルプルール">
+              <div style={{ marginBottom: 14, color: "#1e40af", fontSize: 15, lineHeight: 1.6 }}>CTが指定人数以上で動ける日は、指定人数ぶんをCT午前＋一般撮影午後ヘルプにします。緊急定員でCT3人化した日は発動しません。</div>
+              {(customRules.ctPmHelpRules || []).map((rule: any, idx: number) => (
+                <div key={idx} className="rule-row" style={{ background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #bfdbfe" }}>
+                  <RoomSel v={rule.section || "CT"} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "section", v)} list={ROOM_SECTIONS} />
+                  <span className="rule-label" style={{color:"#1d4ed8"}}>が</span>
+                  <NumInp v={rule.min || 4} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "min", v)} w={60} />
+                  <span className="rule-label" style={{color:"#1d4ed8"}}>人以上なら</span>
+                  <NumInp v={rule.out || 1} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "out", v)} w={60} />
+                  <span className="rule-label" style={{color:"#1d4ed8"}}>人をPMから一般撮影ヘルプへ。行き先:</span>
+                  <MultiPicker selected={rule.targetRooms || ""} onChange={(v: string)=>updateRule("ctPmHelpRules", idx, "targetRooms", v)} options={ROOM_SECTIONS} placeholder="＋ヘルプ先" />
+                  <DelBtn onClick={()=>removeRule("ctPmHelpRules", idx)} />
+                </div>
+              ))}
+              <button className="rule-add" style={{color:"#1d4ed8", borderColor:"#93c5fd"}} onClick={() => addRule("ctPmHelpRules", { section: "CT", min: 4, out: 1, targetRooms: "1号室、2号室、5号室、パノラマCT" })}>＋ CT午後ヘルプルールを追加</button>
             </RuleCard>
 
             <RuleCard bg="#fff1f2" border="#fecaca" color="#be185d" icon="⚠️" title="兼務上限のストッパー設定">
@@ -4163,5 +4242,6 @@ const formatPrintMember = (m: string) => m
   .replace("(16:00〜)", " 16:00〜")
   .replace("(12:15〜13:00)", " 12:15〜13:00")
   .trim();
+
 
 
