@@ -34,7 +34,7 @@ const globalStyle = `
   .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
   .rule-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; width: 100%; }
   .rule-sel, .rule-num { padding: 9px 12px; border-radius: 6px; border: 2px solid #64748b; font-weight: 900; font-size: 17px; transition: border-color 0.2s; color: #111827; }
-  .rule-num { width: 86px; min-width: 86px; text-align: center; flex: 0 0 86px; padding: 8px 10px !important; font-size: 19px !important; line-height: 1.2 !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  .rule-num { width: 96px; min-width: 96px; text-align: center; flex: 0 0 96px; max-width: none; padding: 8px 10px !important; font-size: 19px !important; line-height: 1.2 !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
   input[type=number].rule-num::-webkit-inner-spin-button, input[type=number].rule-num::-webkit-outer-spin-button { margin: 0; }
   .rule-del { border: none; background: none; color: #ef4444; cursor: pointer; font-size: 24px; flex-shrink: 0; padding: 0 8px; transition: 0.2s; }
   .rule-del:hover { background: #fee2e2; border-radius: 6px; }
@@ -414,7 +414,20 @@ export const RuleCard = ({ bg, border, color, icon, title, desc, children }: any
 export const MultiPicker = ({ selected, onChange, options, placeholder }: any) => { const current = split(selected); const handleAdd = (val: string) => { if (val && !current.includes(val)) onChange(join([...current, val])); }; const handleRemove = (idx: number) => { const next = [...current]; next.splice(idx, 1); onChange(join(next)); }; return ( <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, marginBottom: 8 }}>{current.map((item, i) => ( <div key={i} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 16, padding: "6px 12px", fontSize: 15, fontWeight: 700, border: "1px solid #bae6fd", display: "flex", alignItems: "center", gap: 6 }}><span>{item}</span><span onClick={() => handleRemove(i)} style={{ cursor: "pointer", opacity: 0.5 }}>✖</span></div> ))} <select className="rule-sel" onChange={(e: any) => { handleAdd(e.target.value); e.target.value = ""; }} value=""><option value="">{placeholder || "＋追加"}</option>{options.filter((s: string) => !current.includes(s)).map((s: string) => <option key={s} value={s}>{s}</option>)}</select></div> ); };
 
 export const DelBtn = ({onClick}:any) => <button onClick={onClick} className="rule-del">✖</button>;
-export const NumInp = ({v, onChange, w}:any) => { const ww = w || 86; return <input type="number" value={v} onChange={e=>onChange(Number(e.target.value))} className="rule-num" style={{width: ww, minWidth: ww, flex: `0 0 ${typeof ww === "number" ? `${ww}px` : ww}`}} />; };
+export const NumInp = ({v, onChange, w}:any) => {
+  const rawWidth = w ?? 96;
+  const ww = typeof rawWidth === "number" ? Math.max(rawWidth, 96) : rawWidth;
+  const flexBasis = typeof ww === "number" ? ww + "px" : ww;
+  return (
+    <input
+      type="number"
+      value={v}
+      onChange={e=>onChange(Number(e.target.value))}
+      className="rule-num"
+      style={{ width: ww, minWidth: ww, flex: "0 0 " + flexBasis, maxWidth: "none" }}
+    />
+  );
+};
 export const Row = ({children}:any) => <div className="rule-row">{children}</div>;
 export const StaffSel = ({v, onChange, list, ph="スタッフ", w}:any) => <select value={v} onChange={e=>onChange(e.target.value)} className="rule-sel" style={{width:w, flex:"0 0 auto"}}><option value="">{ph}</option>{list.map((s:any)=><option key={s} value={s}>{s}</option>)}</select>;
 export const RoomSel = ({v, onChange, list, ph="場所", w}:any) => <select value={v} onChange={e=>onChange(e.target.value)} className="rule-sel" style={{width:w, flex:"0 0 auto"}}><option value="">{ph}</option>{list.map((s:any)=><option key={s} value={s}>{s}</option>)}</select>;
@@ -3750,12 +3763,12 @@ export default function App(): any {
                       <select className="rule-sel" value={em.type} onChange={(e:any) => updateRule("emergencies", idx, "type", e.target.value)}>
                         <option value="change_capacity">出勤人数が指定以下の場合</option><option value="staff_assign">出勤人数が指定以下の場合（強制配置）</option><option value="role_assign">出勤人数が指定以下の場合（月間担当）</option><option value="clear">出勤人数が指定以下の場合（部屋閉鎖）</option><option value="empty_room_swap">指定の部屋が空室の場合</option>
                       </select>
-                      {em.type !== 'empty_room_swap' && <><NumInp v={em.threshold || 0} onChange={(v:any)=>updateRule("emergencies", idx, "threshold", v)} w={60} />{em.type === 'change_capacity' ? '人未満' : '人以下'}</>}
+                      {em.type !== 'empty_room_swap' && <><NumInp v={em.threshold || 0} onChange={(v:any)=>updateRule("emergencies", idx, "threshold", v)} w={96} />{em.type === 'change_capacity' ? '人未満' : '人以下'}</>}
                       {em.type === 'empty_room_swap' && <><RoomSel v={em.section} onChange={(v:any)=>updateRule("emergencies", idx, "section", v)} list={ROOM_SECTIONS} ph="監視する部屋" /> が空室</>}
                     </div>
                     <div style={{ flex: '1 1 400px', display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '8px' }}>
                        <span style={{fontWeight: 800, color: '#3b82f6', flexShrink: 0}}>➔【アクション】</span>
-                       {em.type === 'change_capacity' && <><RoomSel v={em.section} onChange={(v:any)=>updateRule("emergencies", idx, "section", v)} list={ROOM_SECTIONS} /> の定員を <NumInp v={em.newCapacity||1} onChange={(v:any)=>updateRule("emergencies", idx, "newCapacity", v)} w={60} /> 名にする</>}
+                       {em.type === 'change_capacity' && <><RoomSel v={em.section} onChange={(v:any)=>updateRule("emergencies", idx, "section", v)} list={ROOM_SECTIONS} /> の定員を <NumInp v={em.newCapacity||1} onChange={(v:any)=>updateRule("emergencies", idx, "newCapacity", v)} w={96} /> 名にする</>}
                        {em.type === 'staff_assign' && <><StaffSel v={em.staff} onChange={(v:any)=>updateRule("emergencies", idx, "staff", v)} list={activeGeneralStaff} /> を <RoomSel v={em.section} onChange={(v:any)=>updateRule("emergencies", idx, "section", v)} list={ROOM_SECTIONS} /> に配置</>}
                        {em.type === 'role_assign' && <><select className="rule-sel" value={em.role} onChange={(e:any)=>updateRule("emergencies", idx, "role", e.target.value)}><option value="">月間設定</option>{MONTHLY_CATEGORIES.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select> を <RoomSel v={em.section} onChange={(v:any)=>updateRule("emergencies", idx, "section", v)} list={ROOM_SECTIONS} /> に配置</>}
                        {em.type === 'clear' && <><RoomSel v={em.section} onChange={(v:any)=>updateRule("emergencies", idx, "section", v)} list={ROOM_SECTIONS} /> を無人にする</>}
@@ -3846,7 +3859,7 @@ export default function App(): any {
                 {Object.entries(customRules.capacity || {}).map(([room, count]) => (
                   <div key={room} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", padding: "10px 16px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
                     <span style={{ fontWeight: 800, fontSize: 19 }}>{room}:</span>
-                    <NumInp v={count} onChange={(v:any)=>setCustomRules({...customRules, capacity: {...customRules.capacity, [room]: v}})} w={60} />
+                    <NumInp v={count} onChange={(v:any)=>setCustomRules({...customRules, capacity: {...customRules.capacity, [room]: v}})} w={96} />
                     <span style={{fontSize: 17}}>人</span>
                     <span onClick={() => { const n={...customRules.capacity}; delete n[room]; setCustomRules({...customRules, capacity:n}); }} style={{ cursor: "pointer", color: "#ef4444", marginLeft: 8, fontSize: 21 }}>✖</span>
                   </div>
@@ -3955,9 +3968,9 @@ export default function App(): any {
                 <div key={idx} className="rule-row" style={{ background: "#fff", padding: 14, borderRadius: 10, border: "1px solid #bfdbfe" }}>
                   <RoomSel v={rule.section || "CT"} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "section", v)} list={ROOM_SECTIONS} />
                   <span className="rule-label" style={{color:"#1d4ed8"}}>が</span>
-                  <NumInp v={rule.min || 4} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "min", v)} w={60} />
+                  <NumInp v={rule.min || 4} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "min", v)} w={96} />
                   <span className="rule-label" style={{color:"#1d4ed8"}}>人以上なら</span>
-                  <NumInp v={rule.out || 1} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "out", v)} w={60} />
+                  <NumInp v={rule.out || 1} onChange={(v:any)=>updateRule("ctPmHelpRules", idx, "out", v)} w={96} />
                   <span className="rule-label" style={{color:"#1d4ed8"}}>人をPMから一般撮影ヘルプへ。行き先:</span>
                   <MultiPicker selected={rule.targetRooms || ""} onChange={(v: string)=>updateRule("ctPmHelpRules", idx, "targetRooms", v)} options={ROOM_SECTIONS} placeholder="＋ヘルプ先" />
                   <DelBtn onClick={()=>removeRule("ctPmHelpRules", idx)} />
@@ -3968,7 +3981,7 @@ export default function App(): any {
 
             <RuleCard bg="#fff1f2" border="#fecaca" color="#be185d" icon="⚠️" title="兼務上限のストッパー設定">
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <NumInp v={customRules.alertMaxKenmu ?? 3} onChange={(v:any)=>setCustomRules({...customRules, alertMaxKenmu: v})} w={80} />
+                <NumInp v={customRules.alertMaxKenmu ?? 3} onChange={(v:any)=>setCustomRules({...customRules, alertMaxKenmu: v})} w={96} />
                 <span style={{ fontSize: 17, fontWeight: 700, color: "#9f1239" }}>部屋以上の兼務は自動ブロック（手動時はエラー表示）</span>
               </div>
             </RuleCard>
@@ -3998,7 +4011,7 @@ export default function App(): any {
             
             <RuleCard bg="#eef2ff" border="#c7d2fe" color="#4338ca" icon="🍱" title="昼当番ルール">
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, background: "#fff", padding: "12px 20px", borderRadius: 10, border: "1px solid #c7d2fe", width: "fit-content" }}>
-                  <span style={{ fontSize: 19, fontWeight: 800, color: "#3730a3" }}>基本の人数:</span><NumInp v={customRules.lunchBaseCount ?? 3} onChange={(v:any)=>setCustomRules({...customRules, lunchBaseCount: v})} w={80} />
+                  <span style={{ fontSize: 19, fontWeight: 800, color: "#3730a3" }}>基本の人数:</span><NumInp v={customRules.lunchBaseCount ?? 3} onChange={(v:any)=>setCustomRules({...customRules, lunchBaseCount: v})} w={96} />
               </div>
 
               <div style={{ background: "#fff", padding: 24, borderRadius: 12, border: "1px solid #e0e7ff", marginBottom: 20 }}>
